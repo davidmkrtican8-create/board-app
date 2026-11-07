@@ -46,7 +46,9 @@ function apply(s, op) {
       if (!k || !ID.test(k.id) || !Array.isArray(k.pts) || k.pts.length > 20000 || !/^#[0-9a-f]{3,6}$/i.test(k.c)) return false;
       const kind = KINDS.includes(k.k) ? k.k : 'pen';
       if (kind !== 'pen' && k.pts.length !== 4) return false;
-      (st[op.page] = st[op.page] || {})[k.id] = { k: kind, pts: k.pts.map(Number), c: k.c, w: num(k.w, 1, 30, 4) };
+      const pts = k.pts.map(Number);
+      if (!pts.every(Number.isFinite)) return false;
+      (st[op.page] = st[op.page] || {})[k.id] = { k: kind, pts, c: k.c, w: num(k.w, 0.05, 300, 4) };
       return true;
     }
     case 'image': {
@@ -54,12 +56,12 @@ function apply(s, op) {
       if (!g || !ID.test(g.id) || typeof g.src !== 'string' || g.src.length > 900000 || !IMG.test(g.src)) return false;
       const m = (im[op.page] = im[op.page] || {});
       if (!m[g.id] && Object.keys(m).length >= 40) return false;
-      m[g.id] = { src: g.src, x: num(g.x, -3000, 6000, 0), y: num(g.y, -3000, 6000, 0), w: num(g.w, 20, 3000, 200), h: num(g.h, 20, 3000, 200) };
+      m[g.id] = { src: g.src, x: num(g.x, -1e6, 1e6, 0), y: num(g.y, -1e6, 1e6, 0), w: num(g.w, 1, 1e5, 200), h: num(g.h, 1, 1e5, 200) };
       return true;
     }
     case 'imgset': {
       const g = (im[op.page] || {})[op.id];
-      if (g) { g.x = num(op.x, -3000, 6000, g.x); g.y = num(op.y, -3000, 6000, g.y); g.w = num(op.w, 20, 3000, g.w); g.h = num(op.h, 20, 3000, g.h); }
+      if (g) { g.x = num(op.x, -1e6, 1e6, g.x); g.y = num(op.y, -1e6, 1e6, g.y); g.w = num(op.w, 1, 1e5, g.w); g.h = num(op.h, 1, 1e5, g.h); }
       return true;
     }
     case 'erase': if (st[op.page]) delete st[op.page][op.id]; if (im[op.page]) delete im[op.page][op.id]; return true;
