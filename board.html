@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Общая доска</title>
+<style>
+:root{--bg:#f4f1fa;--panel:#fff;--tx:#201c2b;--mut:#6b6580;--ac:#6a3fc4;--bd:#ddd6ee}
+@media (prefers-color-scheme:dark){:root{--bg:#17141f;--panel:#221e2e;--tx:#ece8f5;--mut:#9a93b0;--ac:#a98bf0;--bd:#3a3450}}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex}
+#side{width:200px;background:var(--panel);border-right:1px solid var(--bd);display:flex;flex-direction:column;padding:10px;gap:6px;overflow:auto}
+.pg{padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pg.on{background:color-mix(in srgb,var(--ac) 16%,transparent);border-color:var(--ac)}
+button,select,input{font:inherit;color:var(--tx);background:var(--panel);border:1px solid var(--bd);border-radius:8px;padding:6px 10px}
+button{cursor:pointer}button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+#main{flex:1;min-width:0;display:flex;flex-direction:column;padding:10px;gap:8px}
+#bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#title{flex:1;min-width:140px;font-weight:600}
+.sw{width:26px;height:26px;border-radius:50%;padding:0;border:2px solid var(--bd)}.sw.on{outline:2px solid var(--ac)}
+#wrap{flex:1;min-height:0;overflow:auto;border:1px solid var(--bd);border-radius:10px;background:#fff}
+canvas{display:block;width:100%;height:auto;touch-action:none;cursor:crosshair}
+#st{font-size:12px;color:var(--mut)}
+@media (max-width:640px){body{flex-direction:column}#side{width:100%;flex-direction:row;align-items:center;border-right:0;border-bottom:1px solid var(--bd);padding:6px}#pl{display:flex;gap:6px}.pg{flex:none}}
+</style>
+</head>
+<body>
+<div id="side"><div id="pl"></div><button id="add">+ Страница</button><button id="cp">Копировать ссылку</button></div>
+<div id="main">
+ <div id="bar">
+  <input id="title" placeholder="Название страницы">
+  <button id="pen" class="on">Перо</button><button id="er">Ластик</button>
+  <span id="cols"></span>
+  <select id="wd"><option value="3">Тонко</option><option value="5" selected>Средне</option><option value="10">Толсто</option></select>
+  <select id="bgs"><option value="grid">Клетка</option><option value="line">Линейка</option><option value="none">Чистый</option></select>
+  <button id="clr">Очистить</button>
+  <span id="st">Подключение…</span>
+ </div>
+ <div id="wrap"><canvas id="cv" width="1600" height="1000"></canvas></div>
+</div>
+<script>
+(function(){
+var W=1600,H=1000,cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+var room=location.pathname.split('/')[2],me=Math.random().toString(36).slice(2),
+    pages=[],strokes={},page=null,live={},tool='pen',color='#1a1a1a',bg='grid',cur=null,lastEmit=0;
+var $=function(i){return document.getElementById(i)};
+function send(op){op.from=me;return fetch('/api/'+room+'/op',{method:'POST',body:JSON.stringify(op)}).catch(function(){$('st').textContent='Нет связи с сервером'})}
+function newId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+
+function drawStroke(s){var p=s.pts;if(!p||p.length<2)return;
+ ctx.strokeStyle=s.c;ctx.lineWidth=s.w;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(p[0],p[1]);
+ for(var i=2;i<p.length;i+=2)ctx.lineTo(p[i],p[i+1]);if(p.length===2)ctx.lineTo(p[0]+.1,p[1]);ctx.stroke()}
+function redraw(){
+ ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.strokeStyle='#dfe6f2';ctx.lineWidth=1;ctx.beginPath();
+ if(bg==='grid'){for(var x=0;x<=W;x+=40){ctx.moveTo(x,0);ctx.lineTo(x,H)}for(var y=0;y<=H;y+=40){ctx.moveTo(0,y);ctx.lineTo(W,y)}}
+ if(bg==='line'){for(var y2=60;y2<=H;y2+=50){ctx.moveTo(0,y2);ctx.lineTo(W,y2)}}
+ ctx.stroke();
+ var ps=strokes[page]||{};for(var id in ps)drawStroke(ps[id]);
+ for(var k in live)if(live[k].page===page)drawStroke(live[k]);
+ if(cur&&cur.pts)drawStroke(cur);
+}
+function renderPages(){var b=$('pl');b.innerHTML='';
+ pages.forEach(function(p){var d=document.createElement('div');d.className='pg'+(p.id===page?' on':'');
+  d.textContent=p.title||'Без названия';d.onclick=function(){openPage(p.id)};b.appendChild(d)})}
+function openPage(id){page=id;live={};renderPages();redraw();
+ var p=pages.filter(function(x){return x.id===id})[0];$('title').value=p?p.title:''}
+
+// входящие события (свои тоже приходят от сервера — применение идемпотентно)
+function onOp(o){
+ if(o.t==='init'){pages=o.s.pages;strokes=o.s.strokes;if(!page||!pages.some(function(p){return p.id===page}))page=pages[0].id;openPage(page);return}
+ if(o.t==='peers'){$('st').textContent='Онлайн: '+o.n;return}
+ if(o.t==='live'){if(o.from!==me){live[o.from]={page:o.page,c:o.c,w:o.w,pts:o.pts};redraw()}return}
+ if(o.t==='stroke'){(strokes[o.page]=strokes[o.page]||{})[o.stroke.id]=o.stroke;if(o.from)delete live[o.from]}
+ if(o.t==='erase'&&strokes[o.page])delete strokes[o.page][o.id];
+ if(o.t==='clear')strokes[o.page]={};
+ if(o.t==='addPage'&&!pages.some(function(p){return p.id===o.id}))pages.push({id:o.id,title:o.title});
+ if(o.t==='title')pages.forEach(function(p){if(p.id===o.id)p.title=o.title});
+ renderPages();redraw();
+ if(o.t==='title'&&o.id===page&&document.activeElement!==$('title'))$('title').value=o.title;
+}
+var es=new EventSource('/api/'+room+'/events');
+es.onmessage=function(e){onOp(JSON.parse(e.data))};
+es.onerror=function(){$('st').textContent='Переподключение…'};
+
+function pos(e){var r=cv.getBoundingClientRect();return[Math.round((e.clientX-r.left)*W/r.width),Math.round((e.clientY-r.top)*H/r.height)]}
+function eraseAt(x,y){var ps=strokes[page]||{};
+ for(var id in ps){var p=ps[id].pts;for(var i=0;i<p.length;i+=2){
+  if(Math.abs(p[i]-x)<24&&Math.abs(p[i+1]-y)<24){delete ps[id];send({t:'erase',page:page,id:id});break}}}
+ redraw()}
+cv.addEventListener('pointerdown',function(e){if(!page)return;e.preventDefault();cv.setPointerCapture(e.pointerId);var p=pos(e);
+ if(tool==='er'){cur={erasing:1};eraseAt(p[0],p[1]);return}
+ cur={id:newId(),pts:[p[0],p[1]],c:color,w:+$('wd').value};redraw()});
+cv.addEventListener('pointermove',function(e){if(!cur)return;var p=pos(e);
+ if(cur.erasing){eraseAt(p[0],p[1]);return}
+ cur.pts.push(p[0],p[1]);redraw();var n=Date.now();
+ if(n-lastEmit>80){lastEmit=n;send({t:'live',page:page,c:cur.c,w:cur.w,pts:cur.pts})}});
+function end(){if(!cur)return;var s=cur;cur=null;if(s.erasing)return;
+ (strokes[page]=strokes[page]||{})[s.id]={pts:s.pts,c:s.c,w:s.w};redraw();
+ send({t:'stroke',page:page,stroke:{id:s.id,pts:s.pts,c:s.c,w:s.w}})}
+cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
+
+$('add').onclick=function(){var id='p'+newId();send({t:'addPage',id:id,title:'Страница '+(pages.length+1)});openPage(id)};
+$('title').onchange=function(){send({t:'title',id:page,title:$('title').value.trim()||'Без названия'})};
+$('pen').onclick=function(){tool='pen';$('pen').className='on';$('er').className=''};
+$('er').onclick=function(){tool='er';$('er').className='on';$('pen').className=''};
+$('bgs').onchange=function(){bg=$('bgs').value;redraw()};
+$('clr').onclick=function(){if(confirm('Очистить страницу для всех?')){strokes[page]={};redraw();send({t:'clear',page:page})}};
+$('cp').onclick=function(){var t=location.href;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(function(){$('cp').textContent='Скопировано'},function(){prompt('Ссылка:',t)});setTimeout(function(){$('cp').textContent='Копировать ссылку'},1500)};
+['#1a1a1a','#d32f2f','#1565c0','#2e7d32','#ef6c00','#7b1fa2'].forEach(function(c,i){
+ var b=document.createElement('button');b.className='sw'+(i?'':' on');b.style.background=c;
+ b.onclick=function(){color=c;$('pen').click();[].forEach.call(document.querySelectorAll('.sw'),function(x){x.classList.remove('on')});b.classList.add('on')};
+ $('cols').appendChild(b)});
+redraw();
+})();
+</script>
+</body>
+</html>
