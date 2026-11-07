@@ -6,7 +6,9 @@ const ADMIN = process.env.ADMIN_KEY || '';
 fs.mkdirSync(DIR, { recursive: true });
 const rooms = {};
 const ID = /^[\w-]{1,40}$/, RID = /^[a-z0-9]{4,32}$/;
-const KINDS = ['pen', 'line', 'arrow', 'rect', 'ellipse'];
+const KINDS = ['pen', 'line', 'arrow', 'rect', 'ellipse', 'poly'];
+const ICE = (() => { try { return JSON.parse(process.env.ICE_SERVERS || ''); } catch (e) { return null; } })()
+  || [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }];
 const IMG = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/=]+$/;
 const COLORS = ['#4caf50', '#1e4f8f', '#e8702a', '#a3238e', '#c4a67a', '#8a9a9f', '#d93025', '#f5c242', '#2a6bb0', '#b0254f', '#8bc34a', '#5b2d90', '#3a9ad9'];
 const IDX = path.join(DIR, '_index.json');
@@ -25,7 +27,7 @@ function room(id) {
     s = { pages: [{ id: 'p1', title: 'Доска 1' }], strokes: {} };
   }
   s.images = s.images || {};
-  return (rooms[id] = { id, s, clients: new Set(), timer: null });
+  return (rooms[id] = { id, s, clients: new Set(), timer: null, call: new Set() });
 }
 function save(r) {
   clearTimeout(r.timer);
@@ -45,7 +47,7 @@ function apply(s, op) {
       const k = op.stroke;
       if (!k || !ID.test(k.id) || !Array.isArray(k.pts) || k.pts.length > 20000 || !/^#[0-9a-f]{3,6}$/i.test(k.c)) return false;
       const kind = KINDS.includes(k.k) ? k.k : 'pen';
-      if (kind !== 'pen' && k.pts.length !== 4) return false;
+      if (kind === 'poly' ? (k.pts.length < 6 || k.pts.length > 40 || k.pts.length % 2) : (kind !== 'pen' && k.pts.length !== 4)) return false;
       const pts = k.pts.map(Number);
       if (!pts.every(Number.isFinite)) return false;
       (st[op.page] = st[op.page] || {})[k.id] = { k: kind, pts, c: k.c, w: num(k.w, 0.05, 300, 4) };
@@ -71,6 +73,7 @@ function apply(s, op) {
       if (!s.pages.some(p => p.id === op.id)) s.pages.push({ id: op.id, title: String(op.title || '').slice(0, 80) });
       return true;
     case 'title': { const p = s.pages.find(p => p.id === op.id); if (p) p.title = String(op.title || '').slice(0, 80); return true; }
+    case 'rtc': return ['hello', 'here', 'offer', 'answer', 'ice', 'bye'].includes(op.kind) && RID.test(String(op.from)) && (!op.to || RID.test(String(op.to))) && JSON.stringify(op.data || null).length < 30000;
     case 'live': return true;
   }
   return false;
@@ -128,23 +131,29 @@ function admin(req, res, u) {
 http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   if (u.pathname.startsWith('/api/admin/')) return admin(req, res, u);
+  if (u.pathname === '/api/ice') return json(res, ICE);
   const m = u.pathname.match(/^\/api\/([a-z0-9]{4,32})\/(events|op)$/);
   if (m) {
     const r = room(m[1]);
     if (!r) { res.writeHead(404); return res.end(); }
     if (m[2] === 'events' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' });
-      res.write('data: ' + JSON.stringify({ t: 'init', s: r.s, name: nameOf(r.id) }) + '\n\n');
+      const cid = String(u.searchParams.get('c') || '');
+      res.write('data: ' + JSON.stringify({ t: 'init', s: r.s, name: nameOf(r.id), call: [...r.call] }) + '\n\n');
       r.clients.add(res);
       bcast(r, { t: 'peers', n: r.clients.size });
       const ping = setInterval(() => res.write(': ping\n\n'), 20000);
-      req.on('close', () => { clearInterval(ping); r.clients.delete(res); bcast(r, { t: 'peers', n: r.clients.size }); });
+      req.on('close', () => {
+        clearInterval(ping); r.clients.delete(res); bcast(r, { t: 'peers', n: r.clients.size });
+        if (RID.test(cid) && r.call.delete(cid)) bcast(r, { t: 'rtc', kind: 'bye', from: cid });
+      });
       return;
     }
     if (m[2] === 'op' && req.method === 'POST') return body(req, res, 1.2e6, op => {
       if (!apply(r.s, op)) { res.writeHead(400); return res.end(); }
+      if (op.t === 'rtc') { if (op.kind === 'hello') r.call.add(op.from); if (op.kind === 'bye') r.call.delete(op.from); }
       bcast(r, op);
-      if (op.t !== 'live') save(r);
+      if (op.t !== 'live' && op.t !== 'rtc') save(r);
       res.writeHead(204); res.end();
     });
   }

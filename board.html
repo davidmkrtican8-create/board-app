@@ -39,7 +39,9 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
   <select id="wd"><option value="3">Тонко</option><option value="5" selected>Средне</option><option value="10">Толсто</option></select>
   <select id="bgs"><option value="grid">Клетка</option><option value="line">Линейка</option><option value="none">Чистый</option></select>
   <button id="zo" title="Уменьшить">−</button><button id="zi" title="Увеличить">+</button><button id="fit">Показать всё</button>
+  <label style="font-size:13px;white-space:nowrap"><input type="checkbox" id="snap" checked style="padding:0"> Ровные фигуры</label>
   <button id="undo">Отменить</button>
+  <button id="call">Звонок</button><button id="mute" hidden>Микрофон: вкл</button><span id="cs" style="font-size:12px"></span>
   <button id="img">Картинка</button><input type="file" id="fi" accept="image/*" hidden>
   <button id="clr">Очистить</button>
   <span id="st">Подключение…</span>
@@ -49,9 +51,10 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
 <script>
 (function(){
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),wrap=document.getElementById('wrap');
-const room=location.pathname.split('/')[2],me=Math.random().toString(36).slice(2);
+const room=location.pathname.split('/')[2],me='c'+Math.random().toString(36).slice(2,10).padEnd(8,'0');
 let pages=[],strokes={},images={},page=null,live={},color='#1a1a1a',bg='grid',cur=null,lastEmit=0,mine=[],redo=[];
-let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false;
+let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,call=null;
+const callers=new Set();
 const views={},imgEl={},ptrs=new Map();
 const $=i=>document.getElementById(i),tool=()=>$('tool').value;
 const send=op=>{op.from=me;return fetch('/api/'+room+'/op',{method:'POST',body:JSON.stringify(op)}).catch(()=>{$('st').textContent='Нет связи с сервером'})};
@@ -73,6 +76,7 @@ function drawStroke(s){
   if(n===1)ctx.lineTo(p[0]+.01,p[1]);
   else if(n===2)ctx.lineTo(p[2],p[3]);
   else{for(let i=1;i<n-1;i++)ctx.quadraticCurveTo(p[2*i],p[2*i+1],(p[2*i]+p[2*i+2])/2,(p[2*i+1]+p[2*i+3])/2);ctx.lineTo(p[2*n-2],p[2*n-1])}
+ }else if(k==='poly'){ctx.moveTo(p[0],p[1]);for(let i=2;i<p.length;i+=2)ctx.lineTo(p[i],p[i+1]);ctx.closePath()
  }else if(p.length>=4){
   const x0=p[0],y0=p[1],x1=p[2],y1=p[3];
   if(k==='line'||k==='arrow'){
@@ -89,7 +93,8 @@ function samples(s){ // контур фигуры точками (для лас�
  const p=s.pts,k=s.k||'pen';if(k==='pen'||p.length<4)return p;
  const x0=p[0],y0=p[1],x1=p[2],y1=p[3],o=[];
  const seg=(ax,ay,bx,by)=>{for(let i=0;i<=12;i++){const t=i/12;o.push(ax+(bx-ax)*t,ay+(by-ay)*t)}};
- if(k==='line'||k==='arrow')seg(x0,y0,x1,y1);
+ if(k==='poly'){for(let i=0;i<p.length;i+=2){const j=(i+2)%p.length;seg(p[i],p[i+1],p[j],p[j+1])}}
+ else if(k==='line'||k==='arrow')seg(x0,y0,x1,y1);
  else if(k==='rect'){seg(x0,y0,x1,y0);seg(x1,y0,x1,y1);seg(x1,y1,x0,y1);seg(x0,y1,x0,y0)}
  else for(let i=0;i<=48;i++){const t=i/48*6.2832;o.push((x0+x1)/2+Math.cos(t)*(x1-x0)/2,(y0+y1)/2+Math.sin(t)*(y1-y0)/2)}
  return o;
@@ -128,7 +133,8 @@ function openPage(id){page=id;live={};view=views[id]||(views[id]=defView());rend
  const p=pages.filter(x=>x.id===id)[0];$('title').value=p?p.title:''}
 
 function onOp(o){
- if(o.t==='init'){$('who').textContent=o.name?'Кабинет: '+o.name:'Доска';document.title=o.name||'Доска';pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};if(!page||!pages.some(p=>p.id===page))page=pages[0].id;openPage(page);return}
+ if(o.t==='rtc'){if(o.from!==me&&(!o.to||o.to===me))handleRtc(o);return}
+ if(o.t==='init'){callers.clear();(o.call||[]).forEach(x=>{if(x!==me)callers.add(x)});if(call)rtc({kind:'hello'});callLabel();$('who').textContent=o.name?'Кабинет: '+o.name:'Доска';document.title=o.name||'Доска';pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};if(!page||!pages.some(p=>p.id===page))page=pages[0].id;openPage(page);return}
  if(o.t==='peers'){$('st').textContent='Онлайн: '+o.n;return}
  if(o.t==='live'){if(o.from!==me){live[o.from]={page:o.page,k:o.k,c:o.c,w:o.w,pts:o.pts};redraw()}return}
  if(o.t==='stroke'){(strokes[o.page]=strokes[o.page]||{})[o.stroke.id]=o.stroke;delete live[o.from]}
@@ -141,7 +147,7 @@ function onOp(o){
  renderPages();redraw();
  if(o.t==='title'&&o.id===page&&document.activeElement!==$('title'))$('title').value=o.title;
 }
-const es=new EventSource('/api/'+room+'/events');
+const es=new EventSource('/api/'+room+'/events?c='+me);
 es.onmessage=e=>onOp(JSON.parse(e.data));
 es.onerror=()=>{$('st').textContent='Переподключение…'};
 
@@ -181,6 +187,61 @@ if(!('ontouchstart' in window)){ // щипок на трекпаде Safari
 
 // --- ввод ---
 const pos=e=>{const r=cv.getBoundingClientRect();return[r2((e.clientX-r.left)/view.s+view.x),r2((e.clientY-r.top)/view.s+view.y)]};
+// --- «ровные фигуры»: удержите перо на секунду в конце линии ---
+function segDist(q,a,b){const dx=b[0]-a[0],dy=b[1]-a[1],l=dx*dx+dy*dy;let t=l?((q[0]-a[0])*dx+(q[1]-a[1])*dy)/l:0;t=Math.max(0,Math.min(1,t));return Math.hypot(a[0]+t*dx-q[0],a[1]+t*dy-q[1])}
+function rdp(p,eps){
+ if(p.length<3)return p.slice();
+ let dm=0,im=0;const a=p[0],b=p[p.length-1];
+ for(let i=1;i<p.length-1;i++){const d=segDist(p[i],a,b);if(d>dm){dm=d;im=i}}
+ if(dm>eps)return rdp(p.slice(0,im+1),eps).slice(0,-1).concat(rdp(p.slice(im),eps));
+ return [a,b];
+}
+function ellipseFit(P,a,b,c,d,tol){
+ const cx=(a+c)/2,cy=(b+d)/2,rx=(c-a)/2,ry=(d-b)/2;if(rx<1||ry<1)return null;
+ const r=P.map(q=>Math.hypot((q[0]-cx)/rx,(q[1]-cy)/ry)),m=r.reduce((s,v)=>s+v,0)/r.length;
+ const sd=Math.sqrt(r.reduce((s,v)=>s+(v-m)*(v-m),0)/r.length);
+ if(m<.8||m>1.25||sd/m>tol)return null;
+ if(Math.abs(rx-ry)<.15*Math.max(rx,ry)){const R=(rx+ry)/2;return{k:'ellipse',pts:[cx-R,cy-R,cx+R,cy+R]}}
+ return{k:'ellipse',pts:[a,b,c,d]};
+}
+function recognize(flat){
+ const P=[];for(let i=0;i<flat.length;i+=2)P.push([flat[i],flat[i+1]]);
+ if(P.length<8)return null;
+ let L=0,a=1e12,b=1e12,c=-1e12,d=-1e12;
+ P.forEach((q,i)=>{if(i)L+=Math.hypot(q[0]-P[i-1][0],q[1]-P[i-1][1]);a=Math.min(a,q[0]);c=Math.max(c,q[0]);b=Math.min(b,q[1]);d=Math.max(d,q[1])});
+ const D=Math.hypot(c-a,d-b);if(D<16/view.s)return null;
+ const f=P[0],l=P[P.length-1],gap=Math.hypot(l[0]-f[0],l[1]-f[1]);
+ if(gap>.5*D){
+  let dev=0;P.forEach(q=>{dev=Math.max(dev,segDist(q,f,l))});
+  if(dev>.07*gap||L>1.25*gap)return null;
+  let x0=f[0],y0=f[1],x1=l[0],y1=l[1];
+  if(Math.abs(y1-y0)<.07*gap){y0=y1=(y0+y1)/2}else if(Math.abs(x1-x0)<.07*gap){x0=x1=(x0+x1)/2}
+  return{k:'line',pts:[x0,y0,x1,y1]};
+ }
+ if(gap>.3*L)return null;
+ const strict=ellipseFit(P,a,b,c,d,.07);if(strict)return strict;
+ const v=rdp(P,.05*D);
+ if(Math.hypot(v[v.length-1][0]-v[0][0],v[v.length-1][1]-v[0][1])<.1*D)v.pop();
+ for(let ch=true;ch&&v.length>3;){ch=false;
+  for(let i=0;i<v.length;i++){
+   const p0=v[(i+v.length-1)%v.length],p1=v[i],p2=v[(i+1)%v.length];
+   let da=Math.abs(Math.atan2(p2[1]-p1[1],p2[0]-p1[0])-Math.atan2(p1[1]-p0[1],p1[0]-p0[0]));if(da>Math.PI)da=2*Math.PI-da;
+   if(da<.35){v.splice(i,1);ch=true;break}}}
+ if(v.length===3)return{k:'poly',pts:v.flat()};
+ if(v.length===4){
+  let ax=true;
+  for(let i=0;i<4;i++){const p1=v[i],p2=v[(i+1)%4],m=Math.abs(Math.atan2(p2[1]-p1[1],p2[0]-p1[0]))%(Math.PI/2);if(Math.min(m,Math.PI/2-m)>.26)ax=false}
+  if(ax){const xs=v.map(q=>q[0]),ys=v.map(q=>q[1]);return{k:'rect',pts:[Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)]}}
+  return{k:'poly',pts:v.flat()};
+ }
+ return ellipseFit(P,a,b,c,d,.11);
+}
+function snapNow(){
+ if(!cur||cur.k!=='pen'||cur.erasing||cur.mv)return;
+ const r=recognize(cur.pts);if(!r)return;
+ cur.k=r.k;cur.pts=r.pts.map(r2);cur.snapped=true;redraw();
+ send({t:'live',page:page,k:cur.k,c:cur.c,w:cur.w,pts:cur.pts});
+}
 function near(p,x,y,rad){
  if(p.length===2)return Math.hypot(p[0]-x,p[1]-y)<rad;
  for(let i=0;i<p.length-2;i+=2){
@@ -205,7 +266,7 @@ cv.addEventListener('pointerdown',e=>{
  try{cv.setPointerCapture(e.pointerId)}catch(_){}
  if(e.pointerType==='touch'){
   ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(ptrs.size===2){if(cur&&cur.pts)clearLive();cur=null;pan=null;beginGesture();return}
+  if(ptrs.size===2){clearTimeout(holdT);if(cur&&cur.pts)clearLive();cur=null;pan=null;beginGesture();return}
   if(ptrs.size>2)return;
  }
  if(!page)return;
@@ -226,7 +287,7 @@ cv.addEventListener('pointermove',e=>{
   if(gest&&ptrs.size>=2){doGesture();return}
  }
  if(pan&&pan.id===e.pointerId){view.x=pan.vx-(e.clientX-pan.x)/view.s;view.y=pan.vy-(e.clientY-pan.y)/view.s;redraw();return}
- if(!cur)return;
+ if(!cur||cur.snapped)return;
  const evs=(e.getCoalescedEvents&&e.getCoalescedEvents())||[];if(!evs.length)evs.push(e);
  if(cur.erasing){evs.forEach(v=>{const p=pos(v);eraseAt(p[0],p[1])});return}
  if(cur.mv){const p=pos(e),g=images[page][cur.mv];
@@ -237,16 +298,17 @@ cv.addEventListener('pointermove',e=>{
   evs.forEach(v=>{const p=pos(v),n=cur.pts.length;
    if(n<19000&&Math.hypot(p[0]-cur.pts[n-2],p[1]-cur.pts[n-1])>=min)cur.pts.push(p[0],p[1])});
  }else{const p=pos(e);cur.pts[2]=p[0];cur.pts[3]=p[1]}
+ if(cur.k==='pen'&&$('snap').checked){const ha=holdA;if(!ha||Math.hypot(e.clientX-ha[0],e.clientY-ha[1])>5){holdA=[e.clientX,e.clientY];clearTimeout(holdT);holdT=setTimeout(snapNow,650)}}
  redraw();const n=Date.now();
  if(n-lastEmit>80){lastEmit=n;send({t:'live',page:page,k:cur.k,c:cur.c,w:cur.w,pts:cur.pts})}
 });
 function end(e){
  if(e.pointerType==='touch'){ptrs.delete(e.pointerId);if(ptrs.size<2)gest=null}
  if(pan&&pan.id===e.pointerId){pan=null;cv.style.cursor=tool()==='hand'?'grab':'crosshair';return}
- if(!cur)return;const s=cur;cur=null;if(s.erasing)return;
+ clearTimeout(holdT);if(!cur)return;const s=cur;cur=null;if(s.erasing)return;
  if(s.mv){const g=images[page][s.mv];send({t:'imgset',page:page,id:s.mv,x:r2(g.x),y:r2(g.y),w:r2(g.w),h:r2(g.h)});return}
  if(s.k==='pen'){const p=pos(e),n=s.pts.length;if(p[0]!==s.pts[n-2]||p[1]!==s.pts[n-1])s.pts.push(p[0],p[1])}
- else if((Math.abs(s.pts[2]-s.pts[0])+Math.abs(s.pts[3]-s.pts[1]))*view.s<4){clearLive();redraw();return}
+ else if(!s.snapped&&(Math.abs(s.pts[2]-s.pts[0])+Math.abs(s.pts[3]-s.pts[1]))*view.s<4){clearLive();redraw();return}
  (strokes[page]=strokes[page]||{})[s.id]={k:s.k,pts:s.pts,c:s.c,w:s.w};mine.push({page:page,id:s.id});redo=[];redraw();
  send({t:'stroke',page:page,stroke:{id:s.id,k:s.k,pts:s.pts,c:s.c,w:s.w}});
 }
@@ -298,6 +360,70 @@ function redoAct(){
  else{(images[r.page]=images[r.page]||{})[r.id]=r.img;send({t:'image',page:r.page,img:Object.assign({id:r.id},r.img)})}
  mine.push({page:r.page,id:r.id});redraw();
 }
+
+// --- голосовой звонок (WebRTC: звук идёт напрямую между участниками) ---
+const rtc=m=>send(Object.assign({t:'rtc'},m));
+function callLabel(){
+ $('call').textContent=call?'Завершить звонок':(callers.size?'Присоединиться к звонку':'Звонок');
+ $('call').style.outline=(!call&&callers.size)?'2px solid #2e7d32':'';
+ $('mute').hidden=!call;
+ if(!call)$('cs').textContent=callers.size?'Идёт звонок…':'';
+}
+function callState(){
+ if(!call)return;
+ const n=Object.values(call.pcs).filter(p=>p.connectionState==='connected').length;
+ $('cs').textContent=n?'Звонок: подключено '+n:'Звонок: ожидание…';
+}
+function mk(f){
+ if(call.pcs[f])return call.pcs[f];
+ const pc=new RTCPeerConnection({iceServers:call.ice});call.pcs[f]=pc;
+ call.stream.getTracks().forEach(t=>pc.addTrack(t,call.stream));
+ pc.onicecandidate=e=>{if(e.candidate)rtc({kind:'ice',to:f,data:e.candidate})};
+ pc.ontrack=e=>{let a=call.audio[f];if(!a){a=call.audio[f]=new Audio();a.autoplay=true;document.body.appendChild(a)}a.srcObject=e.streams[0];a.play().catch(()=>{})};
+ pc.onconnectionstatechange=()=>{if(pc.connectionState==='failed')$('cs').textContent='Не удалось соединиться (возможно, нужен TURN-сервер)';else callState()};
+ return pc;
+}
+async function meet(f){
+ const pc=mk(f);
+ if(me<f&&!pc.offered){pc.offered=true;const o=await pc.createOffer();await pc.setLocalDescription(o);rtc({kind:'offer',to:f,data:pc.localDescription})}
+}
+function drop(f){
+ if(!call)return;
+ if(call.pcs[f]){call.pcs[f].close();delete call.pcs[f]}
+ if(call.audio[f]){call.audio[f].remove();delete call.audio[f]}
+ delete call.q[f];callState();
+}
+function flush(f){const pc=call.pcs[f];(call.q[f]||[]).forEach(c=>pc.addIceCandidate(c).catch(()=>{}));call.q[f]=[]}
+async function handleRtc(o){
+ const f=o.from,k=o.kind;
+ try{
+  if(k==='hello'){callers.add(f);if(call){rtc({kind:'here',to:f});meet(f)}callLabel();return}
+  if(k==='here'){callers.add(f);if(call)meet(f);callLabel();return}
+  if(k==='bye'){callers.delete(f);drop(f);callLabel();return}
+  if(!call)return;
+  if(k==='offer'){const pc=mk(f);await pc.setRemoteDescription(o.data);flush(f);const a=await pc.createAnswer();await pc.setLocalDescription(a);rtc({kind:'answer',to:f,data:pc.localDescription})}
+  else if(k==='answer'){const pc=call.pcs[f];if(pc){await pc.setRemoteDescription(o.data);flush(f)}}
+  else if(k==='ice'){const pc=call.pcs[f];if(pc&&pc.remoteDescription)pc.addIceCandidate(o.data).catch(()=>{});else(call.q[f]=call.q[f]||[]).push(o.data)}
+ }catch(err){$('cs').textContent='Ошибка звонка'}
+}
+async function toggleCall(){
+ if(call)return endCall();
+ if(!navigator.mediaDevices||!window.RTCPeerConnection){$('cs').textContent='Браузер не поддерживает звонки';return}
+ try{
+  const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+  let ice;try{ice=await (await fetch('/api/ice')).json()}catch(e){ice=[{urls:'stun:stun.l.google.com:19302'}]}
+  call={stream:stream,pcs:{},audio:{},q:{},ice:ice};
+  callLabel();callState();rtc({kind:'hello'});
+ }catch(e){$('cs').textContent='Нет доступа к микрофону'}
+}
+function endCall(){
+ if(!call)return;rtc({kind:'bye'});
+ Object.keys(call.pcs).forEach(drop);
+ call.stream.getTracks().forEach(t=>t.stop());call=null;$('mute').textContent='Микрофон: вкл';callLabel();
+}
+$('call').onclick=toggleCall;
+$('mute').onclick=()=>{if(!call)return;const t=call.stream.getAudioTracks()[0];if(!t)return;t.enabled=!t.enabled;$('mute').textContent='Микрофон: '+(t.enabled?'вкл':'выкл')};
+window.addEventListener('pagehide',()=>{if(call)navigator.sendBeacon('/api/'+room+'/op',JSON.stringify({t:'rtc',kind:'bye',from:me}))});
 
 // --- интерфейс ---
 $('add').onclick=()=>{const id='p'+newId(),d=new Date().toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'});let t=d,n=2;while(pages.some(p=>p.title===t))t=d+' ('+(n++)+')';send({t:'addPage',id:id,title:t});openPage(id)};
