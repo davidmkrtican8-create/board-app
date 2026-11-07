@@ -53,7 +53,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),wrap=document.getElementById('wrap');
 const room=location.pathname.split('/')[2],me='c'+Math.random().toString(36).slice(2,10).padEnd(8,'0');
 let pages=[],strokes={},images={},page=null,live={},color='#1a1a1a',bg='grid',cur=null,lastEmit=0,mine=[],redo=[];
-let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,call=null;
+let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,lastP=[0,0],call=null;
 const callers=new Set();
 const views={},imgEl={},ptrs=new Map();
 const $=i=>document.getElementById(i),tool=()=>$('tool').value;
@@ -236,10 +236,31 @@ function recognize(flat){
  }
  return ellipseFit(P,a,b,c,d,.11);
 }
+function adjust(p){ // после привязки фигуру можно тянуть: размер подгоняется движением пера
+ const b=cur.base,q=b.pts,k=b.k;
+ if(k==='line'||k==='arrow'){
+  const x0=q[0],y0=q[1];let x1=p[0],y1=p[1];const len=Math.hypot(x1-x0,y1-y0);
+  if(len>0){if(Math.abs(y1-y0)<.05*len)y1=y0;else if(Math.abs(x1-x0)<.05*len)x1=x0}
+  cur.pts=[x0,y0,x1,y1].map(r2);
+ }else if(k==='ellipse'||k==='rect'){
+  const cx=(q[0]+q[2])/2,cy=(q[1]+q[3])/2,rx=(q[2]-q[0])/2,ry=(q[3]-q[1])/2;
+  const ax=b.p[0]-cx,ay=b.p[1]-cy,f=Math.hypot(p[0]-cx,p[1]-cy)/(Math.hypot(ax,ay)||1);
+  const sx=Math.abs(ax)>.3*rx?(p[0]-cx)/ax:f,sy=Math.abs(ay)>.3*ry?(p[1]-cy)/ay:f;
+  let nx=rx*Math.max(.05,sx),ny=ry*Math.max(.05,sy);
+  if(Math.abs(nx-ny)<.08*Math.max(nx,ny))nx=ny=(nx+ny)/2; // «магнит»: круг и квадрат
+  cur.pts=[cx-nx,cy-ny,cx+nx,cy+ny].map(r2);
+ }else{
+  let cx=0,cy=0;const n=q.length/2;for(let i=0;i<q.length;i+=2){cx+=q[i];cy+=q[i+1]}cx/=n;cy/=n;
+  const f=Math.max(.05,Math.hypot(p[0]-cx,p[1]-cy)/(Math.hypot(b.p[0]-cx,b.p[1]-cy)||1));
+  cur.pts=q.map((v,i)=>r2((i%2?cy:cx)+(v-(i%2?cy:cx))*f));
+ }
+ redraw();const t=Date.now();
+ if(t-lastEmit>80){lastEmit=t;send({t:'live',page:page,k:cur.k,c:cur.c,w:cur.w,pts:cur.pts})}
+}
 function snapNow(){
  if(!cur||cur.k!=='pen'||cur.erasing||cur.mv)return;
  const r=recognize(cur.pts);if(!r)return;
- cur.k=r.k;cur.pts=r.pts.map(r2);cur.snapped=true;redraw();
+ cur.k=r.k;cur.pts=r.pts.map(r2);cur.snapped=true;cur.base={k:cur.k,pts:cur.pts.slice(),p:lastP.slice()};redraw();
  send({t:'live',page:page,k:cur.k,c:cur.c,w:cur.w,pts:cur.pts});
 }
 function near(p,x,y,rad){
@@ -272,7 +293,7 @@ cv.addEventListener('pointerdown',e=>{
  if(!page)return;
  const t=tool();
  if(e.button===1||space||t==='hand'){pan={id:e.pointerId,x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};cv.style.cursor='grabbing';return}
- const p=pos(e);
+ const p=pos(e);lastP=p;
  if(t==='er'){cur={erasing:1};eraseAt(p[0],p[1]);return}
  if(t==='mv'){const id=imgAt(p[0],p[1]);if(!id)return;const g=images[page][id],hs=36/view.s;
   cur={mv:id,size:p[0]>g.x+g.w-hs&&p[1]>g.y+g.h-hs,dx:p[0]-g.x,dy:p[1]-g.y,r:g.h/g.w};return}
@@ -287,7 +308,8 @@ cv.addEventListener('pointermove',e=>{
   if(gest&&ptrs.size>=2){doGesture();return}
  }
  if(pan&&pan.id===e.pointerId){view.x=pan.vx-(e.clientX-pan.x)/view.s;view.y=pan.vy-(e.clientY-pan.y)/view.s;redraw();return}
- if(!cur||cur.snapped)return;
+ if(!cur)return;
+ if(cur.snapped){adjust(pos(e));return}
  const evs=(e.getCoalescedEvents&&e.getCoalescedEvents())||[];if(!evs.length)evs.push(e);
  if(cur.erasing){evs.forEach(v=>{const p=pos(v);eraseAt(p[0],p[1])});return}
  if(cur.mv){const p=pos(e),g=images[page][cur.mv];
@@ -298,6 +320,7 @@ cv.addEventListener('pointermove',e=>{
   evs.forEach(v=>{const p=pos(v),n=cur.pts.length;
    if(n<19000&&Math.hypot(p[0]-cur.pts[n-2],p[1]-cur.pts[n-1])>=min)cur.pts.push(p[0],p[1])});
  }else{const p=pos(e);cur.pts[2]=p[0];cur.pts[3]=p[1]}
+ lastP=pos(e);
  if(cur.k==='pen'&&$('snap').checked){const ha=holdA;if(!ha||Math.hypot(e.clientX-ha[0],e.clientY-ha[1])>5){holdA=[e.clientX,e.clientY];clearTimeout(holdT);holdT=setTimeout(snapNow,650)}}
  redraw();const n=Date.now();
  if(n-lastEmit>80){lastEmit=n;send({t:'live',page:page,k:cur.k,c:cur.c,w:cur.w,pts:cur.pts})}
