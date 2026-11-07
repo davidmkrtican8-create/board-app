@@ -22,6 +22,7 @@ button{cursor:pointer}
 #wrap{flex:1;min-height:0;position:relative;overflow:hidden;border:1px solid var(--bd);border-radius:10px;background:#fff}
 canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
 #st{font-size:12px;color:var(--mut)}
+#newt{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);background:var(--ac);color:#fff;border-color:var(--ac);box-shadow:0 2px 10px rgba(0,0,0,.3);z-index:2}
 @media (max-width:640px){body{flex-direction:column}#side{width:100%;flex-direction:row;align-items:center;border-right:0;border-bottom:1px solid var(--bd);padding:6px}#pl{display:flex;gap:6px}.pg{flex:none}}
 </style>
 </head>
@@ -46,14 +47,14 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
   <button id="clr">Очистить</button>
   <span id="st">Подключение…</span>
  </div>
- <div id="wrap"><canvas id="cv"></canvas></div>
+ <div id="wrap"><canvas id="cv"></canvas><button id="newt" hidden>↓ Новая задача</button></div>
 </div>
 <script>
 (function(){
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),wrap=document.getElementById('wrap');
 const room=location.pathname.split('/')[2],me='c'+Math.random().toString(36).slice(2,10).padEnd(8,'0');
 let pages=[],strokes={},images={},page=null,live={},color='#1a1a1a',bg='grid',cur=null,lastEmit=0,mine=[],redo=[];
-let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,lastP=[0,0],call=null;
+let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,lastP=[0,0],call=null,hoverImg=null,activeImg=null,jump=null;
 const callers=new Set();
 const views={},imgEl={},ptrs=new Map();
 const $=i=>document.getElementById(i),tool=()=>$('tool').value;
@@ -103,6 +104,29 @@ function getImg(id,src){
  if(!imgEl[id]||imgEl[id].s!==src){const e=new Image();e.onload=redraw;e.src=src;imgEl[id]={e:e,s:src}}
  return imgEl[id].e;
 }
+// ручки на картинке: левый верхний угол — переместить, правый нижний — изменить размер (работают в любом инструменте)
+const handlesOn=id=>tool()==='mv'||id===hoverImg||id===activeImg;
+function drawHandles(g){
+ const s=view.s,z=26/s,a=z*.28;
+ ctx.save();ctx.strokeStyle='rgba(106,63,196,.9)';ctx.lineWidth=2/s;ctx.strokeRect(g.x,g.y,g.w,g.h);
+ ctx.fillStyle='rgba(106,63,196,.92)';ctx.fillRect(g.x,g.y,z,z);ctx.fillRect(g.x+g.w-z,g.y+g.h-z,z,z);
+ ctx.strokeStyle='#fff';ctx.lineWidth=2/s;ctx.lineCap='round';ctx.beginPath();
+ const cx=g.x+z/2,cy=g.y+z/2,bx=g.x+g.w-z/2,by=g.y+g.h-z/2;
+ ctx.moveTo(cx-a,cy);ctx.lineTo(cx+a,cy);ctx.moveTo(cx,cy-a);ctx.lineTo(cx,cy+a);
+ ctx.moveTo(bx-a,by+a);ctx.lineTo(bx+a,by-a);
+ ctx.stroke();ctx.restore();
+}
+function handleAt(x,y){
+ const ims=images[page]||{},z=26/view.s;let f=null;
+ for(const id in ims){if(!handlesOn(id))continue;const g=ims[id];
+  if(x>=g.x&&x<=g.x+z&&y>=g.y&&y<=g.y+z)f={id:id,type:'move'};
+  else if(x>=g.x+g.w-z&&x<=g.x+g.w&&y>=g.y+g.h-z&&y<=g.y+g.h)f={id:id,type:'size'}}
+ return f;
+}
+function notifyNew(g){ // у ученика: новая картинка/задача появилась вне экрана
+ const vis=g.x<view.x+cw/view.s&&g.x+g.w>view.x&&g.y<view.y+ch/view.s&&g.y+g.h>view.y;
+ if(vis)return;jump=g;$('newt').hidden=false;
+}
 function grid(){
  const s=view.s,x0=view.x,y0=view.y,x1=x0+cw/s,y1=y0+ch/s;
  ctx.lineWidth=1/s;ctx.strokeStyle='#dfe6f2';ctx.beginPath();
@@ -120,16 +144,16 @@ function redraw(){
  ctx.imageSmoothingQuality='high';
  grid();
  const ims=images[page]||{};
- for(const id in ims){const g=ims[id],e=getImg(id,g.src);if(e.complete&&e.naturalWidth)ctx.drawImage(e,g.x,g.y,g.w,g.h);
-  if(tool()==='mv'){ctx.strokeStyle='#6a3fc4';ctx.lineWidth=2/s;ctx.strokeRect(g.x,g.y,g.w,g.h);ctx.fillStyle='#6a3fc4';ctx.fillRect(g.x+g.w-18/s,g.y+g.h-18/s,18/s,18/s)}}
+ for(const id in ims){const g=ims[id],e=getImg(id,g.src);if(e.complete&&e.naturalWidth)ctx.drawImage(e,g.x,g.y,g.w,g.h)}
  const ps=strokes[page]||{};for(const id in ps)drawStroke(ps[id]);
  for(const k in live)if(live[k].page===page)drawStroke(live[k]);
  if(cur&&cur.pts)drawStroke(cur);
+ for(const id in ims)if(handlesOn(id))drawHandles(ims[id]);
 }
 function renderPages(){const b=$('pl');b.innerHTML='';
  pages.forEach(p=>{const d=document.createElement('div');d.className='pg'+(p.id===page?' on':'');
   d.textContent=p.title||'Без названия';d.onclick=()=>openPage(p.id);b.appendChild(d)})}
-function openPage(id){page=id;live={};view=views[id]||(views[id]=defView());renderPages();redraw();
+function openPage(id){page=id;live={};$('newt').hidden=true;jump=null;view=views[id]||(views[id]=defView());renderPages();redraw();
  const p=pages.filter(x=>x.id===id)[0];$('title').value=p?p.title:''}
 
 function onOp(o){
@@ -138,7 +162,7 @@ function onOp(o){
  if(o.t==='peers'){$('st').textContent='Онлайн: '+o.n;return}
  if(o.t==='live'){if(o.from!==me){live[o.from]={page:o.page,k:o.k,c:o.c,w:o.w,pts:o.pts};redraw()}return}
  if(o.t==='stroke'){(strokes[o.page]=strokes[o.page]||{})[o.stroke.id]=o.stroke;delete live[o.from]}
- if(o.t==='image')(images[o.page]=images[o.page]||{})[o.img.id]=o.img;
+ if(o.t==='image'){(images[o.page]=images[o.page]||{})[o.img.id]=o.img;if(o.from!==me&&o.page===page)notifyNew(o.img)}
  if(o.t==='imgset'&&images[o.page]&&images[o.page][o.id]){const g=images[o.page][o.id];g.x=o.x;g.y=o.y;g.w=o.w;g.h=o.h}
  if(o.t==='erase'){if(strokes[o.page])delete strokes[o.page][o.id];if(images[o.page])delete images[o.page][o.id]}
  if(o.t==='clear'){strokes[o.page]={};images[o.page]={}}
@@ -294,6 +318,9 @@ cv.addEventListener('pointerdown',e=>{
  const t=tool();
  if(e.button===1||space||t==='hand'){pan={id:e.pointerId,x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};cv.style.cursor='grabbing';return}
  const p=pos(e);lastP=p;
+ const hh=t==='er'?null:handleAt(p[0],p[1]);
+ if(hh){const g=images[page][hh.id];activeImg=hh.id;cur={mv:hh.id,size:hh.type==='size',dx:p[0]-g.x,dy:p[1]-g.y,r:g.h/g.w};return}
+ if(t!=='mv'){const ia=imgAt(p[0],p[1]);if(ia!==activeImg){activeImg=ia;redraw()}}
  if(t==='er'){cur={erasing:1};eraseAt(p[0],p[1]);return}
  if(t==='mv'){const id=imgAt(p[0],p[1]);if(!id)return;const g=images[page][id],hs=36/view.s;
   cur={mv:id,size:p[0]>g.x+g.w-hs&&p[1]>g.y+g.h-hs,dx:p[0]-g.x,dy:p[1]-g.y,r:g.h/g.w};return}
@@ -308,6 +335,10 @@ cv.addEventListener('pointermove',e=>{
   if(gest&&ptrs.size>=2){doGesture();return}
  }
  if(pan&&pan.id===e.pointerId){view.x=pan.vx-(e.clientX-pan.x)/view.s;view.y=pan.vy-(e.clientY-pan.y)/view.s;redraw();return}
+ if(!cur&&e.pointerType!=='touch'&&!space){
+  const q=pos(e),hi=imgAt(q[0],q[1]);if(hi!==hoverImg){hoverImg=hi;redraw()}
+  const h2=handleAt(q[0],q[1]);cv.style.cursor=h2?(h2.type==='move'?'move':'nwse-resize'):(tool()==='hand'?'grab':'crosshair');
+ }
  if(!cur)return;
  if(cur.snapped){adjust(pos(e));return}
  const evs=(e.getCoalescedEvents&&e.getCoalescedEvents())||[];if(!evs.length)evs.push(e);
@@ -346,8 +377,7 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('keyup',e=>{if(e.code==='Space'){space=false;cv.style.cursor=tool()==='hand'?'grab':'crosshair'}});
 
 // --- картинки ---
-const nextY={};
-function placeImage(im,task){
+function placeImage(im,task,gap){
  let src=null,w=0,h=0;
  for(const m of [1400,1000,700,500,350]){
   const sc=Math.min(1,m/Math.max(im.width,im.height));w=Math.round(im.width*sc);h=Math.round(im.height*sc);
@@ -357,13 +387,19 @@ function placeImage(im,task){
  if(!src){$('st').textContent='Картинка слишком большая';return}
  const sw=task?Math.min(w,.8*cw):Math.min(w,.6*cw,.6*ch*w/h),dw=sw/view.s,dh=dw*h/w,iid=newId();
  let x=view.x+cw/view.s/2-dw/2,y=view.y+ch/view.s/2-dh/2;
- if(task){ // задачи складываются столбиком сверху вниз
-  x=view.x+(cw/view.s-dw)/2;const ny=nextY[page];
-  y=(ny!==undefined&&ny>=view.y&&ny<view.y+ch/view.s*.9)?ny:view.y+30/view.s;nextY[page]=y+dh+24/view.s;
+ if(task){ // задачи идут столбиком вниз: под последней картинкой и всем написанным, с местом под решение
+  const ims=images[page]||{};let ib=-1e12,ix=null,cb=-1e12;
+  for(const id in ims){const g=ims[id];if(g.y+g.h>ib){ib=g.y+g.h;ix=g.x}}
+  cb=ib;const ps=strokes[page]||{};
+  for(const id in ps){const q=samples(ps[id]);for(let i=1;i<q.length;i+=2)if(q[i]>cb)cb=q[i]}
+  x=ix!==null?ix:view.x+(cw/view.s-dw)/2;
+  y=cb>-1e11?Math.max(cb+50/view.s,ib+gap/view.s):view.y+30/view.s;
+  if(y<view.y||y+dh>view.y+ch/view.s)view.y=y-.1*ch/view.s; // показать новую задачу
+  if(x<view.x||x+dw>view.x+cw/view.s)view.x=x+dw/2-cw/view.s/2;
  }
  mine.push({page:page,id:iid});redo=[];
  send({t:'image',page:page,img:{id:iid,src:src,x:r2(x),y:r2(y),w:r2(dw),h:r2(dh)}});
- if(!task)$('tool').value='mv';redraw();
+ activeImg=iid;if(!task)$('tool').value='mv';redraw();
 }
 function addImage(file){
  const fr=new FileReader();
@@ -374,7 +410,7 @@ function addImage(file){
 window.addEventListener('message',e=>{
  if(e.origin!==location.origin)return;const d=e.data;
  if(!d||d.t!=='task'||typeof d.src!=='string'||!/^data:image\/(png|jpeg);base64,/.test(d.src))return;
- const im=new Image();im.onload=()=>placeImage(im,true);im.src=d.src;
+ const im=new Image();im.onload=()=>placeImage(im,true,Math.max(0,Math.min(1500,+d.gap||240)));im.src=d.src;
 });
 document.addEventListener('paste',e=>{
  const it=(e.clipboardData&&e.clipboardData.items)||[];
@@ -474,6 +510,7 @@ $('cp').onclick=()=>{const t=location.href;(navigator.clipboard?navigator.clipbo
  const b=document.createElement('button');b.className='sw'+(i?'':' on');b.style.background=c;
  b.onclick=()=>{color=c;if(['er','mv','hand'].includes(tool()))$('tool').value='pen';document.querySelectorAll('.sw').forEach(x=>x.classList.remove('on'));b.classList.add('on')};
  $('cols').appendChild(b)});
+$('newt').onclick=()=>{if(!jump)return;view.y=jump.y-.1*ch/view.s;view.x=jump.x+jump.w/2-cw/view.s/2;$('newt').hidden=true;jump=null;redraw()};
 new ResizeObserver(resize).observe(wrap);
 resize();
 })();

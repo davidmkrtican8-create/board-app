@@ -60,7 +60,7 @@ button,input{font:inherit;color:var(--tx);background:var(--panel);border:1px sol
     <div class="tr"><select id="tbook"></select><button id="tadd">+ Сборник</button><button id="tdel" title="Убрать сборник из списка">Убрать</button><input type="file" id="tfile" accept=".pdf,application/pdf" multiple hidden><button id="tclose" style="margin-left:auto">✕</button></div>
     <div class="tr"><button id="tback" title="Назад">↩</button><button id="tprev">←</button><input id="tnum" type="number" min="1"><span id="tcnt"></span><button id="tnext">→</button><select id="tol"><option value="">Оглавление…</option></select></div>
     <div class="tr"><input id="tq" placeholder="Номер задачи, например 4.19" style="flex:1;min-width:120px"><button id="tfind">Найти</button><button id="tpage">Страница целиком → на доску</button></div>
-    <div class="tr" style="padding-top:0"><span id="tmsg" style="font-size:12px;color:var(--mut)"></span></div>
+    <div class="tr" style="padding-top:0"><select id="tgap" title="Сколько свободного места оставлять под решением между задачами"><option value="80">Место под решение: мало</option><option value="240">Место под решение: среднее</option><option value="420">Место под решение: много</option></select><span id="tmsg" style="font-size:12px;color:var(--mut)"></span></div>
     <div id="tview"><div id="tbox"><canvas id="tcv"></canvas><div id="tov"></div></div></div>
    </div>
   </div>
@@ -205,7 +205,7 @@ async function send(fx0,fy0,fx1,fy1,btn){
  if(!(f.getAttribute('src')||'').startsWith('/b/')){msg('Сначала выберите ученика слева',4000);return}
  msg('Отправляю…');
  try{
-  f.contentWindow.postMessage({t:'task',src:await crop(fx0,fy0,fx1,fy1)},location.origin);
+  f.contentWindow.postMessage({t:'task',src:await crop(fx0,fy0,fx1,fy1),gap:+$('tgap').value},location.origin);
   msg('✓ Задача на доске',2500);
   if(btn){const o=btn.textContent;btn.textContent='✓';setTimeout(()=>{btn.textContent=o},1500)}
  }catch(e){msg('Не получилось: '+(e.message||e),4000)}
@@ -266,6 +266,7 @@ $('tk').onclick=()=>{
  if(open&&!inited){inited=true;refresh()}else if(open&&pdf)render();
 };
 $('tclose').onclick=()=>{$('tasks').hidden=true};
+$('tgap').value=localStorage.getItem('tgap')||'240';$('tgap').onchange=()=>localStorage.setItem('tgap',$('tgap').value);
 $('tadd').onclick=()=>$('tfile').click();
 $('tfile').onchange=async()=>{
  const fl=[...$('tfile').files];$('tfile').value='';if(!fl.length)return;
