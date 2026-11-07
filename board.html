@@ -10,6 +10,7 @@
 *{box-sizing:border-box}html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex}
 #side{width:200px;background:var(--panel);border-right:1px solid var(--bd);display:flex;flex-direction:column;padding:10px;gap:6px;overflow:auto}
+#who{font-weight:700;padding:4px 6px}
 .pg{padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pg.on{background:color-mix(in srgb,var(--ac) 16%,transparent);border-color:var(--ac)}
 button,select,input{font:inherit;color:var(--tx);background:var(--panel);border:1px solid var(--bd);border-radius:8px;padding:6px 10px}
@@ -25,7 +26,7 @@ canvas{display:block;width:100%;height:auto;touch-action:none;cursor:crosshair}
 </style>
 </head>
 <body>
-<div id="side"><div id="pl"></div><button id="add">+ Страница</button><button id="cp">Копировать ссылку</button></div>
+<div id="side"><div id="who"></div><div id="pl"></div><button id="add">+ Доска</button><button id="cp">Копировать ссылку</button></div>
 <div id="main">
  <div id="bar">
   <input id="title" placeholder="Название страницы">
@@ -48,7 +49,7 @@ canvas{display:block;width:100%;height:auto;touch-action:none;cursor:crosshair}
 (function(){
 const W=1600,H=1000,cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 const room=location.pathname.split('/')[2],me=Math.random().toString(36).slice(2);
-let pages=[],strokes={},images={},page=null,live={},color='#1a1a1a',bg='grid',cur=null,lastEmit=0,mine=[];
+let pages=[],strokes={},images={},page=null,live={},color='#1a1a1a',bg='grid',cur=null,lastEmit=0,mine=[],redo=[];
 const imgEl={},$=i=>document.getElementById(i);
 const tool=()=>$('tool').value;
 const send=op=>{op.from=me;return fetch('/api/'+room+'/op',{method:'POST',body:JSON.stringify(op)}).catch(()=>{$('st').textContent='Нет связи с сервером'})};
@@ -102,7 +103,7 @@ function openPage(id){page=id;live={};renderPages();redraw();
  const p=pages.filter(x=>x.id===id)[0];$('title').value=p?p.title:''}
 
 function onOp(o){
- if(o.t==='init'){pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};if(!page||!pages.some(p=>p.id===page))page=pages[0].id;openPage(page);return}
+ if(o.t==='init'){$('who').textContent=o.name?'Кабинет: '+o.name:'Доска';document.title=o.name||'Доска';pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};if(!page||!pages.some(p=>p.id===page))page=pages[0].id;openPage(page);return}
  if(o.t==='peers'){$('st').textContent='Онлайн: '+o.n;return}
  if(o.t==='live'){if(o.from!==me){live[o.from]={page:o.page,k:o.k,c:o.c,w:o.w,pts:o.pts};redraw()}return}
  if(o.t==='stroke'){(strokes[o.page]=strokes[o.page]||{})[o.stroke.id]=o.stroke;delete live[o.from]}
@@ -154,7 +155,7 @@ function end(){
  if(!cur)return;const s=cur;cur=null;if(s.erasing)return;
  if(s.mv){const g=images[page][s.mv];send({t:'imgset',page:page,id:s.mv,x:Math.round(g.x),y:Math.round(g.y),w:Math.round(g.w),h:Math.round(g.h)});return}
  if(s.k!=='pen'&&Math.abs(s.pts[2]-s.pts[0])+Math.abs(s.pts[3]-s.pts[1])<4){send({t:'live',page:page,k:'pen',c:s.c,w:1,pts:[]});redraw();return}
- (strokes[page]=strokes[page]||{})[s.id]={k:s.k,pts:s.pts,c:s.c,w:s.w};mine.push({page:page,id:s.id});redraw();
+ (strokes[page]=strokes[page]||{})[s.id]={k:s.k,pts:s.pts,c:s.c,w:s.w};mine.push({page:page,id:s.id});redo=[];redraw();
  send({t:'stroke',page:page,stroke:{id:s.id,k:s.k,pts:s.pts,c:s.c,w:s.w}});
 }
 cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
@@ -170,7 +171,7 @@ function addImage(file){
    if(s.length<=800000){src=s;break}}
   if(!src){$('st').textContent='Картинка слишком большая';return}
   const k=Math.min(1,700/Math.max(w,h)),dw=Math.round(w*k),dh=Math.round(h*k);
-  send({t:'image',page:page,img:{id:newId(),src:src,x:Math.round((W-dw)/2),y:Math.round((H-dh)/2),w:dw,h:dh}});
+  const iid=newId();mine.push({page:page,id:iid});redo=[];send({t:'image',page:page,img:{id:iid,src:src,x:Math.round((W-dw)/2),y:Math.round((H-dh)/2),w:dw,h:dh}});
   $('tool').value='mv';redraw()};
   im.src=fr.result};
  fr.readAsDataURL(file);
@@ -182,11 +183,24 @@ document.addEventListener('paste',e=>{
 $('img').onclick=()=>$('fi').click();
 $('fi').onchange=()=>{if($('fi').files[0])addImage($('fi').files[0]);$('fi').value=''};
 
-$('add').onclick=()=>{const id='p'+newId();send({t:'addPage',id:id,title:'Страница '+(pages.length+1)});openPage(id)};
+$('add').onclick=()=>{const id='p'+newId(),d=new Date().toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'});let t=d,n=2;while(pages.some(p=>p.title===t))t=d+' ('+(n++)+')';send({t:'addPage',id:id,title:t});openPage(id)};
 $('title').onchange=()=>send({t:'title',id:page,title:$('title').value.trim()||'Без названия'});
 $('tool').onchange=redraw;
 $('bgs').onchange=()=>{bg=$('bgs').value;redraw()};
-$('undo').onclick=()=>{const m=mine.pop();if(!m)return;if(strokes[m.page])delete strokes[m.page][m.id];send({t:'erase',page:m.page,id:m.id});redraw()};
+function undo(){const m=mine.pop();if(!m)return;const o=(strokes[m.page]||{})[m.id],g=(images[m.page]||{})[m.id];
+ if(o){redo.push({page:m.page,id:m.id,stroke:o});delete strokes[m.page][m.id]}
+ else if(g){redo.push({page:m.page,id:m.id,img:g});delete images[m.page][m.id]}else return;
+ send({t:'erase',page:m.page,id:m.id});redraw()}
+function redoAct(){const r=redo.pop();if(!r)return;
+ if(r.stroke){(strokes[r.page]=strokes[r.page]||{})[r.id]=r.stroke;send({t:'stroke',page:r.page,stroke:Object.assign({id:r.id},r.stroke)})}
+ else{(images[r.page]=images[r.page]||{})[r.id]=r.img;send({t:'image',page:r.page,img:Object.assign({id:r.id},r.img)})}
+ mine.push({page:r.page,id:r.id});redraw()}
+$('undo').onclick=undo;
+document.addEventListener('keydown',e=>{
+ const z=e.code==='KeyZ',y=e.code==='KeyY';
+ if(!(e.metaKey||e.ctrlKey)||!(z||y))return;
+ if(document.activeElement&&document.activeElement.tagName==='INPUT')return;
+ e.preventDefault();(y||e.shiftKey)?redoAct():undo()});
 $('clr').onclick=()=>{if(confirm('Очистить страницу для всех?')){strokes[page]={};images[page]={};redraw();send({t:'clear',page:page})}};
 $('cp').onclick=()=>{const t=location.href;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{$('cp').textContent='Скопировано'},()=>{prompt('Ссылка:',t)});setTimeout(()=>{$('cp').textContent='Копировать ссылку'},1500)};
 ['#1a1a1a','#d32f2f','#1565c0','#2e7d32','#ef6c00','#7b1fa2'].forEach((c,i)=>{

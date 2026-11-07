@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Кабинет преподавателя</title>
+<style>
+:root{--bg:#f4f1fa;--panel:#fff;--tx:#201c2b;--mut:#6b6580;--ac:#6a3fc4;--bd:#ddd6ee}
+@media (prefers-color-scheme:dark){:root{--bg:#17141f;--panel:#221e2e;--tx:#ece8f5;--mut:#9a93b0;--ac:#a98bf0;--bd:#3a3450}}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input{font:inherit;color:var(--tx);background:var(--panel);border:1px solid var(--bd);border-radius:8px;padding:6px 10px;cursor:pointer}
+#login{max-width:360px;margin:15vh auto;padding:0 16px;display:flex;flex-direction:column;gap:10px}
+#app{height:100%;display:flex}
+#side{width:250px;background:var(--panel);border-right:1px solid var(--bd);display:flex;flex-direction:column;padding:10px;gap:8px}
+.top{display:flex;justify-content:space-between;align-items:center}
+#list{flex:1;overflow:auto;display:flex;flex-direction:column;gap:2px}
+.st{display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:8px;cursor:pointer}
+.st.on{background:color-mix(in srgb,var(--ac) 16%,transparent)}
+.dot{width:8px;height:22px;border-radius:4px;flex:none}
+.foot{display:flex;gap:6px;flex-wrap:wrap}.foot button{font-size:13px;padding:5px 8px}
+#main{flex:1;min-width:0;display:flex;flex-direction:column}
+#bar{display:flex;gap:6px;align-items:center;padding:8px 10px;flex-wrap:wrap}#nm{flex:1;min-width:120px;font-size:17px}
+iframe{flex:1;border:0;width:100%;min-height:0}
+#msg{color:var(--mut)}
+@media (max-width:700px){#app{flex-direction:column}#side{width:100%;max-height:34%;border-right:0;border-bottom:1px solid var(--bd)}}
+</style>
+</head>
+<body>
+<div id="login" hidden><h2>Кабинет преподавателя</h2><input id="pw" type="password" placeholder="Пароль (ADMIN_KEY)"><button id="go">Войти</button><div id="msg"></div></div>
+<div id="app" hidden>
+ <div id="side">
+  <div class="top"><b>Ученики</b><button id="addS">+ Ученик</button></div>
+  <div id="list"></div>
+  <div class="foot"><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden></div>
+ </div>
+ <div id="main">
+  <div id="bar"><b id="nm">Выберите ученика</b><button id="lnk">Ссылка ученика</button><button id="ren">Переименовать</button><button id="del">Удалить</button></div>
+  <iframe id="fr"></iframe>
+ </div>
+</div>
+<script>
+(function(){
+const $=i=>document.getElementById(i);
+let key=localStorage.getItem('adm')||'',students=[],cur=null;
+const api=(p,o)=>fetch(p,Object.assign({headers:{'X-Admin':key,'Content-Type':'application/json'}},o));
+function showLogin(t){$('app').hidden=true;$('login').hidden=false;$('msg').textContent=t||''}
+async function load(){
+ const r=await api('/api/admin/students');
+ if(r.status===503)return showLogin('На сервере не задана переменная ADMIN_KEY. Добавьте её в настройках хостинга.');
+ if(r.status===401)return showLogin(key?'Неверный пароль':'');
+ students=await r.json();$('login').hidden=true;$('app').hidden=false;render();
+ if(!cur&&students.length)pick(localStorage.getItem('last')&&students.some(s=>s.id===localStorage.getItem('last'))?localStorage.getItem('last'):students[0].id);
+}
+function render(){const l=$('list');l.innerHTML='';
+ students.forEach(s=>{const d=document.createElement('div');d.className='st'+(s.id===cur?' on':'');
+  const dot=document.createElement('span');dot.className='dot';dot.style.background=s.color;
+  const t=document.createElement('span');t.textContent=s.name;d.append(dot,t);d.onclick=()=>pick(s.id);l.appendChild(d)})}
+function pick(id){cur=id;localStorage.setItem('last',id);const s=students.filter(x=>x.id===id)[0];
+ if(!s){cur=null;$('nm').textContent='Выберите ученика';$('fr').src='about:blank';render();return}
+ $('nm').textContent=s.name;$('fr').src='/b/'+id;render()}
+async function op(o){const r=await api('/api/admin/op',{method:'POST',body:JSON.stringify(o)});if(r.ok)students=await r.json();else alert('Не получилось');render()}
+$('go').onclick=()=>{key=$('pw').value;localStorage.setItem('adm',key);load()};
+$('pw').onkeydown=e=>{if(e.key==='Enter')$('go').click()};
+$('addS').onclick=async()=>{const n=prompt('Имя ученика (можно с классом, например «Миша 8кл»):');if(!n||!n.trim())return;
+ await op({t:'add',name:n});pick(students[students.length-1].id)};
+$('ren').onclick=async()=>{if(!cur)return;const s=students.filter(x=>x.id===cur)[0];const n=prompt('Новое имя:',s.name);if(!n||!n.trim())return;await op({t:'rename',id:cur,name:n});pick(cur)};
+$('del').onclick=async()=>{if(!cur)return;const s=students.filter(x=>x.id===cur)[0];
+ if(!confirm('Удалить ученика «'+s.name+'» вместе со всеми его досками? Это нельзя отменить.'))return;
+ const id=cur;cur=null;await op({t:'delete',id:id});pick(students.length?students[0].id:null)};
+$('lnk').onclick=()=>{if(!cur)return;const t=location.origin+'/b/'+cur;
+ (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{$('lnk').textContent='Скопировано';setTimeout(()=>{$('lnk').textContent='Ссылка ученика'},1500)},()=>prompt('Ссылка ученика:',t))};
+$('bk').onclick=async()=>{const r=await api('/api/admin/backup');if(!r.ok)return alert('Не получилось');
+ const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());a.download='board-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click()};
+$('rs').onclick=()=>$('rf').click();
+$('rf').onchange=async()=>{const f=$('rf').files[0];$('rf').value='';if(!f)return;
+ if(!confirm('Загрузить копию? Список учеников и их доски будут заменены данными из файла.'))return;
+ try{const data=JSON.parse(await f.text());await op({t:'restore',data:data});cur=null;pick(students.length?students[0].id:null)}catch(e){alert('Файл не подходит')}};
+if(key)load();else showLogin('');
+})();
+</script>
+</body>
+</html>
