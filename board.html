@@ -346,23 +346,36 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('keyup',e=>{if(e.code==='Space'){space=false;cv.style.cursor=tool()==='hand'?'grab':'crosshair'}});
 
 // --- картинки ---
+const nextY={};
+function placeImage(im,task){
+ let src=null,w=0,h=0;
+ for(const m of [1400,1000,700,500,350]){
+  const sc=Math.min(1,m/Math.max(im.width,im.height));w=Math.round(im.width*sc);h=Math.round(im.height*sc);
+  const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);
+  let s=c.toDataURL('image/png');if(s.length>800000)s=c.toDataURL('image/jpeg',.85);
+  if(s.length<=800000){src=s;break}}
+ if(!src){$('st').textContent='Картинка слишком большая';return}
+ const sw=task?Math.min(w,.8*cw):Math.min(w,.6*cw,.6*ch*w/h),dw=sw/view.s,dh=dw*h/w,iid=newId();
+ let x=view.x+cw/view.s/2-dw/2,y=view.y+ch/view.s/2-dh/2;
+ if(task){ // задачи складываются столбиком сверху вниз
+  x=view.x+(cw/view.s-dw)/2;const ny=nextY[page];
+  y=(ny!==undefined&&ny>=view.y&&ny<view.y+ch/view.s*.9)?ny:view.y+30/view.s;nextY[page]=y+dh+24/view.s;
+ }
+ mine.push({page:page,id:iid});redo=[];
+ send({t:'image',page:page,img:{id:iid,src:src,x:r2(x),y:r2(y),w:r2(dw),h:r2(dh)}});
+ if(!task)$('tool').value='mv';redraw();
+}
 function addImage(file){
  const fr=new FileReader();
- fr.onload=()=>{const im=new Image();im.onload=()=>{
-  let src=null,w=0,h=0;
-  for(const m of [1000,700,500,350]){
-   const sc=Math.min(1,m/Math.max(im.width,im.height));w=Math.round(im.width*sc);h=Math.round(im.height*sc);
-   const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);
-   let s=c.toDataURL('image/png');if(s.length>800000)s=c.toDataURL('image/jpeg',.8);
-   if(s.length<=800000){src=s;break}}
-  if(!src){$('st').textContent='Картинка слишком большая';return}
-  const sw=Math.min(w,.6*cw,.6*ch*w/h),dw=sw/view.s,dh=dw*h/w,iid=newId();
-  mine.push({page:page,id:iid});redo=[];
-  send({t:'image',page:page,img:{id:iid,src:src,x:r2(view.x+cw/view.s/2-dw/2),y:r2(view.y+ch/view.s/2-dh/2),w:r2(dw),h:r2(dh)}});
-  $('tool').value='mv';redraw()};
-  im.src=fr.result};
+ fr.onload=()=>{const im=new Image();im.onload=()=>placeImage(im,false);im.src=fr.result};
  fr.readAsDataURL(file);
 }
+// задачи из сборников приходят из кабинета преподавателя
+window.addEventListener('message',e=>{
+ if(e.origin!==location.origin)return;const d=e.data;
+ if(!d||d.t!=='task'||typeof d.src!=='string'||!/^data:image\/(png|jpeg);base64,/.test(d.src))return;
+ const im=new Image();im.onload=()=>placeImage(im,true);im.src=d.src;
+});
 document.addEventListener('paste',e=>{
  const it=(e.clipboardData&&e.clipboardData.items)||[];
  for(let i=0;i<it.length;i++)if(it[i].type.indexOf('image')===0){addImage(it[i].getAsFile());e.preventDefault();return}

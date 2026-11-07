@@ -131,6 +131,13 @@ function admin(req, res, u) {
 http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   if (u.pathname.startsWith('/api/admin/')) return admin(req, res, u);
+  const pj = u.pathname.match(/^\/pdfjs\/(pdf(?:\.worker)?\.min\.mjs)$/);
+  if (pj) { // pdf.js для просмотра сборников задач в кабинете преподавателя
+    const f = path.join(__dirname, pj[1]);
+    if (!fs.existsSync(f)) { res.writeHead(404); return res.end(); }
+    res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=86400' });
+    return fs.createReadStream(f).pipe(res);
+  }
   if (u.pathname === '/api/ice') return json(res, ICE);
   const m = u.pathname.match(/^\/api\/([a-z0-9]{4,32})\/(events|op)$/);
   if (m) {

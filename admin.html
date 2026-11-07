@@ -21,7 +21,25 @@ button,input{font:inherit;color:var(--tx);background:var(--panel);border:1px sol
 .foot{display:flex;gap:6px;flex-wrap:wrap}.foot button{font-size:13px;padding:5px 8px}
 #main{flex:1;min-width:0;display:flex;flex-direction:column}
 #bar{display:flex;gap:6px;align-items:center;padding:8px 10px;flex-wrap:wrap}#nm{flex:1;min-width:120px;font-size:17px}
-iframe{flex:1;border:0;width:100%;min-height:0}
+#work{flex:1;display:flex;min-height:0;position:relative}
+#work iframe{flex:1;min-width:0;border:0;min-height:0}
+#tasks{width:470px;max-width:60%;border-left:1px solid var(--bd);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+#tasks[hidden]{display:none}
+.tr{display:flex;gap:6px;align-items:center;padding:6px 8px;flex-wrap:wrap}
+.tr select{max-width:190px;font-size:13px}.tr button,.tr input{font-size:13px}
+#tnum{width:64px}
+#tview{flex:1;min-height:0;overflow:auto;background:#cfc9de;padding:3px}
+#tbox{position:relative;margin:0 auto;background:#fff}
+#tcv{display:block}
+#tov{position:absolute;inset:0;touch-action:pan-y pinch-zoom;cursor:crosshair}
+.card{position:absolute;border:2px solid transparent;border-radius:6px;pointer-events:none}
+.card.hot{border-color:var(--ac);background:rgba(106,63,196,.07)}
+.plus{position:absolute;width:30px;height:30px;border-radius:50%;padding:0;background:#2e7d32;color:#fff;border-color:#2e7d32;font-size:20px;line-height:1;cursor:pointer}
+.lk{position:absolute;cursor:pointer;border-radius:4px}.lk:hover{outline:2px solid rgba(106,63,196,.55)}
+.mk{position:absolute;left:0;right:0;height:3px;background:#d32f2f;pointer-events:none}
+.sel{position:absolute;border:2px dashed #6a3fc4;background:rgba(106,63,196,.12);pointer-events:none}
+.selbar{position:absolute;display:flex;gap:6px;z-index:3}
+@media (max-width:700px){#tasks{position:absolute;inset:0;width:auto;max-width:none;z-index:5;border-left:0}}
 #msg{color:var(--mut)}
 @media (max-width:700px){#app{flex-direction:column}#side{width:100%;max-height:34%;border-right:0;border-bottom:1px solid var(--bd)}}
 </style>
@@ -35,8 +53,17 @@ iframe{flex:1;border:0;width:100%;min-height:0}
   <div class="foot"><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden></div>
  </div>
  <div id="main">
-  <div id="bar"><b id="nm">Выберите ученика</b><button id="lnk">Ссылка ученика</button><button id="ren">Переименовать</button><button id="del">Удалить</button></div>
-  <iframe id="fr" allow="microphone; clipboard-write"></iframe>
+  <div id="bar"><b id="nm">Выберите ученика</b><button id="tk">Задачи</button><button id="lnk">Ссылка ученика</button><button id="ren">Переименовать</button><button id="del">Удалить</button></div>
+  <div id="work">
+   <iframe id="fr" allow="microphone; clipboard-write"></iframe>
+   <div id="tasks" hidden>
+    <div class="tr"><select id="tbook"></select><button id="tadd">+ Сборник</button><button id="tdel" title="Убрать сборник из списка">Убрать</button><input type="file" id="tfile" accept=".pdf,application/pdf" multiple hidden><button id="tclose" style="margin-left:auto">✕</button></div>
+    <div class="tr"><button id="tback" title="Назад">↩</button><button id="tprev">←</button><input id="tnum" type="number" min="1"><span id="tcnt"></span><button id="tnext">→</button><select id="tol"><option value="">Оглавление…</option></select></div>
+    <div class="tr"><input id="tq" placeholder="Номер задачи, например 4.19" style="flex:1;min-width:120px"><button id="tfind">Найти</button><button id="tpage">Страница целиком → на доску</button></div>
+    <div class="tr" style="padding-top:0"><span id="tmsg" style="font-size:12px;color:var(--mut)"></span></div>
+    <div id="tview"><div id="tbox"><canvas id="tcv"></canvas><div id="tov"></div></div></div>
+   </div>
+  </div>
  </div>
 </div>
 <script>
@@ -77,6 +104,184 @@ $('rf').onchange=async()=>{const f=$('rf').files[0];$('rf').value='';if(!f)retur
  if(!confirm('Загрузить копию? Список учеников и их доски будут заменены данными из файла.'))return;
  try{const data=JSON.parse(await f.text());await op({t:'restore',data:data});cur=null;pick(students.length?students[0].id:null)}catch(e){alert('Файл не подходит')}};
 if(key)load();else showLogin('');
+})();
+</script>
+
+<script>
+// Сборники задач: PDF открывается прямо в браузере, файл остаётся на компьютере преподавателя
+(function(){
+const $=i=>document.getElementById(i);
+let pdfjs=null,pdf=null,book=null,pageNo=1,hist=[],token=0,ol=[],inited=false,sel=null;
+const mem=new Map();
+const idb=()=>new Promise((res,rej)=>{try{const q=indexedDB.open('tasks-books',1);q.onupgradeneeded=()=>q.result.createObjectStore('f');q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)}catch(e){rej(e)}});
+async function store(mode,fn){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction('f',mode),q=fn(t.objectStore('f'));t.oncomplete=()=>res(q&&q.result);t.onerror=()=>rej(t.error)})}
+const bookKeys=async()=>{try{return await store('readonly',s=>s.getAllKeys())}catch(e){return [...mem.keys()]}};
+const bookGet=async k=>{try{return await store('readonly',s=>s.get(k))}catch(e){return mem.get(k)}};
+const bookPut=async(k,v)=>{try{await store('readwrite',s=>s.put(v,k))}catch(e){mem.set(k,v)}};
+const bookDel=async k=>{try{await store('readwrite',s=>s.delete(k))}catch(e){mem.delete(k)}};
+const msg=(t,ms)=>{$('tmsg').textContent=t;if(ms)setTimeout(()=>{if($('tmsg').textContent===t)$('tmsg').textContent=''},ms)};
+
+// поиск карточек задач на странице (шапка карточки закрашена цветом, тело белое, между карточками фон)
+function detect(oc){
+ const w=oc.width,h=oc.height,d=oc.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data;
+ const b0=(3*w+3)*4,bg=[d[b0],d[b0+1],d[b0+2]],xs=Math.floor(w*.105)+4,xe=xs+Math.max(8,Math.floor(w*.02)),ymax=Math.floor(h*.9),n=xe-xs;
+ const HDR=new Uint8Array(h),ISBG=new Uint8Array(h);
+ for(let y=0;y<h;y++){
+  const mn=[255,255,255],mx=[0,0,0],sm=[0,0,0];
+  for(let x=xs;x<xe;x++){const i=(y*w+x)*4;for(let c=0;c<3;c++){const v=d[i+c];if(v<mn[c])mn[c]=v;if(v>mx[c])mx[c]=v;sm[c]+=v}}
+  const u=Math.max(mx[0]-mn[0],mx[1]-mn[1],mx[2]-mn[2])<=8,m=[sm[0]/n,sm[1]/n,sm[2]/n];
+  const db=Math.abs(m[0]-bg[0])+Math.abs(m[1]-bg[1])+Math.abs(m[2]-bg[2]),mm=Math.min(m[0],m[1],m[2]);
+  ISBG[y]=u&&db<14?1:0;
+  HDR[y]=(y<ymax&&u&&db>=14&&mm<246&&!(mm>=248))?1:0;
+ }
+ const minh=Math.max(8,Math.floor(h*.012)),gapn=Math.max(3,Math.floor(h*.006)),bands=[];
+ const anyH=(a,b)=>{for(let i=a;i<Math.min(b,h);i++)if(HDR[i])return true;return false};
+ const allB=(a,b)=>{for(let i=a;i<Math.min(b,h);i++)if(!ISBG[i])return false;return true};
+ for(let y=0;y<ymax;){
+  if(HDR[y]){const s=y;while(y<ymax&&(HDR[y]||anyH(y,y+4)))y++;if(y-s>=minh)bands.push([s,y])}else y++;
+ }
+ const cards=[];let last=-1;
+ for(const [s,e] of bands){if(s<last)continue;let y=e;while(y<ymax&&!allB(y,y+gapn))y++;cards.push([s,y]);last=y}
+ return cards;
+}
+async function resolveDest(d){
+ if(typeof d==='string')d=await pdf.getDestination(d);
+ if(!Array.isArray(d))return null;
+ const ref=d[0],idx=typeof ref==='object'?await pdf.getPageIndex(ref):ref;
+ return{page:idx+1,y:(d[1]&&d[1].name==='XYZ'&&typeof d[3]==='number')?d[3]:null};
+}
+function goto(p,y,push=true){
+ if(!pdf)return;p=Math.max(1,Math.min(pdf.numPages,p|0));
+ if(push&&p!==pageNo)hist.push(pageNo);
+ pageNo=p;$('tnum').value=p;localStorage.setItem('tpos:'+book,p);render(y);
+}
+function clearSel(){if(sel){if(sel.el)sel.el.remove();if(sel.bar)sel.bar.remove();sel=null}}
+async function render(markY){
+ const my=++token,page=await pdf.getPage(pageNo);if(my!==token)return;
+ const base=page.getViewport({scale:1}),cssW=Math.max(280,$('tview').clientWidth-6),k=cssW/base.width,dpr=Math.min(2,window.devicePixelRatio||1);
+ const vp=page.getViewport({scale:k}),vpr=page.getViewport({scale:k*dpr}),cv=$('tcv'),ov=$('tov');
+ cv.width=Math.round(vpr.width);cv.height=Math.round(vpr.height);cv.style.width=vp.width+'px';cv.style.height=vp.height+'px';
+ $('tbox').style.width=vp.width+'px';$('tbox').style.height=vp.height+'px';
+ clearSel();ov.innerHTML='';
+ await page.render({canvasContext:cv.getContext('2d'),viewport:vpr}).promise;if(my!==token)return;
+ const dvp=page.getViewport({scale:500/base.width}),oc=document.createElement('canvas');
+ oc.width=Math.round(dvp.width);oc.height=Math.round(dvp.height);
+ await page.render({canvasContext:oc.getContext('2d',{willReadFrequently:true}),viewport:dvp}).promise;if(my!==token)return;
+ detect(oc).forEach(([s,e])=>{
+  const fy0=Math.max(0,(s-2)/oc.height),fy1=Math.min(1,(e+2)/oc.height),fx0=.095,fx1=.905;
+  const c=document.createElement('div');c.className='card';
+  c.style.cssText='left:'+fx0*100+'%;width:'+(fx1-fx0)*100+'%;top:'+fy0*100+'%;height:'+(fy1-fy0)*100+'%';
+  const b=document.createElement('button');b.className='plus';b.textContent='+';b.title='Отправить эту задачу на доску';
+  b.style.cssText='top:'+fy0*100+'%;left:1%';
+  b.onmouseenter=()=>c.classList.add('hot');b.onmouseleave=()=>c.classList.remove('hot');
+  b.onclick=()=>send(fx0-.005,fy0,fx1+.005,fy1,b);
+  ov.append(c,b);
+ });
+ for(const a of await page.getAnnotations()){
+  if(a.subtype!=='Link'||!a.dest)continue;
+  const p1=vp.convertToViewportPoint(a.rect[0],a.rect[1]),p2=vp.convertToViewportPoint(a.rect[2],a.rect[3]),l=document.createElement('div');
+  l.className='lk';l.style.cssText='left:'+Math.min(p1[0],p2[0])+'px;top:'+Math.min(p1[1],p2[1])+'px;width:'+Math.abs(p2[0]-p1[0])+'px;height:'+Math.abs(p2[1]-p1[1])+'px';
+  l.onpointerdown=e=>e.stopPropagation();
+  l.onclick=async()=>{const t=await resolveDest(a.dest);if(t)goto(t.page,t.y)};
+  ov.appendChild(l);
+ }
+ const sc=$('tview');
+ if(markY!=null){const y=vp.convertToViewportPoint(0,markY)[1],m=document.createElement('div');m.className='mk';m.style.top=y+'px';ov.appendChild(m);sc.scrollTop=Math.max(0,y-70);setTimeout(()=>m.remove(),5000)}
+ else sc.scrollTop=0;
+}
+async function crop(fx0,fy0,fx1,fy1){
+ const page=await pdf.getPage(pageNo),base=page.getViewport({scale:1});
+ const sc=Math.max(1,Math.min(4,1100/((fx1-fx0)*base.width))),vp=page.getViewport({scale:sc});
+ const full=document.createElement('canvas');full.width=Math.round(vp.width);full.height=Math.round(vp.height);
+ await page.render({canvasContext:full.getContext('2d'),viewport:vp}).promise;
+ const x=Math.round(fx0*full.width),y=Math.round(fy0*full.height),w=Math.round((fx1-fx0)*full.width),h=Math.round((fy1-fy0)*full.height);
+ const o=document.createElement('canvas');o.width=w;o.height=h;const c=o.getContext('2d');
+ c.fillStyle='#fff';c.fillRect(0,0,w,h);c.drawImage(full,x,y,w,h,0,0,w,h);
+ let s=o.toDataURL('image/png');if(s.length>700000)s=o.toDataURL('image/jpeg',.9);
+ return s;
+}
+async function send(fx0,fy0,fx1,fy1,btn){
+ const f=$('fr');
+ if(!(f.getAttribute('src')||'').startsWith('/b/')){msg('Сначала выберите ученика слева',4000);return}
+ msg('Отправляю…');
+ try{
+  f.contentWindow.postMessage({t:'task',src:await crop(fx0,fy0,fx1,fy1)},location.origin);
+  msg('✓ Задача на доске',2500);
+  if(btn){const o=btn.textContent;btn.textContent='✓';setTimeout(()=>{btn.textContent=o},1500)}
+ }catch(e){msg('Не получилось: '+(e.message||e),4000)}
+}
+async function openBook(name){
+ msg('Открываю сборник…');
+ try{
+  if(!pdfjs){pdfjs=await import('/pdfjs/pdf.min.mjs');pdfjs.GlobalWorkerOptions.workerSrc='/pdfjs/pdf.worker.min.mjs'}
+  const blob=await bookGet(name);if(!blob){msg('Сборник не найден');return}
+  if(pdf){try{pdf.destroy()}catch(e){}}
+  pdf=await pdfjs.getDocument({data:new Uint8Array(await blob.arrayBuffer())}).promise;
+  book=name;localStorage.setItem('tbook',name);hist=[];$('tcnt').textContent='/ '+pdf.numPages;
+  ol=[];(function w(a,d){for(const o of a||[]){ol.push({t:o.title,d:o.dest,depth:d});w(o.items,d+1)}})(await pdf.getOutline(),0);
+  const s=$('tol');s.innerHTML='<option value="">Оглавление…</option>';
+  ol.forEach((o,i)=>{const e=document.createElement('option');e.value=i;e.textContent='\u2003'.repeat(o.depth)+o.t;s.appendChild(e)});
+  msg('');goto(Math.min(pdf.numPages,+localStorage.getItem('tpos:'+name)||1),null,false);
+ }catch(e){msg('Не удалось открыть сборник: '+(e.message||e))}
+}
+async function refresh(want){
+ const ks=await bookKeys(),s=$('tbook');s.innerHTML='';
+ ks.forEach(k=>{const o=document.createElement('option');o.value=o.textContent=k;s.appendChild(o)});
+ if(!ks.length){pdf=null;book=null;$('tov').innerHTML='';$('tbox').style.height='0';$('tcnt').textContent='';msg('Добавьте сборник (PDF) кнопкой «+ Сборник». Файл останется на вашем компьютере.');return}
+ const w=want||localStorage.getItem('tbook');s.value=ks.includes(w)?w:ks[0];openBook(s.value);
+}
+async function findTask(){
+ const q=$('tq').value.trim().replace(',','.');if(!q||!pdf)return;
+ for(const n of ['task::'+q,'task::'+q+'.1']){
+  let d=null;try{d=await pdf.getDestination(n)}catch(e){}
+  if(d){const t=await resolveDest(d);if(t){goto(t.page,t.y);return}}
+ }
+ msg('Задача '+q+' не найдена. Поиск по номеру работает не во всех сборниках, используйте оглавление.',5000);
+}
+// выделение произвольной области мышью или пером
+const ov=$('tov');
+ov.addEventListener('pointerdown',e=>{
+ if(e.target!==ov||e.pointerType==='touch')return;
+ clearSel();const r=ov.getBoundingClientRect(),d=document.createElement('div');d.className='sel';ov.appendChild(d);
+ sel={el:d,r:r,x:e.clientX-r.left,y:e.clientY-r.top};sel.x1=sel.x;sel.y1=sel.y;ov.setPointerCapture(e.pointerId);
+});
+ov.addEventListener('pointermove',e=>{
+ if(!sel||!sel.el||sel.bar)return;
+ sel.x1=Math.max(0,Math.min(sel.r.width,e.clientX-sel.r.left));sel.y1=Math.max(0,Math.min(sel.r.height,e.clientY-sel.r.top));
+ Object.assign(sel.el.style,{left:Math.min(sel.x,sel.x1)+'px',top:Math.min(sel.y,sel.y1)+'px',width:Math.abs(sel.x1-sel.x)+'px',height:Math.abs(sel.y1-sel.y)+'px'});
+});
+ov.addEventListener('pointerup',()=>{
+ if(!sel||!sel.el||sel.bar)return;
+ const x0=Math.min(sel.x,sel.x1),x1=Math.max(sel.x,sel.x1),y0=Math.min(sel.y,sel.y1),y1=Math.max(sel.y,sel.y1);
+ if(x1-x0<20||y1-y0<20){clearSel();return}
+ const bar=document.createElement('div');bar.className='selbar';bar.style.left=x0+'px';bar.style.top=Math.min(y1+4,sel.r.height-36)+'px';
+ const ok=document.createElement('button'),no=document.createElement('button');
+ ok.textContent='→ На доску';no.textContent='✕';
+ ok.onclick=()=>{const w=sel.r.width,h=sel.r.height;send(x0/w,y0/h,x1/w,y1/h,null);clearSel()};
+ no.onclick=clearSel;bar.append(ok,no);bar.onpointerdown=e=>e.stopPropagation();ov.appendChild(bar);sel.bar=bar;
+});
+
+$('tk').onclick=()=>{
+ const p=$('tasks'),open=p.hidden;p.hidden=!open;
+ if(open&&!inited){inited=true;refresh()}else if(open&&pdf)render();
+};
+$('tclose').onclick=()=>{$('tasks').hidden=true};
+$('tadd').onclick=()=>$('tfile').click();
+$('tfile').onchange=async()=>{
+ const fl=[...$('tfile').files];$('tfile').value='';if(!fl.length)return;
+ msg('Сохраняю…');for(const f of fl)await bookPut(f.name,f);await refresh(fl[0].name);
+};
+$('tdel').onclick=async()=>{
+ if(!book||!confirm('Убрать «'+book+'» из списка? Сам файл на компьютере останется.'))return;
+ await bookDel(book);await refresh();
+};
+$('tbook').onchange=()=>openBook($('tbook').value);
+$('tprev').onclick=()=>goto(pageNo-1);$('tnext').onclick=()=>goto(pageNo+1);
+$('tnum').onchange=()=>goto(+$('tnum').value);
+$('tback').onclick=()=>{if(hist.length)goto(hist.pop(),null,false)};
+$('tol').onchange=async()=>{const v=$('tol').value;if(v==='')return;const t=await resolveDest(ol[+v].d);if(t)goto(t.page,t.y);$('tol').value=''};
+$('tfind').onclick=findTask;$('tq').onkeydown=e=>{if(e.key==='Enter')findTask()};
+$('tpage').onclick=()=>send(.04,.04,.96,.91,null);
 })();
 </script>
 </body>
