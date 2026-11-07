@@ -5,12 +5,15 @@ const DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 fs.mkdirSync(DIR, { recursive: true });
 const rooms = {};
 const ID = /^[\w-]{1,40}$/;
+const KINDS = ['pen', 'line', 'arrow', 'rect', 'ellipse'];
+const IMG = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/=]+$/;
 
 function room(id) {
   if (rooms[id]) return rooms[id];
   let s;
   try { s = JSON.parse(fs.readFileSync(path.join(DIR, id + '.json'), 'utf8')); }
   catch (e) { s = { pages: [{ id: 'p1', title: 'Страница 1' }], strokes: {} }; }
+  s.images = s.images || {};
   return (rooms[id] = { id, s, clients: new Set(), timer: null });
 }
 function save(r) {
@@ -21,19 +24,36 @@ function bcast(r, msg) {
   const d = 'data: ' + JSON.stringify(msg) + '\n\n';
   r.clients.forEach(c => c.write(d));
 }
+const num = (v, a, b, d) => Math.min(b, Math.max(a, Number.isFinite(+v) ? +v : d));
+
 // Проверяет и применяет операцию; возвращает false, если она некорректна
 function apply(s, op) {
-  const st = s.strokes;
+  const st = s.strokes, im = s.images;
   if (!op || !ID.test(op.page || 'p1')) return false;
   switch (op.t) {
     case 'stroke': {
       const k = op.stroke;
       if (!k || !ID.test(k.id) || !Array.isArray(k.pts) || k.pts.length > 20000 || !/^#[0-9a-f]{3,6}$/i.test(k.c)) return false;
-      (st[op.page] = st[op.page] || {})[k.id] = { pts: k.pts.map(Number), c: k.c, w: Math.min(30, Math.max(1, +k.w || 4)) };
+      const kind = KINDS.includes(k.k) ? k.k : 'pen';
+      if (kind !== 'pen' && k.pts.length !== 4) return false;
+      (st[op.page] = st[op.page] || {})[k.id] = { k: kind, pts: k.pts.map(Number), c: k.c, w: num(k.w, 1, 30, 4) };
       return true;
     }
-    case 'erase': if (st[op.page]) delete st[op.page][op.id]; return true;
-    case 'clear': st[op.page] = {}; return true;
+    case 'image': {
+      const g = op.img;
+      if (!g || !ID.test(g.id) || typeof g.src !== 'string' || g.src.length > 900000 || !IMG.test(g.src)) return false;
+      const m = (im[op.page] = im[op.page] || {});
+      if (!m[g.id] && Object.keys(m).length >= 40) return false;
+      m[g.id] = { src: g.src, x: num(g.x, -3000, 6000, 0), y: num(g.y, -3000, 6000, 0), w: num(g.w, 20, 3000, 200), h: num(g.h, 20, 3000, 200) };
+      return true;
+    }
+    case 'imgset': {
+      const g = (im[op.page] || {})[op.id];
+      if (g) { g.x = num(op.x, -3000, 6000, g.x); g.y = num(op.y, -3000, 6000, g.y); g.w = num(op.w, 20, 3000, g.w); g.h = num(op.h, 20, 3000, g.h); }
+      return true;
+    }
+    case 'erase': if (st[op.page]) delete st[op.page][op.id]; if (im[op.page]) delete im[op.page][op.id]; return true;
+    case 'clear': st[op.page] = {}; im[op.page] = {}; return true;
     case 'addPage':
       if (!ID.test(op.id) || s.pages.length >= 50) return false;
       if (!s.pages.some(p => p.id === op.id)) s.pages.push({ id: op.id, title: String(op.title || '').slice(0, 80) });
@@ -59,7 +79,7 @@ http.createServer((req, res) => {
   }
   if (m && m[2] === 'op' && req.method === 'POST') {
     let body = '';
-    req.on('data', c => { body += c; if (body.length > 1e6) req.destroy(); });
+    req.on('data', c => { body += c; if (body.length > 1.2e6) req.destroy(); });
     req.on('end', () => {
       let op; try { op = JSON.parse(body); } catch (e) { res.writeHead(400); return res.end(); }
       const r = room(m[1]);
@@ -70,8 +90,8 @@ http.createServer((req, res) => {
     });
     return;
   }
-  if (u.pathname === '/') {
-    res.writeHead(302, { Location: '/b/' + crypto.randomBytes(4).toString('hex') });
+  if (u.pathname === '/') { // каждый заход создаёт новую пустую доску с неугадываемым адресом
+    res.writeHead(302, { Location: '/b/' + crypto.randomBytes(6).toString('hex') });
     return res.end();
   }
   if (/^\/b\/[a-z0-9]{4,32}$/.test(u.pathname)) {
