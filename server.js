@@ -137,9 +137,15 @@ function admin(req, res, u) {
       const r = rooms[j.id]; if (r) { r.clients.forEach(c => c.end()); delete rooms[j.id]; }
       if (RID.test(String(j.id))) fs.unlink(path.join(DIR, j.id + '.json'), () => {});
     } else if (j.t === 'restore' && j.data && j.data.index && Array.isArray(j.data.index.students)) {
-      index = { students: j.data.index.students.filter(s => RID.test(String(s.id))).map(s => ({ id: s.id, name: String(s.name || '').slice(0, 60), color: String(s.color || '#888').slice(0, 9) })) };
+      const inc = j.data.index.students.filter(s => RID.test(String(s.id))).map(s => ({ id: s.id, name: String(s.name || '').slice(0, 60), color: String(s.color || '#888').slice(0, 9) }));
+      let todo = inc;
+      if (j.merge) { // вернуть только недостающих, существующих не трогать
+        const have = new Set(index.students.map(x => x.id));
+        todo = inc.filter(s => !have.has(s.id));
+        index = { students: index.students.concat(todo) };
+      } else index = { students: inc };
       saveIndex();
-      index.students.forEach(s => {
+      todo.forEach(s => {
         const st = (j.data.rooms || {})[s.id];
         if (!st || !Array.isArray(st.pages)) return;
         st.strokes = st.strokes || {}; st.images = st.images || {};
@@ -162,7 +168,11 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=86400' });
     return fs.createReadStream(f).pipe(res);
   }
-  if (u.pathname === '/api/ice') return iceServers().then(v => json(res, v));
+  if (u.pathname === '/api/ice') { // ключи TURN выдаём только тем, кто открыл существующую доску
+    const rr = String(u.searchParams.get('r') || '');
+    if (!RID.test(rr) || !room(rr)) { res.writeHead(404); return res.end(); }
+    return iceServers().then(v => json(res, v));
+  }
   const m = u.pathname.match(/^\/api\/([a-z0-9]{4,32})\/(events|op)$/);
   if (m) {
     const r = room(m[1]);
@@ -195,7 +205,7 @@ http.createServer((req, res) => {
   }
   const b = u.pathname.match(/^\/b\/([a-z0-9]{4,32})$/);
   if (b) {
-    if (!room(b[1])) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Доска не найдена'); }
+    if (!room(b[1])) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Доска временно недоступна. Попросите преподавателя открыть свой кабинет, затем обновите эту страницу.'); }
     return PAGE('board.html')(req, res);
   }
   res.writeHead(404); res.end('Not found');

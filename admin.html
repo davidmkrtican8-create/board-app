@@ -41,6 +41,7 @@ button,input{font:inherit;color:var(--tx);background:var(--panel);border:1px sol
 .selbar{position:absolute;display:flex;gap:6px;z-index:3}
 @media (max-width:700px){#tasks{position:absolute;inset:0;width:auto;max-width:none;z-index:5;border-left:0}}
 #msg{color:var(--mut)}
+body.nosidebar #side{display:none}
 @media (max-width:700px){#app{flex-direction:column}#side{width:100%;max-height:34%;border-right:0;border-bottom:1px solid var(--bd)}}
 </style>
 </head>
@@ -50,10 +51,10 @@ button,input{font:inherit;color:var(--tx);background:var(--panel);border:1px sol
  <div id="side">
   <div class="top"><b>Ученики</b><button id="addS">+ Ученик</button></div>
   <div id="list"></div>
-  <div class="foot"><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden></div>
+  <div class="foot"><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden><button id="rb" title="Вернуть учеников и доски из копии, которую кабинет сам сохраняет в вашем браузере">Восстановить из автокопии</button><div id="bkst" style="font-size:12px;color:var(--mut);width:100%"></div></div>
  </div>
  <div id="main">
-  <div id="bar"><b id="nm">Выберите ученика</b><button id="tk">Задачи</button><button id="lnk">Ссылка ученика</button><button id="ren">Переименовать</button><button id="del">Удалить</button></div>
+  <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk">Задачи</button><button id="fs" title="Во весь экран">⛶</button><button id="lnk">Ссылка ученика</button><button id="ren">Переименовать</button><button id="del">Удалить</button></div>
   <div id="work">
    <iframe id="fr" allow="microphone; clipboard-write"></iframe>
    <div id="tasks" hidden>
@@ -283,6 +284,59 @@ $('tback').onclick=()=>{if(hist.length)goto(hist.pop(),null,false)};
 $('tol').onchange=async()=>{const v=$('tol').value;if(v==='')return;const t=await resolveDest(ol[+v].d);if(t)goto(t.page,t.y);$('tol').value=''};
 $('tfind').onclick=findTask;$('tq').onkeydown=e=>{if(e.key==='Enter')findTask()};
 $('tpage').onclick=()=>send(.04,.04,.96,.91,null);
+})();
+</script>
+
+<script>
+// Вид кабинета и автокопия
+(function(){
+const $=i=>document.getElementById(i);
+function setSB(h){document.body.classList.toggle('nosidebar',h);localStorage.setItem('nosidebar',h?'1':'0')}
+$('hs').onclick=()=>setSB(!document.body.classList.contains('nosidebar'));
+if(localStorage.getItem('nosidebar')==='1')setSB(true);
+const de=document.documentElement,rf=de.requestFullscreen||de.webkitRequestFullscreen;
+if(!rf)$('fs').hidden=true;
+$('fs').onclick=()=>{const d=document;if(d.fullscreenElement||d.webkitFullscreenElement)(d.exitFullscreen||d.webkitExitFullscreen).call(d);else rf.call(de)};
+
+// Копия всех досок хранится в браузере преподавателя: если сервер потеряет данные (обновление файлов на GitHub), их можно вернуть
+const api=(p,o)=>fetch(p,Object.assign({headers:{'X-Admin':localStorage.getItem('adm')||'','Content-Type':'application/json'}},o));
+const bdb=()=>new Promise((res,rej)=>{try{const q=indexedDB.open('board-backups',1);q.onupgradeneeded=()=>q.result.createObjectStore('b');q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)}catch(e){rej(e)}});
+async function bget(k){const db=await bdb();return new Promise((res,rej)=>{const q=db.transaction('b').objectStore('b').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
+async function bput(k,v){const db=await bdb();return new Promise((res,rej)=>{const t=db.transaction('b','readwrite');t.objectStore('b').put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})}
+const fmt=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+async function serverCount(){const r=await api('/api/admin/students');return r.ok?(await r.json()).length:-1}
+async function makeBackup(){
+ try{
+  if(await serverCount()<1)return; // пустой сервер не затирает копию
+  const r=await api('/api/admin/backup');if(!r.ok)return;
+  const data=await r.json(),now=Date.now(),cur=await bget('latest'),day=await bget('daily');
+  if(cur&&(!day||now-day.t>20*3600e3))await bput('daily',cur);
+  await bput('latest',{t:now,data:data});
+  $('bkst').textContent='Автокопия: '+fmt(now);
+ }catch(e){$('bkst').textContent='Автокопия не сохранилась'}
+}
+async function restore(b){
+ const r=await api('/api/admin/op',{method:'POST',body:JSON.stringify({t:'restore',merge:true,data:b.data})});
+ if(r.ok)location.reload();else alert('Не получилось восстановить');
+}
+async function manualRestore(){
+ for(const k of ['latest','daily']){
+  const b=await bget(k).catch(()=>null);if(!b)continue;
+  if(confirm('Восстановить из '+(k==='latest'?'последней':'суточной')+' автокопии от '+fmt(b.t)+' (учеников: '+b.data.index.students.length+')? Недостающие ученики и доски вернутся, текущие останутся как есть.'))return restore(b);
+ }
+ alert('Подходящей автокопии нет');
+}
+$('rb').onclick=manualRestore;
+async function start(){
+ const n=await serverCount();if(n<0)return;
+ const b=await bget('latest').catch(()=>null);
+ if(n===0&&b&&b.data.index.students.length){
+  if(confirm('На сервере пусто (так бывает после обновления файлов на GitHub). Вернуть учеников и доски из автокопии от '+fmt(b.t)+'?'))return restore(b);
+  $('bkst').textContent='Есть автокопия от '+fmt(b.t)+' (кнопка «Восстановить из автокопии»)';
+ }else await makeBackup();
+ setInterval(makeBackup,180000);
+}
+const tt=setInterval(()=>{if(!$('app').hidden){clearInterval(tt);start()}},700);
 })();
 </script>
 </body>

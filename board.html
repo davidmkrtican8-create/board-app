@@ -22,7 +22,7 @@ button{cursor:pointer}
 #wrap{flex:1;min-height:0;position:relative;overflow:hidden;border:1px solid var(--bd);border-radius:10px;background:#fff}
 canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
 #st{font-size:12px;color:var(--mut)}
-#clogt{position:absolute;inset:12px;z-index:6;width:calc(100% - 24px);height:calc(100% - 24px);font:12px/1.4 ui-monospace,monospace;background:var(--panel);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:8px}
+body.noside #side{display:none}
 #edone{position:absolute;z-index:2;background:var(--ac);color:#fff;border-color:var(--ac);box-shadow:0 2px 10px rgba(0,0,0,.3)}
 #newt{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);background:var(--ac);color:#fff;border-color:var(--ac);box-shadow:0 2px 10px rgba(0,0,0,.3);z-index:2}
 @media (max-width:640px){body{flex-direction:column}#side{width:100%;flex-direction:row;align-items:center;border-right:0;border-bottom:1px solid var(--bd);padding:6px}#pl{display:flex;gap:6px}.pg{flex:none}}
@@ -32,6 +32,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
 <div id="side"><div id="who"></div><div id="pl"></div><button id="add">+ Доска</button><button id="cp">Копировать ссылку</button></div>
 <div id="main">
  <div id="bar">
+  <button id="hp" title="Скрыть или показать список досок">◧</button>
   <input id="title" placeholder="Название доски">
   <select id="tool">
    <option value="pen">Перо</option><option value="line">Линия</option><option value="arrow">Стрелка</option>
@@ -41,23 +42,22 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
   <span id="cols"></span>
   <select id="wd"><option value="3">Тонко</option><option value="5" selected>Средне</option><option value="10">Толсто</option></select>
   <select id="bgs"><option value="grid">Клетка</option><option value="line">Линейка</option><option value="none">Чистый</option></select>
-  <button id="zo" title="Уменьшить">−</button><button id="zi" title="Увеличить">+</button><button id="fit">Показать всё</button>
+  <button id="zo" title="Уменьшить">−</button><button id="zi" title="Увеличить">+</button><button id="fit">Показать всё</button><button id="fs2" title="Во весь экран">⛶</button>
   <label style="font-size:13px;white-space:nowrap"><input type="checkbox" id="snap" checked style="padding:0"> Ровные фигуры</label>
   <button id="undo">Отменить</button>
-  <button id="call">Звонок</button><button id="mute" hidden>Микрофон: вкл</button><button id="aud" hidden>Включить звук</button><button id="clogb" hidden>Лог</button><span id="cs" style="font-size:12px"></span>
+  
   <button id="img">Картинка</button><input type="file" id="fi" accept="image/*" hidden>
   <button id="clr">Очистить</button>
   <span id="st">Подключение…</span>
  </div>
- <div id="wrap"><canvas id="cv"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><textarea id="clogt" hidden readonly></textarea></div>
+ <div id="wrap"><canvas id="cv"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button></div>
 </div>
 <script>
 (function(){
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),wrap=document.getElementById('wrap');
 const room=location.pathname.split('/')[2],me='c'+Math.random().toString(36).slice(2,10).padEnd(8,'0');
 let pages=[],strokes={},images={},page=null,live={},color='#1a1a1a',bg='grid',cur=null,lastEmit=0,mine=[],redo=[];
-let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,lastP=[0,0],call=null,editImg=null,editStroke=null,jump=null;
-const callers=new Set();
+let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,lastP=[0,0],editImg=null,editStroke=null,jump=null;
 const views={},imgEl={},ptrs=new Map();
 const $=i=>document.getElementById(i),tool=()=>$('tool').value;
 const send=op=>{op.from=me;return fetch('/api/'+room+'/op',{method:'POST',body:JSON.stringify(op)}).catch(()=>{$('st').textContent='Нет связи с сервером'})};
@@ -178,8 +178,7 @@ function openPage(id){page=id;live={};$('newt').hidden=true;jump=null;editImg=nu
  const p=pages.filter(x=>x.id===id)[0];$('title').value=p?p.title:''}
 
 function onOp(o){
- if(o.t==='rtc'){if(o.from!==me&&(!o.to||o.to===me))handleRtc(o);return}
- if(o.t==='init'){callers.clear();(o.call||[]).forEach(x=>{if(x!==me)callers.add(x)});if(call)rtc({kind:'hello'});callLabel();$('who').textContent=o.name?'Кабинет: '+o.name:'Доска';document.title=o.name||'Доска';pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};if(!page||!pages.some(p=>p.id===page))page=pages[0].id;openPage(page);return}
+ if(o.t==='init'){$('who').textContent=o.name?'Кабинет: '+o.name:'Доска';document.title=o.name||'Доска';pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};if(!page||!pages.some(p=>p.id===page))page=pages[0].id;openPage(page);return}
  if(o.t==='peers'){$('st').textContent='Онлайн: '+o.n;return}
  if(o.t==='live'){if(o.from!==me){live[o.from]={page:o.page,k:o.k,c:o.c,w:o.w,pts:o.pts};redraw()}return}
  if(o.t==='stroke'){(strokes[o.page]=strokes[o.page]||{})[o.stroke.id]=o.stroke;delete live[o.from]}
@@ -480,90 +479,6 @@ function redoAct(){
  mine.push({page:r.page,id:r.id});redraw();
 }
 
-// --- голосовой звонок (WebRTC: звук идёт напрямую между участниками, а если не выходит — через TURN) ---
-const rtc=m=>send(Object.assign({t:'rtc'},m));
-const clog=[];
-function L(t){clog.push(new Date().toLocaleTimeString()+' '+t);if(clog.length>300)clog.shift();$('clogt').value=clog.join('\n')}
-function callLabel(){
- $('call').textContent=call?'Завершить звонок':(callers.size?'Присоединиться к звонку':'Звонок');
- $('call').style.outline=(!call&&callers.size)?'2px solid #2e7d32':'';
- $('mute').hidden=!call;$('clogb').hidden=!clog.length;
- if(!call){$('cs').textContent=callers.size?'Идёт звонок…':'';$('aud').hidden=true}
-}
-function callState(){
- if(!call)return;
- const n=Object.values(call.pcs).filter(p=>p.connectionState==='connected').length;
- $('cs').textContent=n?'Звонок: подключено '+n:'Звонок: ожидание собеседника…';
-}
-function mk(f){
- if(call.pcs[f])return call.pcs[f];
- const pc=new RTCPeerConnection({iceServers:call.ice,iceCandidatePoolSize:2});call.pcs[f]=pc;
- L('создано соединение с '+f.slice(0,5));
- call.stream.getTracks().forEach(t=>pc.addTrack(t,call.stream));
- pc.onicecandidate=e=>{
-  if(e.candidate){L('кандидат: '+((e.candidate.candidate.match(/ typ (\w+)/)||[])[1]||'?'));rtc({kind:'ice',to:f,data:e.candidate})}
-  else L('сбор кандидатов завершён');
- };
- pc.oniceconnectionstatechange=()=>L('ice: '+pc.iceConnectionState);
- pc.ontrack=e=>{
-  L('получен звук собеседника');let a=call.audio[f];
-  if(!a){a=call.audio[f]=new Audio();a.autoplay=true;a.playsInline=true;document.body.appendChild(a)}
-  a.srcObject=e.streams[0]||new MediaStream([e.track]);
-  const pr=a.play();if(pr&&pr.catch)pr.catch(()=>{L('автовоспроизведение заблокировано');$('aud').hidden=false;$('cs').textContent='Нажмите «Включить звук»'});
- };
- pc.onconnectionstatechange=()=>{
-  L('соединение: '+pc.connectionState);
-  if(pc.connectionState==='failed')$('cs').textContent='Не удалось соединиться. Скорее всего, нужен TURN-сервер';else callState();
- };
- setTimeout(()=>{if(call&&call.pcs[f]===pc&&pc.connectionState!=='connected'&&pc.connectionState!=='closed'){L('нет соединения за 20 с');$('cs').textContent='Нет соединения. Возможно, нужен TURN-сервер (кнопка «Лог»)'}},20000);
- return pc;
-}
-async function meet(f){
- const pc=mk(f);
- if(me<f&&!pc.offered){pc.offered=true;const o=await pc.createOffer();await pc.setLocalDescription(o);L('отправлено предложение соединения');rtc({kind:'offer',to:f,data:pc.localDescription})}
-}
-function drop(f){
- if(!call)return;
- if(call.pcs[f]){call.pcs[f].close();delete call.pcs[f]}
- if(call.audio[f]){call.audio[f].remove();delete call.audio[f]}
- delete call.q[f];callState();
-}
-function flush(f){const pc=call.pcs[f];(call.q[f]||[]).forEach(c=>pc.addIceCandidate(c).catch(()=>{}));call.q[f]=[]}
-async function handleRtc(o){
- const f=o.from,k=o.kind;
- try{
-  if(k==='hello'){callers.add(f);L('собеседник нажал «Звонок»');if(call){rtc({kind:'here',to:f});meet(f)}callLabel();return}
-  if(k==='here'){callers.add(f);if(call)meet(f);callLabel();return}
-  if(k==='bye'){callers.delete(f);L('собеседник вышел из звонка');drop(f);callLabel();return}
-  if(!call)return;
-  if(k==='offer'){L('получено предложение соединения');const pc=mk(f);await pc.setRemoteDescription(o.data);flush(f);const a=await pc.createAnswer();await pc.setLocalDescription(a);rtc({kind:'answer',to:f,data:pc.localDescription})}
-  else if(k==='answer'){L('получен ответ');const pc=call.pcs[f];if(pc){await pc.setRemoteDescription(o.data);flush(f)}}
-  else if(k==='ice'){const pc=call.pcs[f];if(pc&&pc.remoteDescription)pc.addIceCandidate(o.data).catch(()=>{});else(call.q[f]=call.q[f]||[]).push(o.data)}
- }catch(err){L('ошибка: '+(err.message||err));$('cs').textContent='Ошибка звонка (кнопка «Лог»)'}
-}
-async function toggleCall(){
- if(call)return endCall();
- if(!navigator.mediaDevices||!window.RTCPeerConnection){$('cs').textContent='Браузер не поддерживает звонки';L('нет mediaDevices/RTCPeerConnection');callLabel();return}
- try{
-  const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
-  L('микрофон: доступ получен');
-  let ice;try{ice=await (await fetch('/api/ice')).json()}catch(e){ice=[{urls:'stun:stun.l.google.com:19302'}]}
-  L('ICE-серверы: '+ice.length+(ice.some(x=>x.username)?' (есть TURN)':' (только STUN)'));
-  call={stream:stream,pcs:{},audio:{},q:{},ice:ice};
-  callLabel();callState();rtc({kind:'hello'});
- }catch(e){L('микрофон: ошибка '+e.name);$('cs').textContent='Нет доступа к микрофону ('+e.name+')';callLabel()}
-}
-function endCall(){
- if(!call)return;rtc({kind:'bye'});
- Object.keys(call.pcs).forEach(drop);
- call.stream.getTracks().forEach(t=>t.stop());call=null;$('mute').textContent='Микрофон: вкл';callLabel();
-}
-$('call').onclick=toggleCall;
-$('mute').onclick=()=>{if(!call)return;const t=call.stream.getAudioTracks()[0];if(!t)return;t.enabled=!t.enabled;$('mute').textContent='Микрофон: '+(t.enabled?'вкл':'выкл')};
-$('aud').onclick=()=>{Object.values(call?call.audio:{}).forEach(a=>a.play().catch(()=>{}));$('aud').hidden=true;callState()};
-$('clogb').onclick=()=>{$('clogt').hidden=!$('clogt').hidden};
-window.addEventListener('pagehide',()=>{if(call)navigator.sendBeacon('/api/'+room+'/op',JSON.stringify({t:'rtc',kind:'bye',from:me}))});
-
 // --- интерфейс ---
 $('add').onclick=()=>{const id='p'+newId(),d=new Date().toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'});let t=d,n=2;while(pages.some(p=>p.title===t))t=d+' ('+(n++)+')';send({t:'addPage',id:id,title:t});openPage(id)};
 $('title').onchange=()=>send({t:'title',id:page,title:$('title').value.trim()||'Без названия'});
@@ -579,6 +494,12 @@ $('cp').onclick=()=>{const t=location.href;(navigator.clipboard?navigator.clipbo
  $('cols').appendChild(b)});
 $('edone').onclick=()=>{editImg=null;editStroke=null;redraw()};
 $('newt').onclick=()=>{if(!jump)return;view.y=jump.y-.1*ch/view.s;view.x=jump.x+jump.w/2-cw/view.s/2;$('newt').hidden=true;jump=null;redraw()};
+function setSide(h){document.body.classList.toggle('noside',h);localStorage.setItem('noside',h?'1':'0')}
+$('hp').onclick=()=>setSide(!document.body.classList.contains('noside'));
+if(localStorage.getItem('noside')==='1')setSide(true);
+const fe=document.documentElement,frq=fe.requestFullscreen||fe.webkitRequestFullscreen;
+if(window.self!==window.top||!frq)$('fs2').hidden=true; // в кабинете преподавателя полный экран включается там
+$('fs2').onclick=()=>{const d=document;if(d.fullscreenElement||d.webkitFullscreenElement)(d.exitFullscreen||d.webkitExitFullscreen).call(d);else frq.call(fe)};
 new ResizeObserver(resize).observe(wrap);
 resize();
 })();
