@@ -61,6 +61,13 @@ function apply(s, op) {
       m[g.id] = { src: g.src, x: num(g.x, -1e6, 1e6, 0), y: num(g.y, -1e6, 1e6, 0), w: num(g.w, 1, 1e5, 200), h: num(g.h, 1, 1e5, 200) };
       return true;
     }
+    case 'strokeset': { // перенос готового штриха/фигуры (число точек не меняется)
+      const t = (st[op.page] || {})[op.id];
+      if (!t || !Array.isArray(op.pts)) return false;
+      const pts = op.pts.map(Number);
+      if (!pts.every(Number.isFinite) || pts.length !== t.pts.length) return false;
+      t.pts = pts; return true;
+    }
     case 'imgset': {
       const g = (im[op.page] || {})[op.id];
       if (g) { g.x = num(op.x, -1e6, 1e6, g.x); g.y = num(op.y, -1e6, 1e6, g.y); g.w = num(op.w, 1, 1e5, g.w); g.h = num(op.h, 1, 1e5, g.h); }
@@ -79,6 +86,23 @@ function apply(s, op) {
   return false;
 }
 
+// ICE-серверы для звонков: публичные STUN, а при заданных CF_TURN_KEY_ID / CF_TURN_API_TOKEN ещё и TURN от Cloudflare
+let iceCache = { t: 0, v: null };
+async function iceServers() {
+  const id = process.env.CF_TURN_KEY_ID, tok = process.env.CF_TURN_API_TOKEN;
+  if (!id || !tok) return ICE;
+  if (iceCache.v && Date.now() - iceCache.t < 3.6e6) return iceCache.v;
+  try {
+    const r = await fetch('https://rtc.live.cloudflare.com/v1/turn/keys/' + encodeURIComponent(id) + '/credentials/generate-ice-servers', {
+      method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify({ ttl: 86400 }) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    let list = j.iceServers || j; list = Array.isArray(list) ? list : [list];
+    list = list.map(x => ({ ...x, urls: [].concat(x.urls).filter(u => !/:53(\?|$)/.test(u)) }));
+    iceCache = { t: Date.now(), v: list.concat(ICE) };
+    return iceCache.v;
+  } catch (e) { console.log('TURN недоступен: ' + e.message); return ICE; }
+}
 function isAdmin(req) {
   if (!ADMIN) return false;
   const h = x => crypto.createHash('sha256').update(String(x)).digest();
@@ -138,7 +162,7 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=86400' });
     return fs.createReadStream(f).pipe(res);
   }
-  if (u.pathname === '/api/ice') return json(res, ICE);
+  if (u.pathname === '/api/ice') return iceServers().then(v => json(res, v));
   const m = u.pathname.match(/^\/api\/([a-z0-9]{4,32})\/(events|op)$/);
   if (m) {
     const r = room(m[1]);

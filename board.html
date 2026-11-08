@@ -22,6 +22,7 @@ button{cursor:pointer}
 #wrap{flex:1;min-height:0;position:relative;overflow:hidden;border:1px solid var(--bd);border-radius:10px;background:#fff}
 canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
 #st{font-size:12px;color:var(--mut)}
+#clogt{position:absolute;inset:12px;z-index:6;width:calc(100% - 24px);height:calc(100% - 24px);font:12px/1.4 ui-monospace,monospace;background:var(--panel);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:8px}
 #edone{position:absolute;z-index:2;background:var(--ac);color:#fff;border-color:var(--ac);box-shadow:0 2px 10px rgba(0,0,0,.3)}
 #newt{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);background:var(--ac);color:#fff;border-color:var(--ac);box-shadow:0 2px 10px rgba(0,0,0,.3);z-index:2}
 @media (max-width:640px){body{flex-direction:column}#side{width:100%;flex-direction:row;align-items:center;border-right:0;border-bottom:1px solid var(--bd);padding:6px}#pl{display:flex;gap:6px}.pg{flex:none}}
@@ -43,19 +44,19 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
   <button id="zo" title="Уменьшить">−</button><button id="zi" title="Увеличить">+</button><button id="fit">Показать всё</button>
   <label style="font-size:13px;white-space:nowrap"><input type="checkbox" id="snap" checked style="padding:0"> Ровные фигуры</label>
   <button id="undo">Отменить</button>
-  <button id="call">Звонок</button><button id="mute" hidden>Микрофон: вкл</button><span id="cs" style="font-size:12px"></span>
+  <button id="call">Звонок</button><button id="mute" hidden>Микрофон: вкл</button><button id="aud" hidden>Включить звук</button><button id="clogb" hidden>Лог</button><span id="cs" style="font-size:12px"></span>
   <button id="img">Картинка</button><input type="file" id="fi" accept="image/*" hidden>
   <button id="clr">Очистить</button>
   <span id="st">Подключение…</span>
  </div>
- <div id="wrap"><canvas id="cv"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edone" hidden title="Закончить правку картинки (или Enter)">✓ Готово</button></div>
+ <div id="wrap"><canvas id="cv"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><textarea id="clogt" hidden readonly></textarea></div>
 </div>
 <script>
 (function(){
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),wrap=document.getElementById('wrap');
 const room=location.pathname.split('/')[2],me='c'+Math.random().toString(36).slice(2,10).padEnd(8,'0');
 let pages=[],strokes={},images={},page=null,live={},color='#1a1a1a',bg='grid',cur=null,lastEmit=0,mine=[],redo=[];
-let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,lastP=[0,0],call=null,editImg=null,jump=null;
+let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,lastP=[0,0],call=null,editImg=null,editStroke=null,jump=null;
 const callers=new Set();
 const views={},imgEl={},ptrs=new Map();
 const $=i=>document.getElementById(i),tool=()=>$('tool').value;
@@ -128,11 +129,18 @@ function notifyNew(g){ // у ученика: новая картинка/зад�
  const vis=g.x<view.x+cw/view.s&&g.x+g.w>view.x&&g.y<view.y+ch/view.s&&g.y+g.h>view.y;
  if(vis)return;jump=g;$('newt').hidden=false;
 }
-function placeDone(){ // кнопка «Готово» рядом с редактируемой картинкой
- const b=$('edone'),g=editImg&&(images[page]||{})[editImg];
- if(!g){b.hidden=true;return}
+function strokeBox(sk){
+ const q=samples(sk);let a=1e12,b=1e12,c=-1e12,d=-1e12;
+ for(let i=0;i<q.length;i+=2){a=Math.min(a,q[i]);c=Math.max(c,q[i]);b=Math.min(b,q[i+1]);d=Math.max(d,q[i+1])}
+ const pd=10/view.s;return[a-pd,b-pd,c+pd,d+pd];
+}
+function placeDone(){ // кнопка «Готово» рядом с редактируемой картинкой или фигурой
+ const b=$('edone'),g=editImg&&(images[page]||{})[editImg];let rc=null;
+ if(g)rc=[g.x,g.y,g.x+g.w,g.y+g.h];
+ else{const sk=editStroke&&(strokes[page]||{})[editStroke];if(sk)rc=strokeBox(sk)}
+ if(!rc){b.hidden=true;return}
  b.hidden=false;const s=view.s;
- let x=(g.x+g.w-view.x)*s-b.offsetWidth,y=(g.y+g.h-view.y)*s+8;
+ let x=(rc[2]-view.x)*s-b.offsetWidth,y=(rc[3]-view.y)*s+8;
  x=Math.max(6,Math.min(cw-b.offsetWidth-6,x));y=Math.max(6,Math.min(ch-b.offsetHeight-6,y));
  b.style.left=x+'px';b.style.top=y+'px';
 }
@@ -158,12 +166,15 @@ function redraw(){
  for(const k in live)if(live[k].page===page)drawStroke(live[k]);
  if(cur&&cur.pts)drawStroke(cur);
  for(const id in ims)if(handlesOn(id))drawHandles(ims[id]);
+ if(editStroke&&strokes[page]&&strokes[page][editStroke]){ // рамка вокруг только что нарисованной ровной фигуры
+  const bb=strokeBox(strokes[page][editStroke]);ctx.save();ctx.strokeStyle='rgba(106,63,196,.9)';ctx.lineWidth=2/s;ctx.setLineDash([8/s,6/s]);
+  ctx.strokeRect(bb[0],bb[1],bb[2]-bb[0],bb[3]-bb[1]);ctx.restore()}
  placeDone();
 }
 function renderPages(){const b=$('pl');b.innerHTML='';
  pages.forEach(p=>{const d=document.createElement('div');d.className='pg'+(p.id===page?' on':'');
   d.textContent=p.title||'Без названия';d.onclick=()=>openPage(p.id);b.appendChild(d)})}
-function openPage(id){page=id;live={};$('newt').hidden=true;jump=null;editImg=null;view=views[id]||(views[id]=defView());renderPages();redraw();
+function openPage(id){page=id;live={};$('newt').hidden=true;jump=null;editImg=null;editStroke=null;view=views[id]||(views[id]=defView());renderPages();redraw();
  const p=pages.filter(x=>x.id===id)[0];$('title').value=p?p.title:''}
 
 function onOp(o){
@@ -172,6 +183,7 @@ function onOp(o){
  if(o.t==='peers'){$('st').textContent='Онлайн: '+o.n;return}
  if(o.t==='live'){if(o.from!==me){live[o.from]={page:o.page,k:o.k,c:o.c,w:o.w,pts:o.pts};redraw()}return}
  if(o.t==='stroke'){(strokes[o.page]=strokes[o.page]||{})[o.stroke.id]=o.stroke;delete live[o.from]}
+ if(o.t==='strokeset'&&strokes[o.page]&&strokes[o.page][o.id])strokes[o.page][o.id].pts=o.pts;
  if(o.t==='image'){(images[o.page]=images[o.page]||{})[o.img.id]=o.img;if(o.from!==me&&o.page===page)notifyNew(o.img)}
  if(o.t==='imgset'&&images[o.page]&&images[o.page][o.id]){const g=images[o.page][o.id];g.x=o.x;g.y=o.y;g.w=o.w;g.h=o.h}
  if(o.t==='erase'){if(strokes[o.page])delete strokes[o.page][o.id];if(images[o.page])delete images[o.page][o.id]}
@@ -329,6 +341,13 @@ cv.addEventListener('pointerdown',e=>{
  if(e.button===1||space||t==='hand'){pan={id:e.pointerId,x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};cv.style.cursor='grabbing';return}
  const p=pos(e);lastP=p;
  if(e.altKey&&t!=='er'){const ia=imgAt(p[0],p[1]);if(ia){editImg=ia;redraw();return}} // Alt+клик по картинке — править её
+ if(editStroke){ // сразу после «ровной фигуры»: можно перенести её, клик в стороне — выход
+  const sk=(strokes[page]||{})[editStroke];
+  if(!sk||t==='er'){editStroke=null;redraw()}
+  else{const bb=strokeBox(sk);
+   if(p[0]>=bb[0]&&p[0]<=bb[2]&&p[1]>=bb[1]&&p[1]<=bb[3]){cur={mvs:editStroke,sx:p[0],sy:p[1],orig:sk.pts.slice()};return}
+   editStroke=null;redraw();}
+ }
  if(editImg){ // режим правки: тянем картинку за любое место или за ручки; клик в стороне — выход
   const g=(images[page]||{})[editImg];
   if(!g||t==='er'){editImg=null;redraw()}
@@ -353,6 +372,10 @@ cv.addEventListener('pointermove',e=>{
   if(gest&&ptrs.size>=2){doGesture();return}
  }
  if(pan&&pan.id===e.pointerId){view.x=pan.vx-(e.clientX-pan.x)/view.s;view.y=pan.vy-(e.clientY-pan.y)/view.s;redraw();return}
+ if(!cur&&editStroke&&e.pointerType!=='touch'&&!space){
+  const q=pos(e),sk=(strokes[page]||{})[editStroke];
+  if(sk){const bb=strokeBox(sk);cv.style.cursor=(q[0]>=bb[0]&&q[0]<=bb[2]&&q[1]>=bb[1]&&q[1]<=bb[3])?'move':'crosshair'}
+ }
  if(!cur&&editImg&&e.pointerType!=='touch'&&!space){ // только курсор, без подсветки
   const q=pos(e),h2=handleAt(q[0],q[1]),g=(images[page]||{})[editImg],ins=g&&q[0]>=g.x&&q[0]<=g.x+g.w&&q[1]>=g.y&&q[1]<=g.y+g.h;
   cv.style.cursor=h2?(h2.type==='move'?'move':'nwse-resize'):(ins?'move':(tool()==='hand'?'grab':'crosshair'));
@@ -361,6 +384,10 @@ cv.addEventListener('pointermove',e=>{
  if(cur.snapped){adjust(pos(e));return}
  const evs=(e.getCoalescedEvents&&e.getCoalescedEvents())||[];if(!evs.length)evs.push(e);
  if(cur.erasing){evs.forEach(v=>{const p=pos(v);eraseAt(p[0],p[1])});return}
+ if(cur.mvs){const p=pos(e),sk=(strokes[page]||{})[cur.mvs];if(!sk)return;
+  const dx=p[0]-cur.sx,dy=p[1]-cur.sy;sk.pts=cur.orig.map((v,i)=>r2(v+(i%2?dy:dx)));redraw();
+  const t2=Date.now();if(t2-lastEmit>80){lastEmit=t2;send({t:'strokeset',page:page,id:cur.mvs,pts:sk.pts})}
+  return}
  if(cur.mv){const p=pos(e),g=images[page][cur.mv];
   if(cur.size){g.w=Math.max(20/view.s,p[0]-g.x);g.h=g.w*cur.r}else{g.x=p[0]-cur.dx;g.y=p[1]-cur.dy}
   redraw();return}
@@ -378,17 +405,18 @@ function end(e){
  if(e.pointerType==='touch'){ptrs.delete(e.pointerId);if(ptrs.size<2)gest=null}
  if(pan&&pan.id===e.pointerId){pan=null;cv.style.cursor=tool()==='hand'?'grab':'crosshair';return}
  clearTimeout(holdT);if(!cur)return;const s=cur;cur=null;if(s.erasing)return;
+ if(s.mvs){const sk=(strokes[page]||{})[s.mvs];if(sk)send({t:'strokeset',page:page,id:s.mvs,pts:sk.pts});return}
  if(s.mv){const g=images[page][s.mv];send({t:'imgset',page:page,id:s.mv,x:r2(g.x),y:r2(g.y),w:r2(g.w),h:r2(g.h)});return}
  if(s.k==='pen'){const p=pos(e),n=s.pts.length;if(p[0]!==s.pts[n-2]||p[1]!==s.pts[n-1])s.pts.push(p[0],p[1])}
  else if(!s.snapped&&(Math.abs(s.pts[2]-s.pts[0])+Math.abs(s.pts[3]-s.pts[1]))*view.s<4){clearLive();redraw();return}
- (strokes[page]=strokes[page]||{})[s.id]={k:s.k,pts:s.pts,c:s.c,w:s.w};mine.push({page:page,id:s.id});redo=[];redraw();
+ (strokes[page]=strokes[page]||{})[s.id]={k:s.k,pts:s.pts,c:s.c,w:s.w};mine.push({page:page,id:s.id});redo=[];if(s.snapped)editStroke=s.id;redraw();
  send({t:'stroke',page:page,stroke:{id:s.id,k:s.k,pts:s.pts,c:s.c,w:s.w}});
 }
 cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
 document.addEventListener('keydown',e=>{
  const a=document.activeElement,tg=a&&a.tagName;
  if(e.code==='Space'&&!(tg==='INPUT'||tg==='SELECT'||tg==='BUTTON')){space=true;cv.style.cursor='grab';e.preventDefault();return}
- if(editImg&&(e.key==='Enter'||e.key==='Escape')&&tg!=='INPUT'&&tg!=='SELECT'){editImg=null;redraw();e.preventDefault();return}
+ if((editImg||editStroke)&&(e.key==='Enter'||e.key==='Escape')&&tg!=='INPUT'&&tg!=='SELECT'){editImg=null;editStroke=null;redraw();e.preventDefault();return}
  const z=e.code==='KeyZ',y=e.code==='KeyY';
  if(!(e.metaKey||e.ctrlKey)||!(z||y)||tg==='INPUT')return;
  e.preventDefault();(y||e.shiftKey)?redoAct():undo();
@@ -452,31 +480,47 @@ function redoAct(){
  mine.push({page:r.page,id:r.id});redraw();
 }
 
-// --- голосовой звонок (WebRTC: звук идёт напрямую между участниками) ---
+// --- голосовой звонок (WebRTC: звук идёт напрямую между участниками, а если не выходит — через TURN) ---
 const rtc=m=>send(Object.assign({t:'rtc'},m));
+const clog=[];
+function L(t){clog.push(new Date().toLocaleTimeString()+' '+t);if(clog.length>300)clog.shift();$('clogt').value=clog.join('\n')}
 function callLabel(){
  $('call').textContent=call?'Завершить звонок':(callers.size?'Присоединиться к звонку':'Звонок');
  $('call').style.outline=(!call&&callers.size)?'2px solid #2e7d32':'';
- $('mute').hidden=!call;
- if(!call)$('cs').textContent=callers.size?'Идёт звонок…':'';
+ $('mute').hidden=!call;$('clogb').hidden=!clog.length;
+ if(!call){$('cs').textContent=callers.size?'Идёт звонок…':'';$('aud').hidden=true}
 }
 function callState(){
  if(!call)return;
  const n=Object.values(call.pcs).filter(p=>p.connectionState==='connected').length;
- $('cs').textContent=n?'Звонок: подключено '+n:'Звонок: ожидание…';
+ $('cs').textContent=n?'Звонок: подключено '+n:'Звонок: ожидание собеседника…';
 }
 function mk(f){
  if(call.pcs[f])return call.pcs[f];
- const pc=new RTCPeerConnection({iceServers:call.ice});call.pcs[f]=pc;
+ const pc=new RTCPeerConnection({iceServers:call.ice,iceCandidatePoolSize:2});call.pcs[f]=pc;
+ L('создано соединение с '+f.slice(0,5));
  call.stream.getTracks().forEach(t=>pc.addTrack(t,call.stream));
- pc.onicecandidate=e=>{if(e.candidate)rtc({kind:'ice',to:f,data:e.candidate})};
- pc.ontrack=e=>{let a=call.audio[f];if(!a){a=call.audio[f]=new Audio();a.autoplay=true;document.body.appendChild(a)}a.srcObject=e.streams[0];a.play().catch(()=>{})};
- pc.onconnectionstatechange=()=>{if(pc.connectionState==='failed')$('cs').textContent='Не удалось соединиться (возможно, нужен TURN-сервер)';else callState()};
+ pc.onicecandidate=e=>{
+  if(e.candidate){L('кандидат: '+((e.candidate.candidate.match(/ typ (\w+)/)||[])[1]||'?'));rtc({kind:'ice',to:f,data:e.candidate})}
+  else L('сбор кандидатов завершён');
+ };
+ pc.oniceconnectionstatechange=()=>L('ice: '+pc.iceConnectionState);
+ pc.ontrack=e=>{
+  L('получен звук собеседника');let a=call.audio[f];
+  if(!a){a=call.audio[f]=new Audio();a.autoplay=true;a.playsInline=true;document.body.appendChild(a)}
+  a.srcObject=e.streams[0]||new MediaStream([e.track]);
+  const pr=a.play();if(pr&&pr.catch)pr.catch(()=>{L('автовоспроизведение заблокировано');$('aud').hidden=false;$('cs').textContent='Нажмите «Включить звук»'});
+ };
+ pc.onconnectionstatechange=()=>{
+  L('соединение: '+pc.connectionState);
+  if(pc.connectionState==='failed')$('cs').textContent='Не удалось соединиться. Скорее всего, нужен TURN-сервер';else callState();
+ };
+ setTimeout(()=>{if(call&&call.pcs[f]===pc&&pc.connectionState!=='connected'&&pc.connectionState!=='closed'){L('нет соединения за 20 с');$('cs').textContent='Нет соединения. Возможно, нужен TURN-сервер (кнопка «Лог»)'}},20000);
  return pc;
 }
 async function meet(f){
  const pc=mk(f);
- if(me<f&&!pc.offered){pc.offered=true;const o=await pc.createOffer();await pc.setLocalDescription(o);rtc({kind:'offer',to:f,data:pc.localDescription})}
+ if(me<f&&!pc.offered){pc.offered=true;const o=await pc.createOffer();await pc.setLocalDescription(o);L('отправлено предложение соединения');rtc({kind:'offer',to:f,data:pc.localDescription})}
 }
 function drop(f){
  if(!call)return;
@@ -488,24 +532,26 @@ function flush(f){const pc=call.pcs[f];(call.q[f]||[]).forEach(c=>pc.addIceCandi
 async function handleRtc(o){
  const f=o.from,k=o.kind;
  try{
-  if(k==='hello'){callers.add(f);if(call){rtc({kind:'here',to:f});meet(f)}callLabel();return}
+  if(k==='hello'){callers.add(f);L('собеседник нажал «Звонок»');if(call){rtc({kind:'here',to:f});meet(f)}callLabel();return}
   if(k==='here'){callers.add(f);if(call)meet(f);callLabel();return}
-  if(k==='bye'){callers.delete(f);drop(f);callLabel();return}
+  if(k==='bye'){callers.delete(f);L('собеседник вышел из звонка');drop(f);callLabel();return}
   if(!call)return;
-  if(k==='offer'){const pc=mk(f);await pc.setRemoteDescription(o.data);flush(f);const a=await pc.createAnswer();await pc.setLocalDescription(a);rtc({kind:'answer',to:f,data:pc.localDescription})}
-  else if(k==='answer'){const pc=call.pcs[f];if(pc){await pc.setRemoteDescription(o.data);flush(f)}}
+  if(k==='offer'){L('получено предложение соединения');const pc=mk(f);await pc.setRemoteDescription(o.data);flush(f);const a=await pc.createAnswer();await pc.setLocalDescription(a);rtc({kind:'answer',to:f,data:pc.localDescription})}
+  else if(k==='answer'){L('получен ответ');const pc=call.pcs[f];if(pc){await pc.setRemoteDescription(o.data);flush(f)}}
   else if(k==='ice'){const pc=call.pcs[f];if(pc&&pc.remoteDescription)pc.addIceCandidate(o.data).catch(()=>{});else(call.q[f]=call.q[f]||[]).push(o.data)}
- }catch(err){$('cs').textContent='Ошибка звонка'}
+ }catch(err){L('ошибка: '+(err.message||err));$('cs').textContent='Ошибка звонка (кнопка «Лог»)'}
 }
 async function toggleCall(){
  if(call)return endCall();
- if(!navigator.mediaDevices||!window.RTCPeerConnection){$('cs').textContent='Браузер не поддерживает звонки';return}
+ if(!navigator.mediaDevices||!window.RTCPeerConnection){$('cs').textContent='Браузер не поддерживает звонки';L('нет mediaDevices/RTCPeerConnection');callLabel();return}
  try{
   const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+  L('микрофон: доступ получен');
   let ice;try{ice=await (await fetch('/api/ice')).json()}catch(e){ice=[{urls:'stun:stun.l.google.com:19302'}]}
+  L('ICE-серверы: '+ice.length+(ice.some(x=>x.username)?' (есть TURN)':' (только STUN)'));
   call={stream:stream,pcs:{},audio:{},q:{},ice:ice};
   callLabel();callState();rtc({kind:'hello'});
- }catch(e){$('cs').textContent='Нет доступа к микрофону'}
+ }catch(e){L('микрофон: ошибка '+e.name);$('cs').textContent='Нет доступа к микрофону ('+e.name+')';callLabel()}
 }
 function endCall(){
  if(!call)return;rtc({kind:'bye'});
@@ -514,6 +560,8 @@ function endCall(){
 }
 $('call').onclick=toggleCall;
 $('mute').onclick=()=>{if(!call)return;const t=call.stream.getAudioTracks()[0];if(!t)return;t.enabled=!t.enabled;$('mute').textContent='Микрофон: '+(t.enabled?'вкл':'выкл')};
+$('aud').onclick=()=>{Object.values(call?call.audio:{}).forEach(a=>a.play().catch(()=>{}));$('aud').hidden=true;callState()};
+$('clogb').onclick=()=>{$('clogt').hidden=!$('clogt').hidden};
 window.addEventListener('pagehide',()=>{if(call)navigator.sendBeacon('/api/'+room+'/op',JSON.stringify({t:'rtc',kind:'bye',from:me}))});
 
 // --- интерфейс ---
@@ -529,7 +577,7 @@ $('cp').onclick=()=>{const t=location.href;(navigator.clipboard?navigator.clipbo
  const b=document.createElement('button');b.className='sw'+(i?'':' on');b.style.background=c;
  b.onclick=()=>{color=c;if(['er','mv','hand'].includes(tool()))$('tool').value='pen';document.querySelectorAll('.sw').forEach(x=>x.classList.remove('on'));b.classList.add('on')};
  $('cols').appendChild(b)});
-$('edone').onclick=()=>{editImg=null;redraw()};
+$('edone').onclick=()=>{editImg=null;editStroke=null;redraw()};
 $('newt').onclick=()=>{if(!jump)return;view.y=jump.y-.1*ch/view.s;view.x=jump.x+jump.w/2-cw/view.s/2;$('newt').hidden=true;jump=null;redraw()};
 new ResizeObserver(resize).observe(wrap);
 resize();
