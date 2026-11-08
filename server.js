@@ -201,7 +201,24 @@ http.createServer((req, res) => {
   if (u.pathname === '/t') return PAGE('admin.html')(req, res);
   if (u.pathname === '/') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    return res.end('<meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><body style="font:16px system-ui;max-width:420px;margin:15vh auto;padding:0 16px"><h2>Доска репетитора</h2><p>Личную ссылку на свою доску вам присылает преподаватель.</p><p><a href="/t">Вход для преподавателя</a></p>');
+    return res.end(`<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Доска репетитора</title>
+<style>
+:root{--bg:#f4f1fa;--panel:#fff;--tx:#201c2b;--mut:#6b6580;--ac:#6a3fc4;--bd:#ddd6ee}
+@media (prefers-color-scheme:dark){:root{--bg:#17141f;--panel:#221e2e;--tx:#ece8f5;--mut:#9a93b0;--ac:#a98bf0;--bd:#3a3450}}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;justify-content:center}
+main{width:100%;max-width:520px;padding:8vh 18px}
+h1{margin:0 0 6px;font-size:26px}.sub{color:var(--mut);margin:0 0 22px}
+.card{background:var(--panel);border:1px solid var(--bd);border-radius:14px;padding:18px 20px;margin-bottom:14px}
+.card h2{margin:0 0 6px;font-size:18px}.card p{margin:0 0 12px;color:var(--mut)}
+a.btn{display:inline-block;padding:11px 18px;border-radius:10px;background:var(--ac);color:#fff;text-decoration:none;font-weight:600}
+</style>
+<main>
+ <h1>Доска репетитора</h1>
+ <p class="sub">Общая доска для занятий: преподаватель и ученик рисуют вместе.</p>
+ <div class="card"><h2>Я ученик</h2><p>Откройте личную ссылку на свою доску, которую прислал преподаватель (она выглядит как адрес этого сайта и набор букв и цифр в конце). Без неё зайти на доску нельзя. Если ссылки нет, напишите преподавателю.</p></div>
+ <div class="card"><h2>Я преподаватель</h2><p>Вход по вашему паролю: там вы создаёте учеников, открываете их доски и добавляете задачи.</p><a class="btn" href="/t">Войти в кабинет</a></div>
+</main></html>`);
   }
   const b = u.pathname.match(/^\/b\/([a-z0-9]{4,32})$/);
   if (b) {
