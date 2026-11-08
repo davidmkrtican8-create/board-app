@@ -61,7 +61,7 @@ body.nosidebar #side{display:none}
     <div class="tr"><select id="tbook"></select><button id="tadd">+ Сборник</button><button id="tdel" title="Убрать сборник из списка">Убрать</button><input type="file" id="tfile" accept=".pdf,application/pdf" multiple hidden><button id="tclose" style="margin-left:auto">✕</button></div>
     <div class="tr"><button id="tback" title="Назад">↩</button><button id="tprev">←</button><input id="tnum" type="number" min="1"><span id="tcnt"></span><button id="tnext">→</button><select id="tol"><option value="">Оглавление…</option></select></div>
     <div class="tr"><input id="tq" placeholder="Номер задачи, например 4.19" style="flex:1;min-width:120px"><button id="tfind">Найти</button><button id="tpage">Страница целиком → на доску</button></div>
-    <div class="tr" style="padding-top:0"><select id="tgap" title="Сколько свободного места оставлять под решением между задачами"><option value="80">Место под решение: мало</option><option value="240">Место под решение: среднее</option><option value="420">Место под решение: много</option></select><span id="tmsg" style="font-size:12px;color:var(--mut)"></span></div>
+    <div class="tr" style="padding-top:0"><select id="tgap" title="Сколько свободного места оставлять под решением между задачами"><option value="120">Место под решение: мало</option><option value="350">Место под решение: среднее</option><option value="600">Место под решение: много</option></select><span id="tmsg" style="font-size:12px;color:var(--mut)"></span></div>
     <div id="tview"><div id="tbox"><canvas id="tcv"></canvas><div id="tov"></div></div></div>
    </div>
   </div>
@@ -267,7 +267,7 @@ $('tk').onclick=()=>{
  if(open&&!inited){inited=true;refresh()}else if(open&&pdf)render();
 };
 $('tclose').onclick=()=>{$('tasks').hidden=true};
-$('tgap').value=localStorage.getItem('tgap')||'240';$('tgap').onchange=()=>localStorage.setItem('tgap',$('tgap').value);
+$('tgap').value=localStorage.getItem('tgap')||'350';if(!$('tgap').value)$('tgap').value='350';$('tgap').onchange=()=>localStorage.setItem('tgap',$('tgap').value);
 $('tadd').onclick=()=>$('tfile').click();
 $('tfile').onchange=async()=>{
  const fl=[...$('tfile').files];$('tfile').value='';if(!fl.length)return;
