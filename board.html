@@ -22,6 +22,7 @@ button{cursor:pointer}
 #wrap{flex:1;min-height:0;position:relative;overflow:hidden;border:1px solid var(--bd);border-radius:10px;background:#fff}
 canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
 #st{font-size:12px;color:var(--mut)}
+#edone{position:absolute;z-index:2;background:var(--ac);color:#fff;border-color:var(--ac);box-shadow:0 2px 10px rgba(0,0,0,.3)}
 #newt{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);background:var(--ac);color:#fff;border-color:var(--ac);box-shadow:0 2px 10px rgba(0,0,0,.3);z-index:2}
 @media (max-width:640px){body{flex-direction:column}#side{width:100%;flex-direction:row;align-items:center;border-right:0;border-bottom:1px solid var(--bd);padding:6px}#pl{display:flex;gap:6px}.pg{flex:none}}
 </style>
@@ -47,14 +48,14 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
   <button id="clr">Очистить</button>
   <span id="st">Подключение…</span>
  </div>
- <div id="wrap"><canvas id="cv"></canvas><button id="newt" hidden>↓ Новая задача</button></div>
+ <div id="wrap"><canvas id="cv"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edone" hidden title="Закончить правку картинки (или Enter)">✓ Готово</button></div>
 </div>
 <script>
 (function(){
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),wrap=document.getElementById('wrap');
 const room=location.pathname.split('/')[2],me='c'+Math.random().toString(36).slice(2,10).padEnd(8,'0');
 let pages=[],strokes={},images={},page=null,live={},color='#1a1a1a',bg='grid',cur=null,lastEmit=0,mine=[],redo=[];
-let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,lastP=[0,0],call=null,hoverImg=null,activeImg=null,jump=null;
+let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,lastP=[0,0],call=null,editImg=null,jump=null;
 const callers=new Set();
 const views={},imgEl={},ptrs=new Map();
 const $=i=>document.getElementById(i),tool=()=>$('tool').value;
@@ -105,7 +106,7 @@ function getImg(id,src){
  return imgEl[id].e;
 }
 // ручки на картинке: левый верхний угол — переместить, правый нижний — изменить размер (работают в любом инструменте)
-const handlesOn=id=>tool()==='mv'||id===hoverImg||id===activeImg;
+const handlesOn=id=>tool()==='mv'||id===editImg;
 function drawHandles(g){
  const s=view.s,z=26/s,a=z*.28;
  ctx.save();ctx.strokeStyle='rgba(106,63,196,.9)';ctx.lineWidth=2/s;ctx.strokeRect(g.x,g.y,g.w,g.h);
@@ -126,6 +127,14 @@ function handleAt(x,y){
 function notifyNew(g){ // у ученика: новая картинка/задача появилась вне экрана
  const vis=g.x<view.x+cw/view.s&&g.x+g.w>view.x&&g.y<view.y+ch/view.s&&g.y+g.h>view.y;
  if(vis)return;jump=g;$('newt').hidden=false;
+}
+function placeDone(){ // кнопка «Готово» рядом с редактируемой картинкой
+ const b=$('edone'),g=editImg&&(images[page]||{})[editImg];
+ if(!g){b.hidden=true;return}
+ b.hidden=false;const s=view.s;
+ let x=(g.x+g.w-view.x)*s-b.offsetWidth,y=(g.y+g.h-view.y)*s+8;
+ x=Math.max(6,Math.min(cw-b.offsetWidth-6,x));y=Math.max(6,Math.min(ch-b.offsetHeight-6,y));
+ b.style.left=x+'px';b.style.top=y+'px';
 }
 function grid(){
  const s=view.s,x0=view.x,y0=view.y,x1=x0+cw/s,y1=y0+ch/s;
@@ -149,11 +158,12 @@ function redraw(){
  for(const k in live)if(live[k].page===page)drawStroke(live[k]);
  if(cur&&cur.pts)drawStroke(cur);
  for(const id in ims)if(handlesOn(id))drawHandles(ims[id]);
+ placeDone();
 }
 function renderPages(){const b=$('pl');b.innerHTML='';
  pages.forEach(p=>{const d=document.createElement('div');d.className='pg'+(p.id===page?' on':'');
   d.textContent=p.title||'Без названия';d.onclick=()=>openPage(p.id);b.appendChild(d)})}
-function openPage(id){page=id;live={};$('newt').hidden=true;jump=null;view=views[id]||(views[id]=defView());renderPages();redraw();
+function openPage(id){page=id;live={};$('newt').hidden=true;jump=null;editImg=null;view=views[id]||(views[id]=defView());renderPages();redraw();
  const p=pages.filter(x=>x.id===id)[0];$('title').value=p?p.title:''}
 
 function onOp(o){
@@ -318,9 +328,17 @@ cv.addEventListener('pointerdown',e=>{
  const t=tool();
  if(e.button===1||space||t==='hand'){pan={id:e.pointerId,x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};cv.style.cursor='grabbing';return}
  const p=pos(e);lastP=p;
- const hh=t==='er'?null:handleAt(p[0],p[1]);
- if(hh){const g=images[page][hh.id];activeImg=hh.id;cur={mv:hh.id,size:hh.type==='size',dx:p[0]-g.x,dy:p[1]-g.y,r:g.h/g.w};return}
- if(t!=='mv'){const ia=imgAt(p[0],p[1]);if(ia!==activeImg){activeImg=ia;redraw()}}
+ if(e.altKey&&t!=='er'){const ia=imgAt(p[0],p[1]);if(ia){editImg=ia;redraw();return}} // Alt+клик по картинке — править её
+ if(editImg){ // режим правки: тянем картинку за любое место или за ручки; клик в стороне — выход
+  const g=(images[page]||{})[editImg];
+  if(!g||t==='er'){editImg=null;redraw()}
+  else{
+   const hh=handleAt(p[0],p[1]);
+   if(hh){const g2=images[page][hh.id];cur={mv:hh.id,size:hh.type==='size',dx:p[0]-g2.x,dy:p[1]-g2.y,r:g2.h/g2.w};return}
+   if(p[0]>=g.x&&p[0]<=g.x+g.w&&p[1]>=g.y&&p[1]<=g.y+g.h){cur={mv:editImg,size:false,dx:p[0]-g.x,dy:p[1]-g.y,r:g.h/g.w};return}
+   editImg=null;redraw();
+  }
+ }
  if(t==='er'){cur={erasing:1};eraseAt(p[0],p[1]);return}
  if(t==='mv'){const id=imgAt(p[0],p[1]);if(!id)return;const g=images[page][id],hs=36/view.s;
   cur={mv:id,size:p[0]>g.x+g.w-hs&&p[1]>g.y+g.h-hs,dx:p[0]-g.x,dy:p[1]-g.y,r:g.h/g.w};return}
@@ -335,9 +353,9 @@ cv.addEventListener('pointermove',e=>{
   if(gest&&ptrs.size>=2){doGesture();return}
  }
  if(pan&&pan.id===e.pointerId){view.x=pan.vx-(e.clientX-pan.x)/view.s;view.y=pan.vy-(e.clientY-pan.y)/view.s;redraw();return}
- if(!cur&&e.pointerType!=='touch'&&!space){
-  const q=pos(e),hi=imgAt(q[0],q[1]);if(hi!==hoverImg){hoverImg=hi;redraw()}
-  const h2=handleAt(q[0],q[1]);cv.style.cursor=h2?(h2.type==='move'?'move':'nwse-resize'):(tool()==='hand'?'grab':'crosshair');
+ if(!cur&&editImg&&e.pointerType!=='touch'&&!space){ // только курсор, без подсветки
+  const q=pos(e),h2=handleAt(q[0],q[1]),g=(images[page]||{})[editImg],ins=g&&q[0]>=g.x&&q[0]<=g.x+g.w&&q[1]>=g.y&&q[1]<=g.y+g.h;
+  cv.style.cursor=h2?(h2.type==='move'?'move':'nwse-resize'):(ins?'move':(tool()==='hand'?'grab':'crosshair'));
  }
  if(!cur)return;
  if(cur.snapped){adjust(pos(e));return}
@@ -370,6 +388,7 @@ cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
 document.addEventListener('keydown',e=>{
  const a=document.activeElement,tg=a&&a.tagName;
  if(e.code==='Space'&&!(tg==='INPUT'||tg==='SELECT'||tg==='BUTTON')){space=true;cv.style.cursor='grab';e.preventDefault();return}
+ if(editImg&&(e.key==='Enter'||e.key==='Escape')&&tg!=='INPUT'&&tg!=='SELECT'){editImg=null;redraw();e.preventDefault();return}
  const z=e.code==='KeyZ',y=e.code==='KeyY';
  if(!(e.metaKey||e.ctrlKey)||!(z||y)||tg==='INPUT')return;
  e.preventDefault();(y||e.shiftKey)?redoAct():undo();
@@ -399,7 +418,7 @@ function placeImage(im,task,gap){
  }
  mine.push({page:page,id:iid});redo=[];
  send({t:'image',page:page,img:{id:iid,src:src,x:r2(x),y:r2(y),w:r2(dw),h:r2(dh)}});
- activeImg=iid;if(!task)$('tool').value='mv';redraw();
+ editImg=iid;redraw(); // сразу режим правки: можно подвинуть и изменить размер
 }
 function addImage(file){
  const fr=new FileReader();
@@ -510,6 +529,7 @@ $('cp').onclick=()=>{const t=location.href;(navigator.clipboard?navigator.clipbo
  const b=document.createElement('button');b.className='sw'+(i?'':' on');b.style.background=c;
  b.onclick=()=>{color=c;if(['er','mv','hand'].includes(tool()))$('tool').value='pen';document.querySelectorAll('.sw').forEach(x=>x.classList.remove('on'));b.classList.add('on')};
  $('cols').appendChild(b)});
+$('edone').onclick=()=>{editImg=null;redraw()};
 $('newt').onclick=()=>{if(!jump)return;view.y=jump.y-.1*ch/view.s;view.x=jump.x+jump.w/2-cw/view.s/2;$('newt').hidden=true;jump=null;redraw()};
 new ResizeObserver(resize).observe(wrap);
 resize();
