@@ -31,7 +31,8 @@ button.pri{background:var(--ac);color:#fff;border-color:var(--ac)}
 .sw{width:26px;height:26px;border-radius:50%;padding:0;border:2px solid var(--bd)}.sw.on{outline:2px solid var(--ac)}
 #wrap{flex:1;min-height:0;position:relative;overflow:hidden;border:1px solid var(--bd);border-radius:10px;background:var(--sur)}
 canvas{display:block;width:100%;height:100%;touch-action:none}
-#ring{position:absolute;left:0;top:0;pointer-events:none}
+#ovl{position:absolute;left:0;top:0;pointer-events:none}
+#set[hidden]{display:none}
 #st{font-size:12px;color:var(--mut)}
 body.noside #side,body.focus #side{display:none}
 body.focus #bar>*:not(.keep){display:none}
@@ -96,11 +97,12 @@ body.focus #main{padding:4px;gap:4px}
    <p><b>Android:</b> меню браузера ⋮ → «Установить приложение» или «Добавить на главный экран».</p>
   </details>
  </div>
- <div id="wrap"><canvas id="cv"></canvas><canvas id="ring"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button></div>
+ <div id="wrap"><canvas id="cv"></canvas><canvas id="ovl"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button></div>
 </div>
+<script>window.addEventListener('error',function(e){var s=document.getElementById('st');if(s)s.textContent='Ошибка в скрипте: '+(e.message||'')})</script>
 <script>
 (function(){
-const cv=document.getElementById('cv'),rg=document.getElementById('ring'),wrap=document.getElementById('wrap');
+const cv=document.getElementById('cv'),rg=document.getElementById('ovl'),wrap=document.getElementById('wrap');
 let ctx=cv.getContext('2d');const rctx=rg.getContext('2d'),mctx=document.createElement('canvas').getContext('2d');
 const room=location.pathname.split('/')[2],me='c'+Math.random().toString(36).slice(2,10).padEnd(8,'0');
 const isTeacher=window.self!==window.top;
