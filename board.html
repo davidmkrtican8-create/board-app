@@ -3,33 +3,50 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Доска">
+<link rel="apple-touch-icon" href="/icon.png">
 <title>Общая доска</title>
 <style>
-:root{--bg:#f4f1fa;--panel:#fff;--tx:#201c2b;--mut:#6b6580;--ac:#6a3fc4;--bd:#ddd6ee}
-@media (prefers-color-scheme:dark){:root{--bg:#17141f;--panel:#221e2e;--tx:#ece8f5;--mut:#9a93b0;--ac:#a98bf0;--bd:#3a3450}}
+:root{--bg:#f4f1fa;--panel:#fff;--tx:#201c2b;--mut:#6b6580;--ac:#6a3fc4;--bd:#ddd6ee;--sur:#e6e2ef}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17141f;--panel:#221e2e;--tx:#ece8f5;--mut:#9a93b0;--ac:#a98bf0;--bd:#3a3450;--sur:#12101a}}
+:root[data-theme="dark"]{--bg:#17141f;--panel:#221e2e;--tx:#ece8f5;--mut:#9a93b0;--ac:#a98bf0;--bd:#3a3450;--sur:#12101a}
 *{box-sizing:border-box}html,body{height:100%;margin:0}
-body{background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex}
+html,body{overscroll-behavior:none}
+body{background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+input,textarea{-webkit-user-select:text;user-select:text}
 #side{width:200px;background:var(--panel);border-right:1px solid var(--bd);display:flex;flex-direction:column;padding:10px;gap:6px;overflow:auto}
 #who{font-weight:700;padding:4px 6px}
 .pg{padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pg.on{background:color-mix(in srgb,var(--ac) 16%,transparent);border-color:var(--ac)}
-button,select,input{font:inherit;color:var(--tx);background:var(--panel);border:1px solid var(--bd);border-radius:8px;padding:6px 10px}
-button{cursor:pointer}
-#main{flex:1;min-width:0;display:flex;flex-direction:column;padding:10px;gap:8px}
-#bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-#title{flex:1;min-width:140px;font-weight:600}
-.sw{width:26px;height:26px;border-radius:50%;padding:0;border:2px solid var(--bd)}.sw.on{outline:2px solid var(--ac)}
-#wrap{flex:1;min-height:0;position:relative;overflow:hidden;border:1px solid var(--bd);border-radius:10px;background:#fff}
-canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
-#st{font-size:12px;color:var(--mut)}
-body.noside #side{display:none}
-html,body{overscroll-behavior:none}
-body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
-input,textarea{-webkit-user-select:text;user-select:text}
+button,select,input,textarea{font:inherit;color:var(--tx);background:var(--panel);border:1px solid var(--bd);border-radius:8px;padding:6px 10px}
 button,select,label{touch-action:manipulation}
-#wrap{background:#e6e2ef}
-#edone{position:absolute;z-index:2;background:var(--ac);color:#fff;border-color:var(--ac);box-shadow:0 2px 10px rgba(0,0,0,.3)}
-#newt{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);background:var(--ac);color:#fff;border-color:var(--ac);box-shadow:0 2px 10px rgba(0,0,0,.3);z-index:2}
+button{cursor:pointer}
+button.pri{background:var(--ac);color:#fff;border-color:var(--ac)}
+#main{flex:1;min-width:0;display:flex;flex-direction:column;padding:10px;gap:8px;position:relative}
+#bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#title{flex:1;min-width:120px;font-weight:600}
+.sw{width:26px;height:26px;border-radius:50%;padding:0;border:2px solid var(--bd)}.sw.on{outline:2px solid var(--ac)}
+#wrap{flex:1;min-height:0;position:relative;overflow:hidden;border:1px solid var(--bd);border-radius:10px;background:var(--sur)}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+#ring{position:absolute;left:0;top:0;pointer-events:none}
+#st{font-size:12px;color:var(--mut)}
+body.noside #side,body.focus #side{display:none}
+body.focus #bar>*:not(.keep){display:none}
+body.focus #main{padding:4px;gap:4px}
+#edone,#newt,#vbadge{position:absolute;z-index:3;background:var(--ac);color:#fff;border-color:var(--ac);box-shadow:0 2px 10px rgba(0,0,0,.3)}
+#newt{left:50%;bottom:14px;transform:translateX(-50%)}
+#vbadge{left:12px;bottom:12px}
+#set{position:absolute;right:10px;top:54px;z-index:10;width:300px;max-width:calc(100% - 20px);max-height:calc(100% - 70px);overflow:auto;background:var(--panel);border:1px solid var(--bd);border-radius:12px;padding:14px;box-shadow:0 6px 24px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:9px}
+#set h3{margin:0;font-size:16px}#set label{display:flex;gap:8px;align-items:center;justify-content:space-between;font-size:14px}
+#set label.c{justify-content:flex-start}#set details{font-size:13px;color:var(--mut)}#set summary{cursor:pointer}#set p{margin:6px 0 0}
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:50}
+.mc{background:var(--panel);color:var(--tx);border:1px solid var(--bd);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px;max-width:340px;width:calc(100% - 30px)}
+.mr{display:flex;gap:8px;justify-content:flex-end}
+.af{display:grid;grid-template-columns:1fr 1fr;gap:8px}.af label{display:flex;flex-direction:column;gap:3px;font-size:13px}.af label.c{flex-direction:row;align-items:center}.af input[type=number]{width:100%}
+.ttx{position:absolute;z-index:4;background:transparent;border:1px dashed var(--ac);border-radius:4px;padding:0 2px;margin:0;outline:none;resize:none;overflow:hidden;line-height:1.25;font-family:system-ui,-apple-system,Arial,sans-serif;min-width:40px;-webkit-user-select:text;user-select:text}
 @media (max-width:640px){body{flex-direction:column}#side{width:100%;flex-direction:row;align-items:center;border-right:0;border-bottom:1px solid var(--bd);padding:6px}#pl{display:flex;gap:6px}.pg{flex:none}}
 </style>
 </head>
@@ -39,57 +56,148 @@ button,select,label{touch-action:manipulation}
  <div id="bar">
   <button id="hp" title="Скрыть или показать список досок">◧</button>
   <input id="title" placeholder="Название доски">
-  <select id="tool">
-   <option value="pen">Перо</option><option value="line">Линия</option><option value="arrow">Стрелка</option>
-   <option value="rect">Прямоугольник</option><option value="ellipse">Эллипс / круг</option>
-   <option value="er">Ластик</option><option value="mv">Двигать картинку</option><option value="hand">Рука (двигать доску)</option>
+  <select id="tool" class="keep">
+   <optgroup label="Рисование">
+    <option value="pen">Перо</option><option value="text">Текст (печатать)</option><option value="line">Линия</option><option value="arrow">Стрелка</option>
+    <option value="rect">Прямоугольник</option><option value="ellipse">Эллипс / круг</option>
+   </optgroup>
+   <optgroup label="Правка">
+    <option value="mv">Двигать (фигуры, линии, картинки)</option><option value="er">Ластик</option><option value="hand">Рука (двигать доску)</option>
+   </optgroup>
+   <optgroup label="Вставить">
+    <option value="axes">Координатная плоскость…</option>
+   </optgroup>
   </select>
-  <span id="cols"></span>
-  <select id="wd"><option value="2.5">Тонко</option><option value="4" selected>Средне</option><option value="8">Толсто</option></select>
-  <select id="bgs"><option value="grid">Клетка</option><option value="line">Линейка</option><option value="none">Чистый</option></select>
-  <button id="zo" title="Уменьшить">−</button><button id="zi" title="Увеличить">+</button><button id="fit">По ширине</button><button id="fp" hidden>Палец: рисует</button><button id="fs2" title="Во весь экран">⛶</button>
-  <label style="font-size:13px;white-space:nowrap"><input type="checkbox" id="snap" checked style="padding:0"> Ровные фигуры</label>
-  <button id="undo">Отменить</button>
-  
-  <button id="img">Картинка</button><input type="file" id="fi" accept="image/*" hidden>
-  <button id="clr">Очистить</button>
+  <span id="cols" class="keep"></span>
+  <select id="wd" class="keep"><option value="2.5">Тонко</option><option value="4" selected>Средне</option><option value="8">Толсто</option></select>
+  <button id="undo" class="keep">Отменить</button>
+  <button id="zo" title="Уменьшить">−</button><button id="zi" title="Увеличить">+</button><button id="fit">По ширине</button>
+  <select id="fm"><option value="">Файл…</option><option value="img">Вставить картинку…</option><option value="pdf1">Скачать PDF: эта доска</option><option value="pdfa">Скачать PDF: все доски</option><option value="clr">Очистить доску…</option></select>
+  <button id="gear" title="Настройки">⚙</button>
+  <button id="fs2" class="keep" title="Фокус: убрать панели">⛶</button>
   <span id="st">Подключение…</span>
+  <input type="file" id="fi" accept="image/*" hidden>
  </div>
- <div id="wrap"><canvas id="cv"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button></div>
+ <div id="set" hidden>
+  <h3>Настройки</h3>
+  <label>Тема <select id="theme"><option value="auto">Как в системе</option><option value="light">Светлая</option><option value="dark">Тёмная</option></select></label>
+  <label>Фон листа <select id="bgs"><option value="grid">Клетка</option><option value="line">Линейка</option><option value="none">Чистый</option></select></label>
+  <label class="c"><input type="checkbox" id="vonly"> Только просмотр (случайно не нарисую)</label>
+  <label class="c"><input type="checkbox" id="snap"> Ровные фигуры (задержать перо)</label>
+  <label class="c"><input type="checkbox" id="press"> Нажим пера (если планшет передаёт)</label>
+  <label class="c"><input type="checkbox" id="palm"> Со стилусом пальцы только листают</label>
+  <label class="c"><input type="checkbox" id="ring"> Круглый курсор по размеру пера</label>
+  <label class="c"><input type="checkbox" id="seec"> Видеть курсоры других</label>
+  <label class="c"><input type="checkbox" id="showme"> Показывать другим мой курсор</label>
+  <button id="fp" hidden>Палец: рисует</button>
+  <details><summary>Как открыть на весь экран</summary>
+   <p><b>Компьютер:</b> кнопка ⛶ убирает панели. Полный экран браузера: Ctrl+⌘+F (Mac) или F11 (Windows).</p>
+   <p><b>iPhone / iPad:</b> «Поделиться» → «На экран «Домой»»: доска откроется как приложение без панелей Safari.</p>
+   <p><b>Android:</b> меню браузера ⋮ → «Установить приложение» или «Добавить на главный экран».</p>
+  </details>
+ </div>
+ <div id="wrap"><canvas id="cv"></canvas><canvas id="ring"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button></div>
 </div>
 <script>
 (function(){
-const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),wrap=document.getElementById('wrap');
+const cv=document.getElementById('cv'),rg=document.getElementById('ring'),wrap=document.getElementById('wrap');
+let ctx=cv.getContext('2d');const rctx=rg.getContext('2d'),mctx=document.createElement('canvas').getContext('2d');
 const room=location.pathname.split('/')[2],me='c'+Math.random().toString(36).slice(2,10).padEnd(8,'0');
+const isTeacher=window.self!==window.top;
 let pages=[],strokes={},images={},page=null,live={},color='#1a1a1a',bg='grid',cur=null,lastEmit=0,mine=[],redo=[];
 let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,lastP=[0,0],editImg=null,editStroke=null,jump=null,fingerPan=false;
-const views={},imgEl={},ptrs=new Map();
+let viewOnly=false,dark=false,penSeen=false,myName=null,ptr=null,prevTool='pen',lastCur=0,lastCurP=[-9,-9];
+const views={},imgEl={},ptrs=new Map(),cursors={};
 const $=i=>document.getElementById(i),tool=()=>$('tool').value;
 const send=op=>{op.from=me;return fetch('/api/'+room+'/op',{method:'POST',body:JSON.stringify(op)}).catch(()=>{$('st').textContent='Нет связи с сервером'})};
 const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const r2=v=>Math.round(v*100)/100;
-// доска = листы А4 друг под другом (в условных единицах: ширина 1000, высота 1414); внизу всегда есть ещё один чистый лист
+
+// ---------- настройки ----------
+const DEF={theme:'auto',bg:'grid',snap:true,press:true,palm:true,ring:true,seec:true,showme:true};
+const S=Object.assign({},DEF);
+try{Object.assign(S,JSON.parse(localStorage.getItem('bset')||'{}'))}catch(e){}
+const saveS=()=>{try{localStorage.setItem('bset',JSON.stringify(S))}catch(e){}};
+bg=S.bg;
+const DARKMAP={'#1a1a1a':'#f1eef8','#d32f2f':'#ff6b6b','#1565c0':'#6aa8ff','#2e7d32':'#5fd068','#ef6c00':'#ffa040','#7b1fa2':'#d28bf0'};
+const inkCol=c=>dark?(DARKMAP[c]||c):c;
+function applyTheme(){
+ document.documentElement.dataset.theme=S.theme==='auto'?'':S.theme;
+ dark=S.theme==='dark'||(S.theme==='auto'&&!!(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches));
+ redraw();drawOverlay();
+}
+
+// ---------- лист А4: ширина 1000, высота 1414 условных единиц; внизу всегда есть ещё один чистый лист ----------
 const PW=1000,PH=1414,PG=28,PM=16,PS=PH+PG;
 let totH=PH;
 const fitS=()=>cw/(PW+2*PM);
 const defView=()=>({x:-PM,y:-PM,s:fitS()});
 const clearLive=()=>send({t:'live',page:page,k:'pen',c:'#000000',w:1,pts:[]});
-
 function resize(){
  dpr=window.devicePixelRatio||1;cw=Math.max(1,wrap.clientWidth);ch=Math.max(1,wrap.clientHeight);
- cv.width=Math.round(cw*dpr);cv.height=Math.round(ch*dpr);redraw();
+ cv.width=rg.width=Math.round(cw*dpr);cv.height=rg.height=Math.round(ch*dpr);
+ rg.style.width=cw+'px';rg.style.height=ch+'px';redraw();drawOverlay();
 }
-// Рисование: сглаженные кривые через середины отрезков, холст в физических пикселях экрана
+
+// ---------- рисование объектов ----------
+const FONT='system-ui,-apple-system,Arial,sans-serif';
+function textBox(s){ // рамка текста (кэшируется)
+ const key=s.w+'|'+s.s;
+ if(!s._tb||s._tbk!==key){mctx.font=s.w+'px '+FONT;let w=0;const ls=s.s.split('\n');ls.forEach(l=>{w=Math.max(w,mctx.measureText(l).width)});s._tb=[s.pts[0],s.pts[1],s.pts[0]+w,s.pts[1]+ls.length*s.w*1.25];s._tbk=key}
+ return s._tb;
+}
+function axesCfg(s){const a=s.s.split(',').map(Number);return{xa:a[0],xb:a[1],ya:a[2],yb:a[3],g:a[4]===1,u:s.w,ox:s.pts[0],oy:s.pts[1]}}
+function axesBox(s){const c=axesCfg(s),u=c.u;return[c.ox+c.xa*u-.9*u,c.oy-c.yb*u-1.2*u,c.ox+c.xb*u+1.3*u,c.oy-c.ya*u+.9*u]}
+function drawAxes(s,col){
+ const c=axesCfg(s),u=c.u,X=v=>c.ox+v*u,Y=v=>c.oy-v*u;
+ ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
+ if(c.g){ctx.strokeStyle=dark?'rgba(255,255,255,.16)':'rgba(0,0,0,.14)';ctx.lineWidth=Math.max(.8,u*.025);ctx.beginPath();
+  for(let i=Math.ceil(c.xa);i<=c.xb;i++){ctx.moveTo(X(i),Y(c.ya));ctx.lineTo(X(i),Y(c.yb))}
+  for(let j=Math.ceil(c.ya);j<=c.yb;j++){ctx.moveTo(X(c.xa),Y(j));ctx.lineTo(X(c.xb),Y(j))}
+  ctx.stroke()}
+ ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=Math.max(1.6,u*.06);
+ const xe=X(c.xb)+.6*u,ye=Y(c.yb)-.6*u,h=.3*u;
+ ctx.beginPath();ctx.moveTo(X(c.xa)-.2*u,Y(0));ctx.lineTo(xe,Y(0));ctx.moveTo(X(0),Y(c.ya)+.2*u);ctx.lineTo(X(0),ye);ctx.stroke();
+ ctx.beginPath();ctx.moveTo(xe+.14*u,Y(0));ctx.lineTo(xe-h,Y(0)-h*.5);ctx.lineTo(xe-h,Y(0)+h*.5);ctx.fill();
+ ctx.beginPath();ctx.moveTo(X(0),ye-.14*u);ctx.lineTo(X(0)-h*.5,ye+h);ctx.lineTo(X(0)+h*.5,ye+h);ctx.fill();
+ ctx.lineWidth=Math.max(1.2,u*.045);ctx.beginPath();
+ for(let i=Math.ceil(c.xa);i<=Math.floor(c.xb);i++)if(i){ctx.moveTo(X(i),Y(0)-.09*u);ctx.lineTo(X(i),Y(0)+.09*u)}
+ for(let j=Math.ceil(c.ya);j<=Math.floor(c.yb);j++)if(j){ctx.moveTo(X(0)-.09*u,Y(j));ctx.lineTo(X(0)+.09*u,Y(j))}
+ ctx.stroke();
+ ctx.font=Math.max(10,u*.34)+'px '+FONT;
+ ctx.textAlign='center';ctx.textBaseline='top';
+ for(let i=Math.ceil(c.xa);i<=Math.floor(c.xb);i++)if(i)ctx.fillText(String(i),X(i),Y(0)+.14*u);
+ ctx.textAlign='right';ctx.textBaseline='middle';
+ for(let j=Math.ceil(c.ya);j<=Math.floor(c.yb);j++)if(j)ctx.fillText(String(j),X(0)-.14*u,Y(j));
+ ctx.textBaseline='top';ctx.fillText('0',X(0)-.12*u,Y(0)+.12*u);
+ ctx.font='italic '+Math.max(11,u*.4)+'px '+FONT;ctx.textAlign='left';ctx.textBaseline='middle';
+ ctx.fillText('x',xe+.2*u,Y(0)+.05*u);ctx.textBaseline='bottom';ctx.fillText('y',X(0)+.22*u,ye-.02*u);
+ ctx.restore();
+}
+function drawPen(s,col){
+ const p=s.pts,n=p.length/2,pr=s.pr;
+ ctx.strokeStyle=col;ctx.lineCap='round';ctx.lineJoin='round';
+ if(pr&&pr.length===n&&n>2){ // нажим: толщина зависит от давления
+  const W=i=>s.w*(.3+1.2*pr[i]);
+  ctx.lineWidth=W(0);ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo((p[0]+p[2])/2,(p[1]+p[3])/2);ctx.stroke();
+  for(let i=1;i<n-1;i++){ctx.lineWidth=s.w*(.3+1.2*(pr[i-1]+pr[i]+pr[i+1])/3);ctx.beginPath();ctx.moveTo((p[2*i-2]+p[2*i])/2,(p[2*i-1]+p[2*i+1])/2);ctx.quadraticCurveTo(p[2*i],p[2*i+1],(p[2*i]+p[2*i+2])/2,(p[2*i+1]+p[2*i+3])/2);ctx.stroke()}
+  ctx.lineWidth=W(n-1);ctx.beginPath();ctx.moveTo((p[2*n-4]+p[2*n-2])/2,(p[2*n-3]+p[2*n-1])/2);ctx.lineTo(p[2*n-2],p[2*n-1]);ctx.stroke();return;
+ }
+ ctx.lineWidth=s.w;ctx.beginPath();ctx.moveTo(p[0],p[1]);
+ if(n===1)ctx.lineTo(p[0]+.01,p[1]);
+ else if(n===2)ctx.lineTo(p[2],p[3]);
+ else{for(let i=1;i<n-1;i++)ctx.quadraticCurveTo(p[2*i],p[2*i+1],(p[2*i]+p[2*i+2])/2,(p[2*i+1]+p[2*i+3])/2);ctx.lineTo(p[2*n-2],p[2*n-1])}
+ ctx.stroke();
+}
 function drawStroke(s){
  const p=s.pts,k=s.k||'pen';if(!p||p.length<2)return;
- ctx.strokeStyle=s.c;ctx.lineWidth=s.w;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();
- if(k==='pen'){
-  const n=p.length/2;ctx.moveTo(p[0],p[1]);
-  if(n===1)ctx.lineTo(p[0]+.01,p[1]);
-  else if(n===2)ctx.lineTo(p[2],p[3]);
-  else{for(let i=1;i<n-1;i++)ctx.quadraticCurveTo(p[2*i],p[2*i+1],(p[2*i]+p[2*i+2])/2,(p[2*i+1]+p[2*i+3])/2);ctx.lineTo(p[2*n-2],p[2*n-1])}
- }else if(k==='poly'){ctx.moveTo(p[0],p[1]);for(let i=2;i<p.length;i+=2)ctx.lineTo(p[i],p[i+1]);ctx.closePath()
- }else if(p.length>=4){
+ const col=inkCol(s.c);
+ if(k==='text'){if(!s.s)return;ctx.fillStyle=col;ctx.font=s.w+'px '+FONT;ctx.textBaseline='top';ctx.textAlign='left';s.s.split('\n').forEach((l,i)=>ctx.fillText(l,p[0],p[1]+i*s.w*1.25));return}
+ if(k==='axes'){if(s.s)drawAxes(s,col);return}
+ if(k==='pen'){drawPen(s,col);return}
+ ctx.strokeStyle=col;ctx.lineWidth=s.w;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();
+ if(k==='poly'){ctx.moveTo(p[0],p[1]);for(let i=2;i<p.length;i+=2)ctx.lineTo(p[i],p[i+1]);ctx.closePath()}
+ else if(p.length>=4){
   const x0=p[0],y0=p[1],x1=p[2],y1=p[3];
   if(k==='line'||k==='arrow'){
    ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);
@@ -101,21 +209,26 @@ function drawStroke(s){
  }
  ctx.stroke();
 }
-function samples(s){ // контур фигуры точками (для ластика и «Показать всё»)
- const p=s.pts,k=s.k||'pen';if(k==='pen'||p.length<4)return p;
- const x0=p[0],y0=p[1],x1=p[2],y1=p[3],o=[];
- const seg=(ax,ay,bx,by)=>{for(let i=0;i<=12;i++){const t=i/12;o.push(ax+(bx-ax)*t,ay+(by-ay)*t)}};
+function samples(s){ // контур объекта точками (ластик, рамки, высота листа)
+ const p=s.pts,k=s.k||'pen';
+ const o=[],seg=(ax,ay,bx,by)=>{for(let i=0;i<=12;i++){const t=i/12;o.push(ax+(bx-ax)*t,ay+(by-ay)*t)}};
+ const rect=b=>{seg(b[0],b[1],b[2],b[1]);seg(b[2],b[1],b[2],b[3]);seg(b[2],b[3],b[0],b[3]);seg(b[0],b[3],b[0],b[1])};
+ if(k==='text'){if(!s.s)return p;rect(textBox(s));return o}
+ if(k==='axes'){if(!s.s)return p;const b=axesBox(s),c=axesCfg(s);rect(b);seg(b[0],c.oy,b[2],c.oy);seg(c.ox,b[1],c.ox,b[3]);return o}
+ if(k==='pen'||p.length<4)return p;
+ const x0=p[0],y0=p[1],x1=p[2],y1=p[3];
  if(k==='poly'){for(let i=0;i<p.length;i+=2){const j=(i+2)%p.length;seg(p[i],p[i+1],p[j],p[j+1])}}
  else if(k==='line'||k==='arrow')seg(x0,y0,x1,y1);
- else if(k==='rect'){seg(x0,y0,x1,y0);seg(x1,y0,x1,y1);seg(x1,y1,x0,y1);seg(x0,y1,x0,y0)}
+ else if(k==='rect')rect([x0,y0,x1,y1]);
  else for(let i=0;i<=48;i++){const t=i/48*6.2832;o.push((x0+x1)/2+Math.cos(t)*(x1-x0)/2,(y0+y1)/2+Math.sin(t)*(y1-y0)/2)}
  return o;
 }
+const objBox=s=>s.k==='text'?textBox(s):axesBox(s);
 function getImg(id,src){
  if(!imgEl[id]||imgEl[id].s!==src){const e=new Image();e.onload=redraw;e.src=src;imgEl[id]={e:e,s:src}}
  return imgEl[id].e;
 }
-// ручки на картинке: левый верхний угол — переместить, правый нижний — изменить размер (работают в любом инструменте)
+// ручки на картинке: левый верхний угол — переместить, правый нижний — изменить размер
 const handlesOn=id=>tool()==='mv'||id===editImg;
 function drawHandles(g){
  const s=view.s,z=26/s,a=z*.28;
@@ -153,7 +266,7 @@ function placeDone(){ // кнопка «Готово» рядом с редак�
  x=Math.max(6,Math.min(cw-b.offsetWidth-6,x));y=Math.max(6,Math.min(ch-b.offsetHeight-6,y));
  b.style.left=x+'px';b.style.top=y+'px';
 }
-function mY(sk){ // нижняя точка штриха (кэшируется)
+function mY(sk){ // нижняя точка объекта (кэшируется)
  if(sk._my===undefined){const q=samples(sk);let m=-1e12;for(let i=1;i<q.length;i+=2)if(q[i]>m)m=q[i];sk._my=m}
  return sk._my;
 }
@@ -172,24 +285,25 @@ function clampView(n){
  view.x=vw>=PW+2*PM?(PW-vw)/2:Math.max(-PM,Math.min(PW+PM-vw,view.x));
  view.y=Math.max(-PM,Math.min(Math.max(-PM,tot+PM-vh),view.y));
 }
-function sheetGrid(y0){
- const s=view.s;ctx.lineWidth=1/s;ctx.strokeStyle='#dfe6f2';ctx.beginPath();
- const ya=Math.max(y0,view.y),yb=Math.min(y0+PH,view.y+ch/s),xa=Math.max(0,view.x),xb=Math.min(PW,view.x+cw/s);
+function sheetGrid(y0,s,e){
+ ctx.lineWidth=1/s;ctx.strokeStyle=dark?'#2e2a42':'#dfe6f2';ctx.beginPath();
  if(bg==='grid'){let st=24;while(st*s<5)st*=2;
-  for(let x=Math.ceil(xa/st)*st;x<=xb;x+=st){ctx.moveTo(x,ya);ctx.lineTo(x,yb)}
-  for(let y=y0+Math.ceil((ya-y0)/st)*st;y<=yb;y+=st){ctx.moveTo(xa,y);ctx.lineTo(xb,y)}}
+  for(let x=Math.ceil(e.xa/st)*st;x<=e.xb;x+=st){ctx.moveTo(x,e.ya);ctx.lineTo(x,e.yb)}
+  for(let y=y0+Math.ceil((e.ya-y0)/st)*st;y<=e.yb;y+=st){ctx.moveTo(e.xa,y);ctx.lineTo(e.xb,y)}}
  else if(bg==='line'){let st=34;while(st*s<5)st*=2;
-  for(let y=y0+Math.ceil((ya-y0)/st)*st;y<=yb;y+=st){ctx.moveTo(xa,y);ctx.lineTo(xb,y)}}
+  for(let y=y0+Math.ceil((e.ya-y0)/st)*st;y<=e.yb;y+=st){ctx.moveTo(e.xa,y);ctx.lineTo(e.xb,y)}}
  ctx.stroke();
 }
 function redraw(){
  const n=sheets();clampView(n);totH=n*PS-PG;
  const s=view.s;
- ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#e6e2ef';ctx.fillRect(0,0,cv.width,cv.height);
+ ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=dark?'#12101a':'#e6e2ef';ctx.fillRect(0,0,cv.width,cv.height);
  ctx.setTransform(dpr*s,0,0,dpr*s,-view.x*s*dpr,-view.y*s*dpr);
  ctx.imageSmoothingQuality='high';
  const vis=[];for(let k=0;k<n;k++){const y0=k*PS;if(y0+PH>=view.y&&y0<=view.y+ch/s)vis.push(y0)}
- vis.forEach(y0=>{ctx.fillStyle='#fff';ctx.fillRect(0,y0,PW,PH);sheetGrid(y0);ctx.strokeStyle='#cfc8e0';ctx.lineWidth=1/s;ctx.strokeRect(0,y0,PW,PH)});
+ vis.forEach(y0=>{ctx.fillStyle=dark?'#1e1a2a':'#fff';ctx.fillRect(0,y0,PW,PH);
+  sheetGrid(y0,s,{xa:Math.max(0,view.x),xb:Math.min(PW,view.x+cw/s),ya:Math.max(y0,view.y),yb:Math.min(y0+PH,view.y+ch/s)});
+  ctx.strokeStyle=dark?'#3a3450':'#cfc8e0';ctx.lineWidth=1/s;ctx.strokeRect(0,y0,PW,PH)});
  ctx.save();ctx.beginPath();vis.forEach(y0=>ctx.rect(0,y0,PW,PH));ctx.clip(); // чернила видны только на листах
  const ims=images[page]||{};
  for(const id in ims){const g=ims[id],e=getImg(id,g.src);if(e.complete&&e.naturalWidth)ctx.drawImage(e,g.x,g.y,g.w,g.h)}
@@ -198,23 +312,49 @@ function redraw(){
  if(cur&&cur.pts)drawStroke(cur);
  ctx.restore();
  for(const id in ims)if(handlesOn(id))drawHandles(ims[id]);
- if(editStroke&&strokes[page]&&strokes[page][editStroke]){ // рамка вокруг только что нарисованной ровной фигуры
+ if(editStroke&&strokes[page]&&strokes[page][editStroke]){ // пунктирная рамка вокруг только что созданного объекта
   const bb=strokeBox(strokes[page][editStroke]);ctx.save();ctx.strokeStyle='rgba(106,63,196,.9)';ctx.lineWidth=2/s;ctx.setLineDash([8/s,6/s]);
   ctx.strokeRect(bb[0],bb[1],bb[2]-bb[0],bb[3]-bb[1]);ctx.restore()}
- placeDone();
+ placeDone();drawOverlay();
 }
+// верхний слой: круглый курсор и курсоры других участников
+function drawOverlay(){
+ const c=rctx;c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,rg.width,rg.height);c.setTransform(dpr,0,0,dpr,0,0);
+ if(S.seec){
+  const now=Date.now();
+  for(const id in cursors){const o=cursors[id];
+   if(now-o.t>3500){delete cursors[id];continue}
+   if(o.page!==page)continue;
+   const sx=(o.x-view.x)*view.s,sy=(o.y-view.y)*view.s;if(sx<-30||sy<-30||sx>cw+30||sy>ch+30)continue;
+   c.fillStyle=o.color;c.strokeStyle='#fff';c.lineWidth=1.5;c.beginPath();c.moveTo(sx,sy);c.lineTo(sx+3,sy+16);c.lineTo(sx+7,sy+11.5);c.lineTo(sx+13,sy+14);c.closePath();c.fill();c.stroke();
+   c.font='12px '+FONT;const tw=c.measureText(o.label).width+12;
+   c.fillStyle=o.color;c.beginPath();c.rect(sx+12,sy+14,tw,18);c.fill();
+   c.fillStyle='#fff';c.textAlign='left';c.textBaseline='middle';c.fillText(o.label,sx+18,sy+23);
+  }
+ }
+ if(ptr&&S.ring&&!viewOnly&&ringTools.includes(tool())&&!space){
+  const er=tool()==='er',r=er?16:Math.max(4,+$('wd').value*view.s/2);
+  c.lineWidth=2;c.strokeStyle='rgba(255,255,255,.95)';c.beginPath();c.arc(ptr.x,ptr.y,r+1,0,6.2832);c.stroke();
+  c.lineWidth=1;c.strokeStyle='rgba(0,0,0,.8)';if(er)c.setLineDash([4,3]);c.beginPath();c.arc(ptr.x,ptr.y,r,0,6.2832);c.stroke();c.setLineDash([]);
+  if(!er){c.fillStyle='rgba(0,0,0,.8)';c.beginPath();c.arc(ptr.x,ptr.y,1.2,0,6.2832);c.fill()}
+ }
+}
+const ringTools=['pen','line','arrow','rect','ellipse','er'];
+function setCursor(){const t=tool();cv.style.cursor=(space||t==='hand'||viewOnly)?'grab':(S.ring&&ringTools.includes(t))?'none':t==='text'?'text':t==='mv'?'default':'crosshair'}
 function renderPages(){const b=$('pl');b.innerHTML='';
  pages.forEach(p=>{const d=document.createElement('div');d.className='pg'+(p.id===page?' on':'');
   d.textContent=p.title||'Без названия';d.onclick=()=>openPage(p.id);b.appendChild(d)})}
 function openPage(id){page=id;live={};$('newt').hidden=true;jump=null;editImg=null;editStroke=null;view=views[id]||(views[id]=defView());renderPages();redraw();
  const p=pages.filter(x=>x.id===id)[0];$('title').value=p?p.title:''}
 
+// ---------- сообщения от сервера ----------
 function onOp(o){
- if(o.t==='init'){$('who').textContent=o.name?'Кабинет: '+o.name:'Доска';document.title=o.name||'Доска';pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};if(!page||!pages.some(p=>p.id===page))page=pages[0].id;openPage(page);return}
+ if(o.t==='init'){myName=o.name||null;$('who').textContent=o.name?'Кабинет: '+o.name:'Доска';document.title=o.name||'Доска';pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};if(!page||!pages.some(p=>p.id===page))page=pages[0].id;openPage(page);return}
  if(o.t==='peers'){$('st').textContent='Онлайн: '+o.n;return}
+ if(o.t==='cursor'){if(o.from!==me){cursors[o.from]={x:o.x,y:o.y,page:o.page,label:String(o.label||'Участник'),color:/^#[0-9a-f]{6}$/i.test(o.color)?o.color:'#0e9f8e',t:Date.now()};drawOverlay()}return}
  if(o.t==='live'){if(o.from!==me){live[o.from]={page:o.page,k:o.k,c:o.c,w:o.w,pts:o.pts};redraw()}return}
  if(o.t==='stroke'){(strokes[o.page]=strokes[o.page]||{})[o.stroke.id]=o.stroke;delete live[o.from]}
- if(o.t==='strokeset'&&strokes[o.page]&&strokes[o.page][o.id]){strokes[o.page][o.id].pts=o.pts;strokes[o.page][o.id]._my=undefined}
+ if(o.t==='strokeset'&&strokes[o.page]&&strokes[o.page][o.id]){strokes[o.page][o.id].pts=o.pts;strokes[o.page][o.id]._my=undefined;strokes[o.page][o.id]._tb=undefined}
  if(o.t==='image'){(images[o.page]=images[o.page]||{})[o.img.id]=o.img;if(o.from!==me&&o.page===page)notifyNew(o.img)}
  if(o.t==='imgset'&&images[o.page]&&images[o.page][o.id]){const g=images[o.page][o.id];g.x=o.x;g.y=o.y;g.w=o.w;g.h=o.h}
  if(o.t==='erase'){if(strokes[o.page])delete strokes[o.page][o.id];if(images[o.page])delete images[o.page][o.id]}
@@ -227,8 +367,9 @@ function onOp(o){
 const es=new EventSource('/api/'+room+'/events?c='+me);
 es.onmessage=e=>onOp(JSON.parse(e.data));
 es.onerror=()=>{$('st').textContent='Переподключение…'};
+setInterval(()=>{if(Object.keys(cursors).length)drawOverlay()},1000);
 
-// --- камера: бесконечная доска ---
+// ---------- камера ----------
 function zoomAt(px,py,f){
  const lim=fitS(),ns=Math.min(lim*6,Math.max(lim*.6,view.s*f)),wx=px/view.s+view.x,wy=py/view.s+view.y;
  view.s=ns;view.x=wx-px/ns;view.y=wy-py/ns;redraw();
@@ -253,9 +394,8 @@ if(!('ontouchstart' in window)){ // щипок на трекпаде Safari
  cv.addEventListener('gesturechange',e=>{e.preventDefault();const r=cv.getBoundingClientRect();zoomAt(e.clientX-r.left,e.clientY-r.top,e.scale/gs);gs=e.scale});
 }
 
-// --- ввод ---
+// ---------- ровные фигуры: удержите перо в конце линии ----------
 const pos=e=>{const r=cv.getBoundingClientRect();return[r2(Math.max(0,Math.min(PW,(e.clientX-r.left)/view.s+view.x))),r2(Math.max(0,Math.min(totH,(e.clientY-r.top)/view.s+view.y)))]};
-// --- «ровные фигуры»: удержите перо на секунду в конце линии ---
 function segDist(q,a,b){const dx=b[0]-a[0],dy=b[1]-a[1],l=dx*dx+dy*dy;let t=l?((q[0]-a[0])*dx+(q[1]-a[1])*dy)/l:0;t=Math.max(0,Math.min(1,t));return Math.hypot(a[0]+t*dx-q[0],a[1]+t*dy-q[1])}
 function rdp(p,eps){
  if(p.length<3)return p.slice();
@@ -290,11 +430,11 @@ function recognize(flat){
  const strict=ellipseFit(P,a,b,c,d,.07);if(strict)return strict;
  const v=rdp(P,.05*D);
  if(Math.hypot(v[v.length-1][0]-v[0][0],v[v.length-1][1]-v[0][1])<.1*D)v.pop();
- for(let ch=true;ch&&v.length>3;){ch=false;
+ for(let ch2=true;ch2&&v.length>3;){ch2=false;
   for(let i=0;i<v.length;i++){
    const p0=v[(i+v.length-1)%v.length],p1=v[i],p2=v[(i+1)%v.length];
    let da=Math.abs(Math.atan2(p2[1]-p1[1],p2[0]-p1[0])-Math.atan2(p1[1]-p0[1],p1[0]-p0[0]));if(da>Math.PI)da=2*Math.PI-da;
-   if(da<.35){v.splice(i,1);ch=true;break}}}
+   if(da<.35){v.splice(i,1);ch2=true;break}}}
  if(v.length===3)return{k:'poly',pts:v.flat()};
  if(v.length===4){
   let ax=true;
@@ -326,11 +466,13 @@ function adjust(p){ // после привязки фигуру можно тя�
  if(t-lastEmit>80){lastEmit=t;send({t:'live',page:page,k:cur.k,c:cur.c,w:cur.w,pts:cur.pts})}
 }
 function snapNow(){
- if(!cur||cur.k!=='pen'||cur.erasing||cur.mv)return;
+ if(!cur||cur.k!=='pen'||cur.erasing||cur.mv||cur.mvs)return;
  const r=recognize(cur.pts);if(!r)return;
- cur.k=r.k;cur.pts=r.pts.map(r2);cur.snapped=true;cur.base={k:cur.k,pts:cur.pts.slice(),p:lastP.slice()};redraw();
+ cur.k=r.k;cur.pts=r.pts.map(r2);cur.pr=null;cur.snapped=true;cur.base={k:cur.k,pts:cur.pts.slice(),p:lastP.slice()};redraw();
  send({t:'live',page:page,k:cur.k,c:cur.c,w:cur.w,pts:cur.pts});
 }
+
+// ---------- поиск объектов под курсором ----------
 function near(p,x,y,rad){
  if(p.length===2)return Math.hypot(p[0]-x,p[1]-y)<rad;
  for(let i=0;i<p.length-2;i+=2){
@@ -339,20 +481,79 @@ function near(p,x,y,rad){
   if(Math.hypot(ax+t*dx-x,ay+t*dy-y)<rad)return true}
  return false;
 }
+const inBox=(b,x,y)=>x>=b[0]&&x<=b[2]&&y>=b[1]&&y<=b[3];
+function hit(sk,x,y,rad,forMove){
+ if(sk.k==='text'&&sk.s)return inBox(textBox(sk),x,y);
+ if(sk.k==='axes'&&sk.s&&forMove)return inBox(axesBox(sk),x,y);
+ return near(samples(sk),x,y,rad);
+}
+function strokeAt(x,y,forMove,onlyText){
+ const ps=strokes[page]||{},rad=(forMove?14:16)/view.s;let f=null;
+ for(const id in ps){const sk=ps[id];if(onlyText&&sk.k!=='text')continue;if(hit(sk,x,y,rad,forMove))f=id}
+ return f;
+}
 function eraseAt(x,y){
- const rad=16/view.s,ps=strokes[page]||{};let hit=false;
- for(const id in ps)if(near(samples(ps[id]),x,y,rad)){delete ps[id];send({t:'erase',page:page,id:id});hit=true}
- if(!hit){const ims=images[page]||{};
+ const ps=strokes[page]||{};let any=false;
+ for(const id in ps)if(hit(ps[id],x,y,16/view.s,false)){delete ps[id];send({t:'erase',page:page,id:id});any=true}
+ if(!any){const ims=images[page]||{};
   for(const id in ims){const g=ims[id];if(x>=g.x&&x<=g.x+g.w&&y>=g.y&&y<=g.y+g.h){delete ims[id];send({t:'erase',page:page,id:id});break}}}
  redraw();
 }
 function imgAt(x,y){const ims=images[page]||{};let f=null;
  for(const id in ims){const g=ims[id];if(x>=g.x&&x<=g.x+g.w&&y>=g.y&&y<=g.y+g.h)f=id}return f}
+const clean=o=>{const r={id:o.id,k:o.k,pts:o.pts,c:o.c,w:o.w};if(o.s!==undefined)r.s=o.s;if(o.pr)r.pr=o.pr;return r};
+function addObj(o){ // добавить свой объект на доску (штрих, текст, оси)
+ (strokes[page]=strokes[page]||{})[o.id]=o;mine.push({page:page,id:o.id});redo=[];send({t:'stroke',page:page,stroke:clean(o)});redraw();
+}
 
+// ---------- текст ----------
+let tbox=null;
+function wrapText(v,size,maxW){
+ mctx.font=size+'px '+FONT;const out=[];
+ v.split('\n').forEach(line=>{
+  let cur2='';
+  line.split(' ').forEach(w=>{const t=cur2?cur2+' '+w:w;if(cur2&&mctx.measureText(t).width>maxW){out.push(cur2);cur2=w}else cur2=t});
+  out.push(cur2)});
+ return out.join('\n');
+}
+function openText(x,y,id){
+ closeText(true);
+ const ex=id?strokes[page][id]:null,size=ex?ex.w:Math.round(+$('wd').value*9);
+ const ta=document.createElement('textarea');ta.className='ttx';
+ ta.style.left=(x-view.x)*view.s+'px';ta.style.top=(y-view.y)*view.s+'px';
+ ta.style.fontSize=Math.max(11,size*view.s)+'px';ta.style.color=inkCol(ex?ex.c:color);
+ ta.style.width=Math.max(160,Math.min(cw-(x-view.x)*view.s-8,PW*view.s))+'px';
+ ta.rows=Math.max(1,ex?ex.s.split('\n').length:1);ta.value=ex?ex.s:'';
+ const fit2=()=>{ta.style.height='auto';ta.style.height=ta.scrollHeight+'px'};
+ let done=false;
+ const commit=()=>{
+  if(done)return;done=true;tbox=null;
+  const v=ta.value.replace(/\s+$/,'');ta.remove();
+  if(!v){return}
+  const txt=wrapText(v,size,Math.max(60,PW-x-12));
+  if(ex){ex.s=txt;ex._my=undefined;ex._tb=undefined;send({t:'stroke',page:page,stroke:clean(ex)});redraw();return}
+  addObj({id:newId(),k:'text',pts:[x,y],c:color,w:size,s:txt});
+ };
+ ta.oninput=fit2;
+ ta.onkeydown=e=>{if(e.key==='Escape'){done=true;tbox=null;ta.remove()}else if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();commit()}};
+ ta.onblur=commit;
+ wrap.appendChild(ta);tbox={commit:commit};fit2();ta.focus();
+}
+function closeText(){if(tbox)tbox.commit()}
+
+// ---------- ввод пером, мышью и пальцем ----------
+const pn=e=>Math.max(.05,Math.min(1,e.pressure||.5));
+function sendCursor(e){
+ if(!S.showme||!page)return;const n=Date.now();if(n-lastCur<90)return;
+ const p=pos(e);if(Math.abs(p[0]-lastCurP[0])+Math.abs(p[1]-lastCurP[1])<2)return;
+ lastCur=n;lastCurP=p;send({t:'cursor',page:page,x:p[0],y:p[1],label:isTeacher?'Преподаватель':(myName||'Ученик'),color:isTeacher?'#6a3fc4':'#0e9f8e'});
+}
 cv.addEventListener('pointerdown',e=>{
  e.preventDefault();
  if(e.pointerType==='mouse'&&e.button===2)return;
+ if(tbox&&e.target===cv)closeText();
  try{cv.setPointerCapture(e.pointerId)}catch(_){}
+ if(e.pointerType==='pen')penSeen=true;
  if(e.pointerType==='touch'){
   ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(ptrs.size===2){clearTimeout(holdT);if(cur&&cur.pts)clearLive();cur=null;pan=null;beginGesture();return}
@@ -360,35 +561,45 @@ cv.addEventListener('pointerdown',e=>{
  }
  if(!page)return;
  const t=tool();
- if(e.button===1||space||t==='hand'||(e.pointerType==='touch'&&fingerPan)){pan={id:e.pointerId,x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};cv.style.cursor='grabbing';return}
+ const panMode=e.button===1||space||t==='hand'||viewOnly||(e.pointerType==='touch'&&(fingerPan||(S.palm&&penSeen)));
+ if(panMode){pan={id:e.pointerId,x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};cv.style.cursor='grabbing';return}
  const p=pos(e);lastP=p;
  if(e.altKey&&t!=='er'){const ia=imgAt(p[0],p[1]);if(ia){editImg=ia;redraw();return}} // Alt+клик по картинке — править её
- if(editStroke){ // сразу после «ровной фигуры»: можно перенести её, клик в стороне — выход
+ if(editStroke){ // сразу после создания фигуры/оси: можно перенести, клик в стороне — выход
   const sk=(strokes[page]||{})[editStroke];
   if(!sk||t==='er'){editStroke=null;redraw()}
   else{const bb=strokeBox(sk);
-   if(p[0]>=bb[0]&&p[0]<=bb[2]&&p[1]>=bb[1]&&p[1]<=bb[3]){cur={mvs:editStroke,sx:p[0],sy:p[1],orig:sk.pts.slice()};return}
+   if(inBox(bb,p[0],p[1])){cur={mvs:editStroke,sx:p[0],sy:p[1],orig:sk.pts.slice()};return}
    editStroke=null;redraw();}
  }
- if(editImg){ // режим правки: тянем картинку за любое место или за ручки; клик в стороне — выход
+ if(editImg){ // режим правки картинки: тянем за любое место или за ручки; клик в стороне — выход
   const g=(images[page]||{})[editImg];
   if(!g||t==='er'){editImg=null;redraw()}
   else{
    const hh=handleAt(p[0],p[1]);
    if(hh){const g2=images[page][hh.id];cur={mv:hh.id,size:hh.type==='size',dx:p[0]-g2.x,dy:p[1]-g2.y,r:g2.h/g2.w};return}
-   if(p[0]>=g.x&&p[0]<=g.x+g.w&&p[1]>=g.y&&p[1]<=g.y+g.h){cur={mv:editImg,size:false,dx:p[0]-g.x,dy:p[1]-g.y,r:g.h/g.w};return}
+   if(inBox([g.x,g.y,g.x+g.w,g.y+g.h],p[0],p[1])){cur={mv:editImg,size:false,dx:p[0]-g.x,dy:p[1]-g.y,r:g.h/g.w};return}
    editImg=null;redraw();
   }
  }
  if(t==='er'){cur={erasing:1};eraseAt(p[0],p[1]);return}
- if(t==='mv'){const id=imgAt(p[0],p[1]);if(!id)return;const g=images[page][id],hs=36/view.s;
-  cur={mv:id,size:p[0]>g.x+g.w-hs&&p[1]>g.y+g.h-hs,dx:p[0]-g.x,dy:p[1]-g.y,r:g.h/g.w};return}
+ if(t==='text'){const id=strokeAt(p[0],p[1],true,true);openText(id?strokes[page][id].pts[0]:p[0],id?strokes[page][id].pts[1]:p[1],id);return}
+ if(t==='mv'){ // двигать: сначала фигуры/линии/текст, потом картинки; пустое место — листаем доску
+  const hh=handleAt(p[0],p[1]);
+  if(hh){const g2=images[page][hh.id];cur={mv:hh.id,size:hh.type==='size',dx:p[0]-g2.x,dy:p[1]-g2.y,r:g2.h/g2.w};return}
+  const sid=strokeAt(p[0],p[1],true);
+  if(sid){const sk=strokes[page][sid];editStroke=sid;cur={mvs:sid,sx:p[0],sy:p[1],orig:sk.pts.slice()};redraw();return}
+  const iid=imgAt(p[0],p[1]);
+  if(iid){const g=images[page][iid];cur={mv:iid,size:false,dx:p[0]-g.x,dy:p[1]-g.y,r:g.h/g.w};return}
+  pan={id:e.pointerId,x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};return;
+ }
  const w=+$('wd').value; // толщина чернил привязана к листу, а не к масштабу
- cur=t==='pen'?{id:newId(),k:'pen',pts:[p[0],p[1]],c:color,w:w}
+ cur=t==='pen'?{id:newId(),k:'pen',pts:[p[0],p[1]],c:color,w:w,pr:(e.pointerType==='pen'&&S.press)?[pn(e)]:null}
               :{id:newId(),k:t,pts:[p[0],p[1],p[0],p[1]],c:color,w:w};
  redraw();
 });
 cv.addEventListener('pointermove',e=>{
+ if(e.pointerType!=='touch'){const r=cv.getBoundingClientRect();ptr={x:e.clientX-r.left,y:e.clientY-r.top};if(!cur||cur.erasing||cur.k==='pen')drawOverlay();sendCursor(e)}
  if(e.pointerType==='touch'&&ptrs.has(e.pointerId)){
   ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(gest&&ptrs.size>=2){doGesture();return}
@@ -396,18 +607,18 @@ cv.addEventListener('pointermove',e=>{
  if(pan&&pan.id===e.pointerId){view.x=pan.vx-(e.clientX-pan.x)/view.s;view.y=pan.vy-(e.clientY-pan.y)/view.s;redraw();return}
  if(!cur&&editStroke&&e.pointerType!=='touch'&&!space){
   const q=pos(e),sk=(strokes[page]||{})[editStroke];
-  if(sk){const bb=strokeBox(sk);cv.style.cursor=(q[0]>=bb[0]&&q[0]<=bb[2]&&q[1]>=bb[1]&&q[1]<=bb[3])?'move':'crosshair'}
+  if(sk)cv.style.cursor=inBox(strokeBox(sk),q[0],q[1])?'move':(S.ring&&ringTools.includes(tool())?'none':'crosshair');
  }
- if(!cur&&editImg&&e.pointerType!=='touch'&&!space){ // только курсор, без подсветки
-  const q=pos(e),h2=handleAt(q[0],q[1]),g=(images[page]||{})[editImg],ins=g&&q[0]>=g.x&&q[0]<=g.x+g.w&&q[1]>=g.y&&q[1]<=g.y+g.h;
-  cv.style.cursor=h2?(h2.type==='move'?'move':'nwse-resize'):(ins?'move':(tool()==='hand'?'grab':'crosshair'));
+ if(!cur&&editImg&&e.pointerType!=='touch'&&!space){
+  const q=pos(e),h2=handleAt(q[0],q[1]),g=(images[page]||{})[editImg],ins=g&&inBox([g.x,g.y,g.x+g.w,g.y+g.h],q[0],q[1]);
+  cv.style.cursor=h2?(h2.type==='move'?'move':'nwse-resize'):(ins?'move':(S.ring&&ringTools.includes(tool())?'none':'crosshair'));
  }
  if(!cur)return;
  if(cur.snapped){adjust(pos(e));return}
  const evs=(e.getCoalescedEvents&&e.getCoalescedEvents())||[];if(!evs.length)evs.push(e);
  if(cur.erasing){evs.forEach(v=>{const p=pos(v);eraseAt(p[0],p[1])});return}
  if(cur.mvs){const p=pos(e),sk=(strokes[page]||{})[cur.mvs];if(!sk)return;
-  const dx=p[0]-cur.sx,dy=p[1]-cur.sy;sk.pts=cur.orig.map((v,i)=>r2(v+(i%2?dy:dx)));sk._my=undefined;redraw();
+  const dx=p[0]-cur.sx,dy=p[1]-cur.sy;sk.pts=cur.orig.map((v,i)=>r2(v+(i%2?dy:dx)));sk._my=undefined;sk._tb=undefined;redraw();
   const t2=Date.now();if(t2-lastEmit>80){lastEmit=t2;send({t:'strokeset',page:page,id:cur.mvs,pts:sk.pts})}
   return}
  if(cur.mv){const p=pos(e),g=images[page][cur.mv];
@@ -416,36 +627,45 @@ cv.addEventListener('pointermove',e=>{
  if(cur.k==='pen'){
   const min=1.5/view.s;
   evs.forEach(v=>{const p=pos(v),n=cur.pts.length;
-   if(n<19000&&Math.hypot(p[0]-cur.pts[n-2],p[1]-cur.pts[n-1])>=min)cur.pts.push(p[0],p[1])});
+   if(n<19000&&Math.hypot(p[0]-cur.pts[n-2],p[1]-cur.pts[n-1])>=min){cur.pts.push(p[0],p[1]);if(cur.pr)cur.pr.push(pn(v))}});
  }else{const p=pos(e);cur.pts[2]=p[0];cur.pts[3]=p[1]}
  lastP=pos(e);
- if(cur.k==='pen'&&$('snap').checked){const ha=holdA;if(!ha||Math.hypot(e.clientX-ha[0],e.clientY-ha[1])>5){holdA=[e.clientX,e.clientY];clearTimeout(holdT);holdT=setTimeout(snapNow,650)}}
+ if(cur.k==='pen'&&S.snap){const ha=holdA;if(!ha||Math.hypot(e.clientX-ha[0],e.clientY-ha[1])>5){holdA=[e.clientX,e.clientY];clearTimeout(holdT);holdT=setTimeout(snapNow,650)}}
  redraw();const n=Date.now();
- if(n-lastEmit>80){lastEmit=n;send({t:'live',page:page,k:cur.k,c:cur.c,w:cur.w,pts:cur.pts})}
+ if(n-lastEmit>80){lastEmit=n;send({t:'live',page:page,k:cur.k,c:cur.c,w:cur.w,pts:cur.pts,pr:cur.pr||undefined})}
 });
 function end(e){
  if(e.pointerType==='touch'){ptrs.delete(e.pointerId);if(ptrs.size<2)gest=null}
- if(pan&&pan.id===e.pointerId){pan=null;cv.style.cursor=tool()==='hand'?'grab':'crosshair';return}
+ if(pan&&pan.id===e.pointerId){pan=null;setCursor();return}
  clearTimeout(holdT);if(!cur)return;const s=cur;cur=null;if(s.erasing)return;
  if(s.mvs){const sk=(strokes[page]||{})[s.mvs];if(sk)send({t:'strokeset',page:page,id:s.mvs,pts:sk.pts});return}
  if(s.mv){const g=images[page][s.mv];send({t:'imgset',page:page,id:s.mv,x:r2(g.x),y:r2(g.y),w:r2(g.w),h:r2(g.h)});return}
- if(s.k==='pen'){const p=pos(e),n=s.pts.length;if(p[0]!==s.pts[n-2]||p[1]!==s.pts[n-1])s.pts.push(p[0],p[1])}
+ if(s.k==='pen'){
+  const p=pos(e),n=s.pts.length;if(p[0]!==s.pts[n-2]||p[1]!==s.pts[n-1]){s.pts.push(p[0],p[1]);if(s.pr)s.pr.push(pn(e))}
+  if(s.pr){const mn=Math.min(...s.pr),mx=Math.max(...s.pr);if(mx-mn<.06||s.pr.length!==s.pts.length/2)s.pr=null;else s.pr=s.pr.map(v=>Math.round(v*100)/100)}
+ }
  else if(!s.snapped&&(Math.abs(s.pts[2]-s.pts[0])+Math.abs(s.pts[3]-s.pts[1]))*view.s<4){clearLive();redraw();return}
- (strokes[page]=strokes[page]||{})[s.id]={k:s.k,pts:s.pts,c:s.c,w:s.w};mine.push({page:page,id:s.id});redo=[];if(s.snapped)editStroke=s.id;redraw();
- send({t:'stroke',page:page,stroke:{id:s.id,k:s.k,pts:s.pts,c:s.c,w:s.w}});
+ const o={id:s.id,k:s.k,pts:s.pts,c:s.c,w:s.w};if(s.pr)o.pr=s.pr;
+ if(s.snapped)editStroke=s.id;
+ addObj(o);
 }
 cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
+cv.addEventListener('pointerleave',()=>{ptr=null;drawOverlay()});
+
+// ---------- клавиатура (Cmd/Ctrl+Z работает и после клика по кнопкам) ----------
+const isTextTarget=t=>!!t&&(t.tagName==='TEXTAREA'||(t.tagName==='INPUT'&&/^(text|number|search|password|email|url|tel)$/i.test(t.type||'text')));
 document.addEventListener('keydown',e=>{
  const a=document.activeElement,tg=a&&a.tagName;
- if(e.code==='Space'&&!(tg==='INPUT'||tg==='SELECT'||tg==='BUTTON')){space=true;cv.style.cursor='grab';e.preventDefault();return}
- if((editImg||editStroke)&&(e.key==='Enter'||e.key==='Escape')&&tg!=='INPUT'&&tg!=='SELECT'){editImg=null;editStroke=null;redraw();e.preventDefault();return}
+ if(isTextTarget(a))return;
+ if(e.code==='Space'&&!(tg==='SELECT'||tg==='BUTTON')){space=true;setCursor();e.preventDefault();return}
+ if((editImg||editStroke)&&(e.key==='Enter'||e.key==='Escape')&&tg!=='SELECT'){editImg=null;editStroke=null;redraw();e.preventDefault();return}
  const z=e.code==='KeyZ',y=e.code==='KeyY';
- if(!(e.metaKey||e.ctrlKey)||!(z||y)||tg==='INPUT')return;
- e.preventDefault();(y||e.shiftKey)?redoAct():undo();
-});
-document.addEventListener('keyup',e=>{if(e.code==='Space'){space=false;cv.style.cursor=tool()==='hand'?'grab':'crosshair'}});
+ if(!(e.metaKey||e.ctrlKey)||!(z||y))return;
+ e.preventDefault();if(viewOnly)return;(y||e.shiftKey)?redoAct():undo();
+},true);
+document.addEventListener('keyup',e=>{if(e.code==='Space'){space=false;setCursor()}});
 
-// --- картинки ---
+// ---------- картинки и задачи из сборников ----------
 function placeImage(im,task,gap){
  let src=null,w=0,h=0;
  for(const m of [1400,1000,700,500,350]){
@@ -476,20 +696,21 @@ function addImage(file){
  fr.onload=()=>{const im=new Image();im.onload=()=>placeImage(im,false);im.src=fr.result};
  fr.readAsDataURL(file);
 }
-// задачи из сборников приходят из кабинета преподавателя
 window.addEventListener('message',e=>{
- if(e.origin!==location.origin)return;const d=e.data;
- if(!d||d.t!=='task'||typeof d.src!=='string'||!/^data:image\/(png|jpeg);base64,/.test(d.src))return;
+ if(e.origin!==location.origin)return;const d=e.data;if(!d)return;
+ if(d.t==='key'){if(!viewOnly)(d.a==='redo'?redoAct:undo)();return}
+ if(d.t==='theme'&&['auto','light','dark'].includes(d.v)){S.theme=d.v;$('theme').value=d.v;saveS();applyTheme();return}
+ if(d.t!=='task'||typeof d.src!=='string'||!/^data:image\/(png|jpeg);base64,/.test(d.src))return;
  const im=new Image();im.onload=()=>placeImage(im,true,Math.max(0,Math.min(1500,+d.gap||350)));im.src=d.src;
 });
 document.addEventListener('paste',e=>{
+ if(viewOnly||isTextTarget(document.activeElement))return;
  const it=(e.clipboardData&&e.clipboardData.items)||[];
  for(let i=0;i<it.length;i++)if(it[i].type.indexOf('image')===0){addImage(it[i].getAsFile());e.preventDefault();return}
 });
-$('img').onclick=()=>$('fi').click();
 $('fi').onchange=()=>{if($('fi').files[0])addImage($('fi').files[0]);$('fi').value=''};
 
-// --- отмена / возврат ---
+// ---------- отмена / возврат ----------
 function undo(){
  const m=mine.pop();if(!m)return;const o=(strokes[m.page]||{})[m.id],g=(images[m.page]||{})[m.id];
  if(o){redo.push({page:m.page,id:m.id,stroke:o});delete strokes[m.page][m.id]}
@@ -498,39 +719,143 @@ function undo(){
 }
 function redoAct(){
  const r=redo.pop();if(!r)return;
- if(r.stroke){(strokes[r.page]=strokes[r.page]||{})[r.id]=r.stroke;send({t:'stroke',page:r.page,stroke:Object.assign({id:r.id},r.stroke)})}
+ if(r.stroke){(strokes[r.page]=strokes[r.page]||{})[r.id]=r.stroke;send({t:'stroke',page:r.page,stroke:clean(Object.assign({id:r.id},r.stroke))})}
  else{(images[r.page]=images[r.page]||{})[r.id]=r.img;send({t:'image',page:r.page,img:Object.assign({id:r.id},r.img)})}
  mine.push({page:r.page,id:r.id});redraw();
 }
 
-// --- интерфейс ---
+// ---------- диалоги внутри страницы (родные окна браузера ломают полный экран) ----------
+function modal(msg,opt){
+ return new Promise(res=>{
+  const ov=document.createElement('div');ov.className='mo';
+  const c=document.createElement('div');c.className='mc';
+  const p=document.createElement('div');p.textContent=msg;p.style.fontWeight='600';c.appendChild(p);
+  if(opt&&opt.body)c.appendChild(opt.body);
+  const row=document.createElement('div');row.className='mr';
+  const no=document.createElement('button');no.textContent='Отмена';
+  const ok=document.createElement('button');ok.textContent=(opt&&opt.ok)||'ОК';ok.className='pri';
+  const done=v=>{ov.remove();res(v)};
+  no.onclick=()=>done(false);ok.onclick=()=>done(true);
+  ov.addEventListener('pointerdown',e=>{if(e.target===ov)done(false)});
+  row.append(no,ok);c.appendChild(row);ov.appendChild(c);document.body.appendChild(ov);ok.focus();
+ });
+}
+async function insertAxes(){
+ const b=document.createElement('div');b.className='af';
+ b.innerHTML='<label>x от <input id="ax1" type="number" value="-5"></label><label>x до <input id="ax2" type="number" value="5"></label><label>y от <input id="ay1" type="number" value="-5"></label><label>y до <input id="ay2" type="number" value="5"></label><label>Размер <select id="asz"><option value=".45">Маленький</option><option value=".65" selected>Средний</option><option value=".9">Большой</option></select></label><label class="c"><input type="checkbox" id="agr" checked> Сетка</label>';
+ if(!await modal('Координатная плоскость с подписанными осями',{body:b,ok:'Вставить'}))return;
+ const g=id=>b.querySelector(id),cl=(v,a,z)=>Math.max(a,Math.min(z,Math.round(+v||0)));
+ const xa=cl(g('#ax1').value,-30,-1),xb=cl(g('#ax2').value,1,30),ya=cl(g('#ay1').value,-30,-1),yb=cl(g('#ay2').value,1,30);
+ const u=Math.min(60,Math.max(14,(+g('#asz').value*PW)/(xb-xa+2)));
+ let ox=PW/2-((xa+xb)/2)*u;
+ const bx0=ox+xa*u-.9*u,bx1=ox+xb*u+1.3*u;if(bx0<8)ox+=8-bx0;if(bx1>PW-8)ox-=bx1-(PW-8);
+ const hh=(yb-ya+2.1)*u;let cy=Math.max(hh/2+10,view.y+ch/view.s/2);
+ const oy=cy+((ya+yb)/2)*u,id=newId();
+ editImg=null;
+ addObj({id:id,k:'axes',pts:[r2(ox),r2(oy)],c:color,w:r2(u),s:[xa,xb,ya,yb,g('#agr').checked?1:0].join(',')});
+ editStroke=id;redraw();
+}
+
+// ---------- PDF: конспекты на случай потери данных ----------
+function makePDF(jpegs){
+ const enc=new TextEncoder(),chunks=[],offs=[];let len=0;
+ const push=u=>{chunks.push(u);len+=u.length},str=s=>push(enc.encode(s));
+ str('%PDF-1.4\n%\u00e2\u00e3\u00cf\u00d3\n');
+ const obj=(id,fn)=>{offs[id]=len;str(id+' 0 obj\n');fn();str('\nendobj\n')};
+ const N=jpegs.length;
+ obj(1,()=>str('<< /Type /Catalog /Pages 2 0 R >>'));
+ obj(2,()=>str('<< /Type /Pages /Kids ['+jpegs.map((_,i)=>(3+3*i)+' 0 R').join(' ')+'] /Count '+N+' >>'));
+ jpegs.forEach((d,i)=>{
+  const pid=3+3*i,cid=4+3*i,iid=5+3*i,bin=atob(d.split(',')[1]),bytes=new Uint8Array(bin.length);
+  for(let j=0;j<bin.length;j++)bytes[j]=bin.charCodeAt(j);
+  obj(pid,()=>str('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im0 '+iid+' 0 R >> >> /Contents '+cid+' 0 R >>'));
+  const cs='q 595 0 0 842 0 0 cm /Im0 Do Q';
+  obj(cid,()=>str('<< /Length '+cs.length+' >>\nstream\n'+cs+'\nendstream'));
+  obj(iid,()=>{str('<< /Type /XObject /Subtype /Image /Width 1240 /Height 1754 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '+bytes.length+' >>\nstream\n');push(bytes);str('\nendstream')});
+ });
+ const xref=len,total=3*N+3;
+ str('xref\n0 '+total+'\n0000000000 65535 f \n');
+ for(let id=1;id<total;id++)str(String(offs[id]).padStart(10,'0')+' 00000 n \n');
+ str('trailer\n<< /Size '+total+' /Root 1 0 R >>\nstartxref\n'+xref+'\n%%EOF');
+ return new Blob(chunks,{type:'application/pdf'});
+}
+async function exportPDF(all){
+ const ids=all?pages.map(p=>p.id):[page];
+ $('st').textContent='Готовлю PDF…';
+ const keepCtx=ctx,keepDark=dark,jpegs=[];
+ try{
+  dark=false;
+  for(const pid of ids){
+   const sk=strokes[pid]||{},im=images[pid]||{};
+   await Promise.all(Object.keys(im).map(id=>{const e=getImg(id,im[id].src);return e.complete?1:new Promise(r=>{e.addEventListener('load',r,{once:true});e.addEventListener('error',r,{once:true})})}));
+   let b=0;for(const id in sk)b=Math.max(b,mY(sk[id]));for(const id in im)b=Math.max(b,im[id].y+im[id].h);
+   const n=Math.max(1,Math.floor(b/PS)+1),sc=1240/PW;
+   for(let k=0;k<n;k++){
+    const c=document.createElement('canvas');c.width=1240;c.height=1754;ctx=c.getContext('2d');
+    const y0=k*PS;ctx.setTransform(sc,0,0,sc,0,-y0*sc);
+    ctx.fillStyle='#fff';ctx.fillRect(0,y0,PW,PH);
+    sheetGrid(y0,sc,{xa:0,xb:PW,ya:y0,yb:y0+PH});
+    ctx.save();ctx.beginPath();ctx.rect(0,y0,PW,PH);ctx.clip();
+    for(const id in im){const g=im[id],e=getImg(id,g.src);if(e.complete&&e.naturalWidth)ctx.drawImage(e,g.x,g.y,g.w,g.h)}
+    for(const id in sk)drawStroke(sk[id]);
+    ctx.restore();
+    jpegs.push(c.toDataURL('image/jpeg',.88));
+   }
+  }
+ }finally{ctx=keepCtx;dark=keepDark}
+ const blob=makePDF(jpegs);
+ const title=(pages.find(p=>p.id===page)||{}).title||'доска';
+ const fname=((myName?myName+' — ':'')+(all?'все доски':title)).replace(/[\\/:*?"<>|]/g,'_')+'.pdf';
+ const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;document.body.appendChild(a);a.click();
+ setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);
+ $('st').textContent='PDF сохранён';redraw();
+}
+
+// ---------- интерфейс ----------
 $('add').onclick=()=>{const id='p'+newId(),d=new Date().toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'});let t=d,n=2;while(pages.some(p=>p.title===t))t=d+' ('+(n++)+')';send({t:'addPage',id:id,title:t});openPage(id)};
 $('title').onchange=()=>send({t:'title',id:page,title:$('title').value.trim()||'Без названия'});
-$('tool').onchange=()=>{cv.style.cursor=tool()==='hand'?'grab':'crosshair';redraw()};
-$('bgs').onchange=()=>{bg=$('bgs').value;redraw()};
-$('undo').onclick=undo;
+$('tool').onchange=()=>{const v=tool();if(v==='axes'){$('tool').value=prevTool;insertAxes();return}prevTool=v;closeText();setCursor();drawOverlay();redraw()};
+$('undo').onclick=()=>{if(!viewOnly)undo()};
 $('zi').onclick=()=>zoomAt(cw/2,ch/2,1.25);$('zo').onclick=()=>zoomAt(cw/2,ch/2,.8);$('fit').onclick=fit;
-$('clr').onclick=()=>{if(confirm('Очистить доску для всех?')){strokes[page]={};images[page]={};redraw();send({t:'clear',page:page})}};
+$('fm').onchange=async()=>{
+ const v=$('fm').value;$('fm').value='';
+ if(v==='img'&&!viewOnly)$('fi').click();
+ else if(v==='pdf1')exportPDF(false);
+ else if(v==='pdfa')exportPDF(true);
+ else if(v==='clr'&&!viewOnly&&await modal('Очистить эту доску для всех? Вернуть нельзя.',{ok:'Очистить'})){strokes[page]={};images[page]={};redraw();send({t:'clear',page:page})}
+};
 $('cp').onclick=()=>{const t=location.href;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{$('cp').textContent='Скопировано'},()=>{prompt('Ссылка:',t)});setTimeout(()=>{$('cp').textContent='Копировать ссылку'},1500)};
 ['#1a1a1a','#d32f2f','#1565c0','#2e7d32','#ef6c00','#7b1fa2'].forEach((c,i)=>{
  const b=document.createElement('button');b.className='sw'+(i?'':' on');b.style.background=c;
- b.onclick=()=>{color=c;if(['er','mv','hand'].includes(tool()))$('tool').value='pen';document.querySelectorAll('.sw').forEach(x=>x.classList.remove('on'));b.classList.add('on')};
+ b.onclick=()=>{color=c;if(['er','mv','hand'].includes(tool())){$('tool').value='pen';prevTool='pen'}setCursor();document.querySelectorAll('.sw').forEach(x=>x.classList.remove('on'));b.classList.add('on')};
  $('cols').appendChild(b)});
 $('edone').onclick=()=>{editImg=null;editStroke=null;redraw()};
 $('newt').onclick=()=>{if(!jump)return;view.y=jump.y-40;$('newt').hidden=true;jump=null;redraw()};
-if(window.self===window.top)$('clr').hidden=true; // ученик не видит «Очистить» (в кабинете преподавателя кнопка есть)
+if(!isTeacher){const o=$('fm').querySelector('[value=clr]');if(o)o.remove()} // ученик не видит «Очистить»
 if(navigator.maxTouchPoints>0){$('fp').hidden=false;$('fp').onclick=()=>{fingerPan=!fingerPan;$('fp').textContent='Палец: '+(fingerPan?'листает':'рисует')}}
+// настройки
+$('gear').onclick=()=>{$('set').hidden=!$('set').hidden};
+document.addEventListener('pointerdown',e=>{if(!$('set').hidden&&!$('set').contains(e.target)&&e.target!==$('gear'))$('set').hidden=true},true);
+['snap','press','palm','ring','seec','showme'].forEach(id=>{$(id).checked=!!S[id];$(id).onchange=()=>{S[id]=$(id).checked;saveS();setCursor();drawOverlay()}});
+$('theme').value=S.theme;$('theme').onchange=()=>{S.theme=$('theme').value;saveS();applyTheme()};
+$('bgs').value=S.bg;$('bgs').onchange=()=>{bg=$('bgs').value;S.bg=bg;saveS();redraw()};
+function setView(v){viewOnly=v;$('vonly').checked=v;$('vbadge').hidden=!v;closeText();editImg=null;editStroke=null;setCursor();redraw()}
+$('vonly').onchange=()=>setView($('vonly').checked);
+$('vbadge').onclick=()=>setView(false);
+// защита от случайных выделений и меню на телефоне
 document.addEventListener('selectstart',e=>{const t=e.target&&e.target.nodeType===1?e.target:(e.target&&e.target.parentElement);if(!t||!/^(INPUT|TEXTAREA)$/.test(t.tagName))e.preventDefault()});
-document.addEventListener('contextmenu',e=>{if(e.target===cv)e.preventDefault()});
+document.addEventListener('contextmenu',e=>{if(e.target===cv||e.target===rg)e.preventDefault()});
 if('ontouchstart' in window)['gesturestart','gesturechange','gestureend'].forEach(n=>document.addEventListener(n,e=>e.preventDefault()));
+// список досок и режим «фокус» (убирает панели; встроенный полный экран браузера ломает клавиатуру в Safari, поэтому без него)
 function setSide(h){document.body.classList.toggle('noside',h);localStorage.setItem('noside',h?'1':'0')}
 $('hp').onclick=()=>setSide(!document.body.classList.contains('noside'));
 if(localStorage.getItem('noside')==='1')setSide(true);
-const fe=document.documentElement,frq=fe.requestFullscreen||fe.webkitRequestFullscreen;
-if(window.self!==window.top||!frq)$('fs2').hidden=true; // в кабинете преподавателя полный экран включается там
-$('fs2').onclick=()=>{const d=document;if(d.fullscreenElement||d.webkitFullscreenElement)(d.exitFullscreen||d.webkitExitFullscreen).call(d);else frq.call(fe)};
+$('fs2').onclick=()=>{document.body.classList.toggle('focus');setTimeout(resize,30)};
+if(isTeacher)$('fs2').hidden=true; // в кабинете преподавателя эта кнопка есть сверху
+// приложение «на главный экран» (полноэкранный режим на телефоне)
+const mf=document.createElement('link');mf.rel='manifest';mf.href='/b/'+room+'/manifest.webmanifest';document.head.appendChild(mf);
 new ResizeObserver(resize).observe(wrap);
-resize();
+applyTheme();setCursor();resize();
 })();
 </script>
 </body>

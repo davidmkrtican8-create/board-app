@@ -6,7 +6,10 @@
 <title>Кабинет преподавателя</title>
 <style>
 :root{--bg:#f4f1fa;--panel:#fff;--tx:#201c2b;--mut:#6b6580;--ac:#6a3fc4;--bd:#ddd6ee}
-@media (prefers-color-scheme:dark){:root{--bg:#17141f;--panel:#221e2e;--tx:#ece8f5;--mut:#9a93b0;--ac:#a98bf0;--bd:#3a3450}}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17141f;--panel:#221e2e;--tx:#ece8f5;--mut:#9a93b0;--ac:#a98bf0;--bd:#3a3450}}
+:root[data-theme="dark"]{--bg:#17141f;--panel:#221e2e;--tx:#ece8f5;--mut:#9a93b0;--ac:#a98bf0;--bd:#3a3450}
+body.admfocus #side{display:none}
+body.admfocus #bar>*:not(.keep){display:none}
 *{box-sizing:border-box}html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
 button,input{font:inherit;color:var(--tx);background:var(--panel);border:1px solid var(--bd);border-radius:8px;padding:6px 10px;cursor:pointer}
@@ -78,7 +81,7 @@ body.nosidebar #side{display:none}
   <div class="foot"><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden><button id="lo" title="Выйти из кабинета на этом устройстве">Выйти</button><button id="rb" title="Вернуть учеников и доски из копии, которую кабинет сам сохраняет в вашем браузере">Восстановить из автокопии</button><div id="bkst" style="font-size:12px;color:var(--mut);width:100%"></div></div>
  </div>
  <div id="main">
-  <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk">Задачи</button><button id="fs" title="Во весь экран">⛶</button><button id="lnk">Ссылка ученика</button><button id="ren">Переименовать</button><button id="del">Удалить</button></div>
+  <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk" class="keep">Задачи</button><button id="fs" class="keep" title="Фокус: убрать панели">⛶</button><button id="th" class="keep" title="Тема: как в системе / светлая / тёмная">◐</button><button id="lnk">Ссылка ученика</button><button id="ren">Переименовать</button><button id="del">Удалить</button></div>
   <div id="work">
    <iframe id="fr" allow="microphone; clipboard-write"></iframe>
    <div id="tasks" hidden>
@@ -320,9 +323,21 @@ const $=i=>document.getElementById(i);
 function setSB(h){document.body.classList.toggle('nosidebar',h);localStorage.setItem('nosidebar',h?'1':'0')}
 $('hs').onclick=()=>setSB(!document.body.classList.contains('nosidebar'));
 if(localStorage.getItem('nosidebar')==='1')setSB(true);
-const de=document.documentElement,rf=de.requestFullscreen||de.webkitRequestFullscreen;
-if(!rf)$('fs').hidden=true;
-$('fs').onclick=()=>{const d=document;if(d.fullscreenElement||d.webkitFullscreenElement)(d.exitFullscreen||d.webkitExitFullscreen).call(d);else rf.call(de)};
+// «фокус»: убирает боковые панели (встроенный полный экран Safari ломает клавиатуру, поэтому без него)
+$('fs').onclick=()=>document.body.classList.toggle('admfocus');
+// тема кабинета и доски
+let th=localStorage.getItem('admtheme')||'auto';
+function applyTh(){document.documentElement.dataset.theme=th==='auto'?'':th;try{$('fr').contentWindow.postMessage({t:'theme',v:th},location.origin)}catch(e){}}
+$('th').onclick=()=>{th=th==='auto'?'dark':th==='dark'?'light':'auto';localStorage.setItem('admtheme',th);applyTh();$('th').title='Тема: '+({auto:'как в системе',dark:'тёмная',light:'светлая'})[th]};
+$('fr').addEventListener('load',()=>{if(th!=='auto')applyTh()});
+applyTh();
+// Cmd/Ctrl+Z, когда фокус не в доске: передаём в доску, а не в браузер (иначе Safari «возвращает закрытую вкладку»)
+window.addEventListener('keydown',e=>{
+ if(!(e.metaKey||e.ctrlKey)||!(e.code==='KeyZ'||e.code==='KeyY'))return;
+ const x=document.activeElement;if(x&&(x.tagName==='TEXTAREA'||(x.tagName==='INPUT'&&/^(text|number|search|password)$/i.test(x.type||'text'))))return;
+ const f=$('fr');if(!(f.getAttribute('src')||'').startsWith('/b/'))return;
+ e.preventDefault();f.contentWindow.postMessage({t:'key',a:(e.code==='KeyY'||e.shiftKey)?'redo':'undo'},location.origin);
+},true);
 
 // Копия всех досок хранится в браузере преподавателя: если сервер потеряет данные (обновление файлов на GitHub), их можно вернуть
 const api=(p,o)=>fetch(p,Object.assign({headers:{'X-Admin':localStorage.getItem('adm')||'','Content-Type':'application/json'}},o));

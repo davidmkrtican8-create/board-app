@@ -6,7 +6,7 @@ const ADMIN = process.env.ADMIN_KEY || '';
 fs.mkdirSync(DIR, { recursive: true });
 const rooms = {};
 const ID = /^[\w-]{1,40}$/, RID = /^[a-z0-9]{4,32}$/;
-const KINDS = ['pen', 'line', 'arrow', 'rect', 'ellipse', 'poly'];
+const KINDS = ['pen', 'line', 'arrow', 'rect', 'ellipse', 'poly', 'text', 'axes'];
 const ICE = (() => { try { return JSON.parse(process.env.ICE_SERVERS || ''); } catch (e) { return null; } })()
   || [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }];
 const IMG = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/=]+$/;
@@ -47,10 +47,21 @@ function apply(s, op) {
       const k = op.stroke;
       if (!k || !ID.test(k.id) || !Array.isArray(k.pts) || k.pts.length > 20000 || !/^#[0-9a-f]{3,6}$/i.test(k.c)) return false;
       const kind = KINDS.includes(k.k) ? k.k : 'pen';
-      if (kind === 'poly' ? (k.pts.length < 6 || k.pts.length > 40 || k.pts.length % 2) : (kind !== 'pen' && k.pts.length !== 4)) return false;
+      const single = kind === 'text' || kind === 'axes';
+      if (kind === 'poly' ? (k.pts.length < 6 || k.pts.length > 40 || k.pts.length % 2) : single ? k.pts.length !== 2 : (kind !== 'pen' && k.pts.length !== 4)) return false;
       const pts = k.pts.map(Number);
       if (!pts.every(Number.isFinite)) return false;
-      (st[op.page] = st[op.page] || {})[k.id] = { k: kind, pts, c: k.c, w: num(k.w, 0.05, 300, 4) };
+      const o = { k: kind, pts, c: k.c, w: num(k.w, 0.05, 300, 4) };
+      if (kind === 'text') { // напечатанный текст
+        if (typeof k.s !== 'string' || !k.s.trim() || k.s.length > 800) return false;
+        o.s = k.s; o.w = num(k.w, 6, 300, 36);
+      }
+      if (kind === 'axes') { // координатная плоскость: «xmin,xmax,ymin,ymax,сетка»
+        if (typeof k.s !== 'string' || !/^-?\d+(\.\d+)?(,-?\d+(\.\d+)?){3}(,[01])?$/.test(k.s)) return false;
+        o.s = k.s; o.w = num(k.w, 8, 120, 40);
+      }
+      if (kind === 'pen' && Array.isArray(k.pr) && k.pr.length === pts.length / 2 && k.pr.every(v => typeof v === 'number' && v >= 0 && v <= 1)) o.pr = k.pr.map(v => Math.round(v * 100) / 100); // нажим пера
+      (st[op.page] = st[op.page] || {})[k.id] = o;
       return true;
     }
     case 'image': {
@@ -81,6 +92,7 @@ function apply(s, op) {
       return true;
     case 'title': { const p = s.pages.find(p => p.id === op.id); if (p) p.title = String(op.title || '').slice(0, 80); return true; }
     case 'rtc': return ['hello', 'here', 'offer', 'answer', 'ice', 'bye'].includes(op.kind) && RID.test(String(op.from)) && (!op.to || RID.test(String(op.to))) && JSON.stringify(op.data || null).length < 30000;
+    case 'cursor': return Number.isFinite(+op.x) && Number.isFinite(+op.y) && String(op.label || '').length <= 40;
     case 'live': return true;
   }
   return false;
@@ -194,9 +206,21 @@ http.createServer((req, res) => {
       if (!apply(r.s, op)) { res.writeHead(400); return res.end(); }
       if (op.t === 'rtc') { if (op.kind === 'hello') r.call.add(op.from); if (op.kind === 'bye') r.call.delete(op.from); }
       bcast(r, op);
-      if (op.t !== 'live' && op.t !== 'rtc') save(r);
+      if (op.t !== 'live' && op.t !== 'rtc' && op.t !== 'cursor') save(r);
       res.writeHead(204); res.end();
     });
+  }
+  if (u.pathname === '/health') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('ok'); } // для сервиса, который не даёт сайту «засыпать»
+  if (u.pathname === '/icon.png') {
+    const f = path.join(__dirname, 'icon.png');
+    if (!fs.existsSync(f)) { res.writeHead(404); return res.end(); }
+    res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+    return fs.createReadStream(f).pipe(res);
+  }
+  const mf = u.pathname.match(/^\/b\/([a-z0-9]{4,32})\/manifest\.webmanifest$/);
+  if (mf) { // «установить как приложение»: на телефоне открывается без панелей браузера
+    res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8' });
+    return res.end(JSON.stringify({ name: 'Доска', short_name: 'Доска', start_url: '/b/' + mf[1], scope: '/', display: 'fullscreen', display_override: ['fullscreen', 'standalone'], background_color: '#f4f1fa', theme_color: '#6a3fc4', icons: [{ src: '/icon.png', sizes: '512x512', type: 'image/png', purpose: 'any' }] }));
   }
   if (u.pathname === '/t') return PAGE('admin.html')(req, res);
   if (u.pathname === '/') {
@@ -222,7 +246,10 @@ a.btn{display:inline-block;padding:11px 18px;border-radius:10px;background:var(-
   }
   const b = u.pathname.match(/^\/b\/([a-z0-9]{4,32})$/);
   if (b) {
-    if (!room(b[1])) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Доска временно недоступна. Попросите преподавателя открыть свой кабинет, затем обновите эту страницу.'); }
+    if (!room(b[1])) {
+      res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="15"><body style="font:16px system-ui;max-width:420px;margin:12vh auto;padding:0 18px"><h2>Доска пока недоступна</h2><p>Сайт только что проснулся или обновился. Попросите преподавателя открыть свой кабинет: он вернёт доски. Эта страница обновится сама через несколько секунд.</p>');
+    }
     return PAGE('board.html')(req, res);
   }
   res.writeHead(404); res.end('Not found');
