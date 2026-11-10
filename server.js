@@ -1,6 +1,7 @@
 // Доска репетитора: сервер без зависимостей (только встроенный Node.js)
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0'; // на своём сервере HOST=127.0.0.1: снаружи доступен только защищённый адрес
 const DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const ADMIN = process.env.ADMIN_KEY || '';
 fs.mkdirSync(DIR, { recursive: true });
@@ -84,7 +85,11 @@ function apply(s, op) {
       if (g) { g.x = num(op.x, -1e6, 1e6, g.x); g.y = num(op.y, -1e6, 1e6, g.y); g.w = num(op.w, 1, 1e5, g.w); g.h = num(op.h, 1, 1e5, g.h); }
       return true;
     }
-    case 'erase': if (st[op.page]) delete st[op.page][op.id]; if (im[op.page]) delete im[op.page][op.id]; return true;
+    case 'erase': { // одно или сразу несколько (ids)
+      const ids = Array.isArray(op.ids) ? op.ids.slice(0, 500) : [op.id];
+      for (const id of ids) if (typeof id === 'string' && ID.test(id)) { if (st[op.page]) delete st[op.page][id]; if (im[op.page]) delete im[op.page][id]; }
+      return true;
+    }
     case 'clear': st[op.page] = {}; im[op.page] = {}; return true;
     case 'addPage':
       if (!ID.test(op.id) || s.pages.length >= 200) return false;
@@ -253,4 +258,4 @@ a.btn{display:inline-block;padding:11px 18px;border-radius:10px;background:var(-
     return PAGE('board.html')(req, res);
   }
   res.writeHead(404); res.end('Not found');
-}).listen(PORT, () => console.log('Доска запущена: http://localhost:' + PORT + (ADMIN ? '' : ' (ADMIN_KEY не задан: кабинет преподавателя выключен)')));
+}).listen(PORT, HOST, () => console.log('Доска запущена: http://localhost:' + PORT + (ADMIN ? '' : ' (ADMIN_KEY не задан: кабинет преподавателя выключен)')));

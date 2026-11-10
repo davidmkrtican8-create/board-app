@@ -37,9 +37,11 @@ canvas{display:block;width:100%;height:100%;touch-action:none}
 body.noside #side,body.focus #side{display:none}
 body.focus #bar>*:not(.keep){display:none}
 body.focus #main{padding:4px;gap:4px}
-#edone,#newt,#vbadge{position:absolute;z-index:3;background:var(--ac);color:#fff;border-color:var(--ac);box-shadow:0 2px 10px rgba(0,0,0,.3)}
+#edone,#newt,#vbadge,#zfit{position:absolute;z-index:3;background:var(--ac);color:#fff;border-color:var(--ac);box-shadow:0 2px 10px rgba(0,0,0,.3)}
 #newt{left:50%;bottom:14px;transform:translateX(-50%)}
 #vbadge{left:12px;bottom:12px}
+#zfit{right:12px;bottom:12px}
+#zhint{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:4;background:#d32f2f;color:#fff;padding:8px 12px;border-radius:10px;font-size:14px;max-width:90%;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.3)}
 #set{position:absolute;right:10px;top:54px;z-index:10;width:300px;max-width:calc(100% - 20px);max-height:calc(100% - 70px);overflow:auto;background:var(--panel);border:1px solid var(--bd);border-radius:12px;padding:14px;box-shadow:0 6px 24px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:9px}
 #set h3{margin:0;font-size:16px}#set label{display:flex;gap:8px;align-items:center;justify-content:space-between;font-size:14px}
 #set label.c{justify-content:flex-start}#set details{font-size:13px;color:var(--mut)}#set summary{cursor:pointer}#set p{margin:6px 0 0}
@@ -97,7 +99,7 @@ body.focus #main{padding:4px;gap:4px}
    <p><b>Android:</b> меню браузера ⋮ → «Установить приложение» или «Добавить на главный экран».</p>
   </details>
  </div>
- <div id="wrap"><canvas id="cv"></canvas><canvas id="ovl"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button></div>
+ <div id="wrap"><canvas id="cv"></canvas><canvas id="ovl"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button><button id="zfit" hidden>↺ Вернуть масштаб</button><div id="zhint" hidden>Страница приближена в браузере. Вернуть: Ctrl+0 (на Mac ⌘0)</div></div>
 </div>
 <script>window.addEventListener('error',function(e){var s=document.getElementById('st');if(s)s.textContent='Ошибка в скрипте: '+(e.message||'')})</script>
 <script>
@@ -108,6 +110,7 @@ const room=location.pathname.split('/')[2],me='c'+Math.random().toString(36).sli
 const isTeacher=window.self!==window.top;
 let pages=[],strokes={},images={},page=null,live={},color='#1a1a1a',bg='grid',cur=null,lastEmit=0,mine=[],redo=[];
 let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,lastP=[0,0],editImg=null,editStroke=null,jump=null,fingerPan=false;
+let rectC=null,rq=0,pendErase=[],pendPage=null,eraseT=0;
 let viewOnly=false,dark=false,penSeen=false,myName=null,ptr=null,prevTool='pen',lastCur=0,lastCurP=[-9,-9];
 const views={},imgEl={},ptrs=new Map(),cursors={};
 const $=i=>document.getElementById(i),tool=()=>$('tool').value;
@@ -135,7 +138,13 @@ let totH=PH;
 const fitS=()=>cw/(PW+2*PM);
 const defView=()=>({x:-PM,y:-PM,s:fitS()});
 const clearLive=()=>send({t:'live',page:page,k:'pen',c:'#000000',w:1,pts:[]});
+const dpr0=window.devicePixelRatio||1;
+function chkZoom(){ // браузерное приближение (Ctrl +) можно заметить по изменению масштаба экрана
+ const z=Math.abs((window.devicePixelRatio||1)/dpr0-1)>.12||!!(window.visualViewport&&window.visualViewport.scale>1.08);
+ $('zhint').hidden=!z;
+}
 function resize(){
+ rectC=null;chkZoom();
  dpr=window.devicePixelRatio||1;cw=Math.max(1,wrap.clientWidth);ch=Math.max(1,wrap.clientHeight);
  cv.width=rg.width=Math.round(cw*dpr);cv.height=rg.height=Math.round(ch*dpr);
  rg.style.width=cw+'px';rg.style.height=ch+'px';redraw();drawOverlay();
@@ -225,6 +234,10 @@ function samples(s){ // контур объекта точками (ластик
  else for(let i=0;i<=48;i++){const t=i/48*6.2832;o.push((x0+x1)/2+Math.cos(t)*(x1-x0)/2,(y0+y1)/2+Math.sin(t)*(y1-y0)/2)}
  return o;
 }
+const smp=s=>s._sm||(s._sm=samples(s));
+function bbox(sk){if(!sk._bb){const q=smp(sk);let a=1e12,b=1e12,c=-1e12,d=-1e12;for(let i=0;i<q.length;i+=2){if(q[i]<a)a=q[i];if(q[i]>c)c=q[i];if(q[i+1]<b)b=q[i+1];if(q[i+1]>d)d=q[i+1]}sk._bb=[a,b,c,d]}return sk._bb}
+const inval=s=>{s._my=undefined;s._tb=undefined;s._bb=undefined;s._sm=undefined};
+function rd(){if(rq)return;rq=requestAnimationFrame(()=>{rq=0;redraw()})} // не чаще одного раза за кадр
 const objBox=s=>s.k==='text'?textBox(s):axesBox(s);
 function getImg(id,src){
  if(!imgEl[id]||imgEl[id].s!==src){const e=new Image();e.onload=redraw;e.src=src;imgEl[id]={e:e,s:src}}
@@ -254,7 +267,7 @@ function notifyNew(g){ // у ученика: новая картинка/зад�
  if(vis)return;jump=g;$('newt').hidden=false;
 }
 function strokeBox(sk){
- const q=samples(sk);let a=1e12,b=1e12,c=-1e12,d=-1e12;
+ const q=smp(sk);let a=1e12,b=1e12,c=-1e12,d=-1e12;
  for(let i=0;i<q.length;i+=2){a=Math.min(a,q[i]);c=Math.max(c,q[i]);b=Math.min(b,q[i+1]);d=Math.max(d,q[i+1])}
  const pd=10/view.s;return[a-pd,b-pd,c+pd,d+pd];
 }
@@ -269,7 +282,7 @@ function placeDone(){ // кнопка «Готово» рядом с редак�
  b.style.left=x+'px';b.style.top=y+'px';
 }
 function mY(sk){ // нижняя точка объекта (кэшируется)
- if(sk._my===undefined){const q=samples(sk);let m=-1e12;for(let i=1;i<q.length;i+=2)if(q[i]>m)m=q[i];sk._my=m}
+ if(sk._my===undefined){const q=smp(sk);let m=-1e12;for(let i=1;i<q.length;i+=2)if(q[i]>m)m=q[i];sk._my=m}
  return sk._my;
 }
 function bottomY(){
@@ -282,7 +295,7 @@ function bottomY(){
 }
 const sheets=()=>Math.floor(bottomY()/PS)+2;
 function clampView(n){
- const lim=fitS();view.s=Math.max(lim*.6,Math.min(lim*6,view.s));
+ const lim=fitS();view.s=Math.max(lim*.6,Math.min(lim*4,view.s));
  const vw=cw/view.s,vh=ch/view.s,tot=n*PS-PG;
  view.x=vw>=PW+2*PM?(PW-vw)/2:Math.max(-PM,Math.min(PW+PM-vw,view.x));
  view.y=Math.max(-PM,Math.min(Math.max(-PM,tot+PM-vh),view.y));
@@ -309,7 +322,8 @@ function redraw(){
  ctx.save();ctx.beginPath();vis.forEach(y0=>ctx.rect(0,y0,PW,PH));ctx.clip(); // чернила видны только на листах
  const ims=images[page]||{};
  for(const id in ims){const g=ims[id],e=getImg(id,g.src);if(e.complete&&e.naturalWidth)ctx.drawImage(e,g.x,g.y,g.w,g.h)}
- const ps=strokes[page]||{};for(const id in ps)drawStroke(ps[id]);
+ const ps=strokes[page]||{},vx0=view.x-30,vx1=view.x+cw/s+30,vy0=view.y-30,vy1=view.y+ch/s+30;
+ for(const id in ps){const sk=ps[id],B=bbox(sk);if(B[2]<vx0||B[0]>vx1||B[3]<vy0||B[1]>vy1)continue;drawStroke(sk)} // за экраном не рисуем
  for(const k in live)if(live[k].page===page)drawStroke(live[k]);
  if(cur&&cur.pts)drawStroke(cur);
  ctx.restore();
@@ -318,6 +332,7 @@ function redraw(){
   const bb=strokeBox(strokes[page][editStroke]);ctx.save();ctx.strokeStyle='rgba(106,63,196,.9)';ctx.lineWidth=2/s;ctx.setLineDash([8/s,6/s]);
   ctx.strokeRect(bb[0],bb[1],bb[2]-bb[0],bb[3]-bb[1]);ctx.restore()}
  placeDone();drawOverlay();
+ const zf=view.s>fitS()*1.3;if($('zfit').hidden===zf)$('zfit').hidden=!zf;
 }
 // верхний слой: круглый курсор и курсоры других участников
 function drawOverlay(){
@@ -351,15 +366,16 @@ function openPage(id){page=id;live={};$('newt').hidden=true;jump=null;editImg=nu
 
 // ---------- сообщения от сервера ----------
 function onOp(o){
+ if(o.from===me&&(o.t==='strokeset'||o.t==='imgset'||o.t==='stroke'))return; // своё эхо со старым положением заставляло объект дёргаться
  if(o.t==='init'){myName=o.name||null;$('who').textContent=o.name?'Кабинет: '+o.name:'Доска';document.title=o.name||'Доска';pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};if(!page||!pages.some(p=>p.id===page))page=pages[0].id;openPage(page);return}
  if(o.t==='peers'){$('st').textContent='Онлайн: '+o.n;return}
  if(o.t==='cursor'){if(o.from!==me){cursors[o.from]={x:o.x,y:o.y,page:o.page,label:String(o.label||'Участник'),color:/^#[0-9a-f]{6}$/i.test(o.color)?o.color:'#0e9f8e',t:Date.now()};drawOverlay()}return}
  if(o.t==='live'){if(o.from!==me){live[o.from]={page:o.page,k:o.k,c:o.c,w:o.w,pts:o.pts};redraw()}return}
  if(o.t==='stroke'){(strokes[o.page]=strokes[o.page]||{})[o.stroke.id]=o.stroke;delete live[o.from]}
- if(o.t==='strokeset'&&strokes[o.page]&&strokes[o.page][o.id]){strokes[o.page][o.id].pts=o.pts;strokes[o.page][o.id]._my=undefined;strokes[o.page][o.id]._tb=undefined}
+ if(o.t==='strokeset'&&strokes[o.page]&&strokes[o.page][o.id]){strokes[o.page][o.id].pts=o.pts;inval(strokes[o.page][o.id])}
  if(o.t==='image'){(images[o.page]=images[o.page]||{})[o.img.id]=o.img;if(o.from!==me&&o.page===page)notifyNew(o.img)}
  if(o.t==='imgset'&&images[o.page]&&images[o.page][o.id]){const g=images[o.page][o.id];g.x=o.x;g.y=o.y;g.w=o.w;g.h=o.h}
- if(o.t==='erase'){if(strokes[o.page])delete strokes[o.page][o.id];if(images[o.page])delete images[o.page][o.id]}
+ if(o.t==='erase'){(o.ids||[o.id]).forEach(id=>{if(strokes[o.page])delete strokes[o.page][id];if(images[o.page])delete images[o.page][id]})}
  if(o.t==='clear'){strokes[o.page]={};images[o.page]={}}
  if(o.t==='addPage'&&!pages.some(p=>p.id===o.id))pages.push({id:o.id,title:o.title});
  if(o.t==='title')pages.forEach(p=>{if(p.id===o.id)p.title=o.title});
@@ -373,7 +389,7 @@ setInterval(()=>{if(Object.keys(cursors).length)drawOverlay()},1000);
 
 // ---------- камера ----------
 function zoomAt(px,py,f){
- const lim=fitS(),ns=Math.min(lim*6,Math.max(lim*.6,view.s*f)),wx=px/view.s+view.x,wy=py/view.s+view.y;
+ const lim=fitS(),ns=Math.min(lim*4,Math.max(lim*.6,view.s*f)),wx=px/view.s+view.x,wy=py/view.s+view.y;
  view.s=ns;view.x=wx-px/ns;view.y=wy-py/ns;redraw();
 }
 function fit(){view.s=fitS();redraw()} // «По ширине»
@@ -383,12 +399,14 @@ function beginGesture(){
 }
 function doGesture(){
  const a=[...ptrs.values()],r=cv.getBoundingClientRect(),mx=(a[0].x+a[1].x)/2-r.left,my=(a[0].y+a[1].y)/2-r.top,d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)||1;
- const lim=fitS(),ns=Math.min(lim*6,Math.max(lim*.6,gest.s*d/gest.d));view.s=ns;view.x=gest.wx-mx/ns;view.y=gest.wy-my/ns;redraw();
+ const lim=fitS(),ns=Math.min(lim*4,Math.max(lim*.6,gest.s*d/gest.d));view.s=ns;view.x=gest.wx-mx/ns;view.y=gest.wy-my/ns;redraw();
 }
 cv.addEventListener('wheel',e=>{
- e.preventDefault();const r=cv.getBoundingClientRect();
- if(e.ctrlKey||e.metaKey)zoomAt(e.clientX-r.left,e.clientY-r.top,Math.exp(-e.deltaY*.01));
- else{view.x+=e.deltaX/view.s;view.y+=e.deltaY/view.s;redraw()}
+ e.preventDefault();const r=cv.getBoundingClientRect(),m=e.deltaMode===1?16:1,dy=e.deltaY*m,dx=e.deltaX*m;
+ if(e.ctrlKey||e.metaKey){ // щелчок колеса мыши = +12%, щипок на тачпаде = плавно
+  const f=Math.abs(dy)>=50?(dy<0?1.12:1/1.12):Math.exp(-Math.max(-25,Math.min(25,dy))*.012);
+  zoomAt(e.clientX-r.left,e.clientY-r.top,f)}
+ else{view.x+=dx/view.s;view.y+=dy/view.s;redraw()}
 },{passive:false});
 if(!('ontouchstart' in window)){ // щипок на трекпаде Safari
  let gs=1;
@@ -397,7 +415,7 @@ if(!('ontouchstart' in window)){ // щипок на трекпаде Safari
 }
 
 // ---------- ровные фигуры: удержите перо в конце линии ----------
-const pos=e=>{const r=cv.getBoundingClientRect();return[r2(Math.max(0,Math.min(PW,(e.clientX-r.left)/view.s+view.x))),r2(Math.max(0,Math.min(totH,(e.clientY-r.top)/view.s+view.y)))]};
+const pos=e=>{const r=rectC||(rectC=cv.getBoundingClientRect());return[r2(Math.max(0,Math.min(PW,(e.clientX-r.left)/view.s+view.x))),r2(Math.max(0,Math.min(totH,(e.clientY-r.top)/view.s+view.y)))]};
 function segDist(q,a,b){const dx=b[0]-a[0],dy=b[1]-a[1],l=dx*dx+dy*dy;let t=l?((q[0]-a[0])*dx+(q[1]-a[1])*dy)/l:0;t=Math.max(0,Math.min(1,t));return Math.hypot(a[0]+t*dx-q[0],a[1]+t*dy-q[1])}
 function rdp(p,eps){
  if(p.length<3)return p.slice();
@@ -464,7 +482,7 @@ function adjust(p){ // после привязки фигуру можно тя�
   const f=Math.max(.05,Math.hypot(p[0]-cx,p[1]-cy)/(Math.hypot(b.p[0]-cx,b.p[1]-cy)||1));
   cur.pts=q.map((v,i)=>r2((i%2?cy:cx)+(v-(i%2?cy:cx))*f));
  }
- redraw();const t=Date.now();
+ rd();const t=Date.now();
  if(t-lastEmit>80){lastEmit=t;send({t:'live',page:page,k:cur.k,c:cur.c,w:cur.w,pts:cur.pts})}
 }
 function snapNow(){
@@ -476,30 +494,36 @@ function snapNow(){
 
 // ---------- поиск объектов под курсором ----------
 function near(p,x,y,rad){
- if(p.length===2)return Math.hypot(p[0]-x,p[1]-y)<rad;
+ const q2=rad*rad;
+ if(p.length===2){const dx=p[0]-x,dy=p[1]-y;return dx*dx+dy*dy<q2}
  for(let i=0;i<p.length-2;i+=2){
   const ax=p[i],ay=p[i+1],dx=p[i+2]-ax,dy=p[i+3]-ay,l=dx*dx+dy*dy;
-  let t=l?((x-ax)*dx+(y-ay)*dy)/l:0;t=Math.max(0,Math.min(1,t));
-  if(Math.hypot(ax+t*dx-x,ay+t*dy-y)<rad)return true}
+  let t=l?((x-ax)*dx+(y-ay)*dy)/l:0;t=t<0?0:t>1?1:t;
+  const ex=ax+t*dx-x,ey=ay+t*dy-y;if(ex*ex+ey*ey<q2)return true}
  return false;
 }
 const inBox=(b,x,y)=>x>=b[0]&&x<=b[2]&&y>=b[1]&&y<=b[3];
 function hit(sk,x,y,rad,forMove){
+ const B=bbox(sk);if(x<B[0]-rad||x>B[2]+rad||y<B[1]-rad||y>B[3]+rad)return false; // быстрый отсев
  if(sk.k==='text'&&sk.s)return inBox(textBox(sk),x,y);
  if(sk.k==='axes'&&sk.s&&forMove)return inBox(axesBox(sk),x,y);
- return near(samples(sk),x,y,rad);
+ return near(smp(sk),x,y,rad);
 }
 function strokeAt(x,y,forMove,onlyText){
  const ps=strokes[page]||{},rad=(forMove?14:16)/view.s;let f=null;
  for(const id in ps){const sk=ps[id];if(onlyText&&sk.k!=='text')continue;if(hit(sk,x,y,rad,forMove))f=id}
  return f;
 }
+function flushErase(){ // стёртое уходит одним сообщением, а не десятками
+ clearTimeout(eraseT);eraseT=0;if(!pendErase.length)return;
+ const ids=pendErase;pendErase=[];send({t:'erase',page:pendPage,ids:ids});
+}
 function eraseAt(x,y){
- const ps=strokes[page]||{};let any=false;
- for(const id in ps)if(hit(ps[id],x,y,16/view.s,false)){delete ps[id];send({t:'erase',page:page,id:id});any=true}
+ const ps=strokes[page]||{},rad=16/view.s;let any=false;
+ for(const id in ps)if(hit(ps[id],x,y,rad,false)){delete ps[id];pendPage=page;pendErase.push(id);any=true}
  if(!any){const ims=images[page]||{};
-  for(const id in ims){const g=ims[id];if(x>=g.x&&x<=g.x+g.w&&y>=g.y&&y<=g.y+g.h){delete ims[id];send({t:'erase',page:page,id:id});break}}}
- redraw();
+  for(const id in ims){const g=ims[id];if(inBox([g.x,g.y,g.x+g.w,g.y+g.h],x,y)){delete ims[id];pendPage=page;pendErase.push(id);any=true;break}}}
+ if(any){rd();if(!eraseT)eraseT=setTimeout(flushErase,70)}
 }
 function imgAt(x,y){const ims=images[page]||{};let f=null;
  for(const id in ims){const g=ims[id];if(x>=g.x&&x<=g.x+g.w&&y>=g.y&&y<=g.y+g.h)f=id}return f}
@@ -533,7 +557,7 @@ function openText(x,y,id){
   const v=ta.value.replace(/\s+$/,'');ta.remove();
   if(!v){return}
   const txt=wrapText(v,size,Math.max(60,PW-x-12));
-  if(ex){ex.s=txt;ex._my=undefined;ex._tb=undefined;send({t:'stroke',page:page,stroke:clean(ex)});redraw();return}
+  if(ex){ex.s=txt;inval(ex);send({t:'stroke',page:page,stroke:clean(ex)});redraw();return}
   addObj({id:newId(),k:'text',pts:[x,y],c:color,w:size,s:txt});
  };
  ta.oninput=fit2;
@@ -551,7 +575,7 @@ function sendCursor(e){
  lastCur=n;lastCurP=p;send({t:'cursor',page:page,x:p[0],y:p[1],label:isTeacher?'Преподаватель':(myName||'Ученик'),color:isTeacher?'#6a3fc4':'#0e9f8e'});
 }
 cv.addEventListener('pointerdown',e=>{
- e.preventDefault();
+ rectC=null;e.preventDefault();
  if(e.pointerType==='mouse'&&e.button===2)return;
  if(tbox&&e.target===cv)closeText();
  try{cv.setPointerCapture(e.pointerId)}catch(_){}
@@ -620,12 +644,12 @@ cv.addEventListener('pointermove',e=>{
  const evs=(e.getCoalescedEvents&&e.getCoalescedEvents())||[];if(!evs.length)evs.push(e);
  if(cur.erasing){evs.forEach(v=>{const p=pos(v);eraseAt(p[0],p[1])});return}
  if(cur.mvs){const p=pos(e),sk=(strokes[page]||{})[cur.mvs];if(!sk)return;
-  const dx=p[0]-cur.sx,dy=p[1]-cur.sy;sk.pts=cur.orig.map((v,i)=>r2(v+(i%2?dy:dx)));sk._my=undefined;sk._tb=undefined;redraw();
+  const dx=p[0]-cur.sx,dy=p[1]-cur.sy;sk.pts=cur.orig.map((v,i)=>r2(v+(i%2?dy:dx)));inval(sk);rd();
   const t2=Date.now();if(t2-lastEmit>80){lastEmit=t2;send({t:'strokeset',page:page,id:cur.mvs,pts:sk.pts})}
   return}
  if(cur.mv){const p=pos(e),g=images[page][cur.mv];
   if(cur.size){g.w=Math.max(20/view.s,p[0]-g.x);g.h=g.w*cur.r}else{g.x=p[0]-cur.dx;g.y=p[1]-cur.dy}
-  redraw();return}
+  rd();return}
  if(cur.k==='pen'){
   const min=1.5/view.s;
   evs.forEach(v=>{const p=pos(v),n=cur.pts.length;
@@ -633,13 +657,13 @@ cv.addEventListener('pointermove',e=>{
  }else{const p=pos(e);cur.pts[2]=p[0];cur.pts[3]=p[1]}
  lastP=pos(e);
  if(cur.k==='pen'&&S.snap){const ha=holdA;if(!ha||Math.hypot(e.clientX-ha[0],e.clientY-ha[1])>5){holdA=[e.clientX,e.clientY];clearTimeout(holdT);holdT=setTimeout(snapNow,650)}}
- redraw();const n=Date.now();
+ rd();const n=Date.now();
  if(n-lastEmit>80){lastEmit=n;send({t:'live',page:page,k:cur.k,c:cur.c,w:cur.w,pts:cur.pts,pr:cur.pr||undefined})}
 });
 function end(e){
  if(e.pointerType==='touch'){ptrs.delete(e.pointerId);if(ptrs.size<2)gest=null}
  if(pan&&pan.id===e.pointerId){pan=null;setCursor();return}
- clearTimeout(holdT);if(!cur)return;const s=cur;cur=null;if(s.erasing)return;
+ clearTimeout(holdT);if(!cur)return;const s=cur;cur=null;if(s.erasing){flushErase();return}
  if(s.mvs){const sk=(strokes[page]||{})[s.mvs];if(sk)send({t:'strokeset',page:page,id:s.mvs,pts:sk.pts});return}
  if(s.mv){const g=images[page][s.mv];send({t:'imgset',page:page,id:s.mv,x:r2(g.x),y:r2(g.y),w:r2(g.w),h:r2(g.h)});return}
  if(s.k==='pen'){
@@ -661,6 +685,7 @@ document.addEventListener('keydown',e=>{
  if(isTextTarget(a))return;
  if(e.code==='Space'&&!(tg==='SELECT'||tg==='BUTTON')){space=true;setCursor();e.preventDefault();return}
  if((editImg||editStroke)&&(e.key==='Enter'||e.key==='Escape')&&tg!=='SELECT'){editImg=null;editStroke=null;redraw();e.preventDefault();return}
+ if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&e.key==='0'){fit();return}
  const z=e.code==='KeyZ',y=e.code==='KeyY';
  if(!(e.metaKey||e.ctrlKey)||!(z||y))return;
  e.preventDefault();if(viewOnly)return;(y||e.shiftKey)?redoAct():undo();
@@ -832,6 +857,8 @@ $('cp').onclick=()=>{const t=location.href;(navigator.clipboard?navigator.clipbo
  b.onclick=()=>{color=c;if(['er','mv','hand'].includes(tool())){$('tool').value='pen';prevTool='pen'}setCursor();document.querySelectorAll('.sw').forEach(x=>x.classList.remove('on'));b.classList.add('on')};
  $('cols').appendChild(b)});
 $('edone').onclick=()=>{editImg=null;editStroke=null;redraw()};
+$('zfit').onclick=()=>{fit()};
+if(window.visualViewport)window.visualViewport.addEventListener('resize',chkZoom);
 $('newt').onclick=()=>{if(!jump)return;view.y=jump.y-40;$('newt').hidden=true;jump=null;redraw()};
 if(!isTeacher){const o=$('fm').querySelector('[value=clr]');if(o)o.remove()} // ученик не видит «Очистить»
 if(navigator.maxTouchPoints>0){$('fp').hidden=false;$('fp').onclick=()=>{fingerPan=!fingerPan;$('fp').textContent='Палец: '+(fingerPan?'листает':'рисует')}}
