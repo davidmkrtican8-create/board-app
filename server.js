@@ -67,6 +67,7 @@ function apply(s, op) {
         if (!SHAPES.includes(k.s)) return false;
         o.s = k.s;
       }
+      if (['line', 'arrow', 'rect', 'ellipse', 'poly', 'shape'].includes(kind) && Number.isFinite(+k.a) && +k.a) o.a = num(k.a, -7, 7, 0); // поворот фигуры, радианы
       if (kind === 'pen' && Array.isArray(k.pr) && k.pr.length === pts.length / 2 && k.pr.every(v => typeof v === 'number' && v >= 0 && v <= 1)) o.pr = k.pr.map(v => Math.round(v * 100) / 100); // нажим пера
       (st[op.page] = st[op.page] || {})[k.id] = o;
       return true;
@@ -84,7 +85,9 @@ function apply(s, op) {
       if (!t || !Array.isArray(op.pts)) return false;
       const pts = op.pts.map(Number);
       if (!pts.every(Number.isFinite) || pts.length !== t.pts.length) return false;
-      t.pts = pts; return true;
+      t.pts = pts;
+      if (op.a !== undefined && Number.isFinite(+op.a)) { if (+op.a) t.a = num(op.a, -7, 7, 0); else delete t.a; } // поворот
+      return true;
     }
     case 'imgset': {
       const g = (im[op.page] || {})[op.id];
@@ -101,6 +104,12 @@ function apply(s, op) {
       if (!ID.test(op.id) || s.pages.length >= 200) return false;
       if (!s.pages.some(p => p.id === op.id)) s.pages.push({ id: op.id, title: String(op.title || '').slice(0, 80) });
       return true;
+    case 'delPage': { // удалить одну доску ученика (последнюю удалить нельзя)
+      const i = s.pages.findIndex(p => p.id === op.id);
+      if (i < 0 || s.pages.length <= 1) return false;
+      s.pages.splice(i, 1); delete st[op.id]; delete im[op.id];
+      return true;
+    }
     case 'title': { const p = s.pages.find(p => p.id === op.id); if (p) p.title = String(op.title || '').slice(0, 80); return true; }
     case 'rtc': return ['hello', 'here', 'offer', 'answer', 'ice', 'bye'].includes(op.kind) && RID.test(String(op.from)) && (!op.to || RID.test(String(op.to))) && JSON.stringify(op.data || null).length < 30000;
     case 'cursor': return Number.isFinite(+op.x) && Number.isFinite(+op.y) && String(op.label || '').length <= 40;
