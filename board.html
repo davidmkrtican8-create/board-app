@@ -50,7 +50,14 @@ body.focus #main{padding:4px;gap:4px}
 .mr{display:flex;gap:8px;justify-content:flex-end}
 .af{display:grid;grid-template-columns:1fr 1fr;gap:8px}.af label{display:flex;flex-direction:column;gap:3px;font-size:13px}.af label.c{flex-direction:row;align-items:center}.af input[type=number]{width:100%}
 .tb.on{background:color-mix(in srgb,var(--ac) 16%,var(--panel));border-color:var(--ac)}
-.tb.pe{min-width:104px;font-weight:600}.tb.pe.er{background:var(--ac);color:#fff;border-color:var(--ac)}
+.tb.pe{width:112px;white-space:nowrap;font-weight:600;border-radius:8px 0 0 8px;margin-right:-6px}.tb.pe.er{background:var(--ac);color:#fff;border-color:var(--ac)}
+#ersb{border-radius:0 8px 8px 0;padding:6px 7px;align-self:stretch}
+#ersp[hidden]{display:none}
+#ersp{position:absolute;z-index:10;background:var(--panel);border:1px solid var(--bd);border-radius:12px;padding:8px;box-shadow:0 6px 24px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:2px;min-width:250px}
+#ersp h4{margin:2px 6px 4px;font-size:12px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+#ersp button{display:flex;align-items:center;gap:10px;text-align:left;border-color:transparent;background:transparent}
+#ersp button:hover{background:color-mix(in srgb,var(--ac) 8%,transparent)}#ersp button.on{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 16%,transparent)}
+#ersp .dot{flex:none;width:26px;display:flex;justify-content:center;align-items:center}#ersp .dot i{display:block;border-radius:50%;border:1.5px solid var(--tx)}
 #wdw{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--mut)}#wd{width:90px;padding:0;border:0;background:none;accent-color:var(--ac)}#wdv{min-width:32px}
 #shp[hidden]{display:none}
 #shp{position:absolute;z-index:10;width:372px;max-width:calc(100% - 20px);max-height:calc(100% - 70px);overflow:auto;background:var(--panel);border:1px solid var(--bd);border-radius:12px;padding:10px 12px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
@@ -70,7 +77,7 @@ body.focus #main{padding:4px;gap:4px}
   <button id="hp" title="Скрыть или показать список досок">◧</button>
   <input id="title" placeholder="Название доски">
   <button id="pe" class="keep tb pe" title="Переключить перо ⇄ ластик (клавиша E)"></button>
-  <select id="ersm" class="keep" title="Какой ластик" hidden><option value="12">Ластик: маленький</option><option value="25">Ластик: средний</option><option value="50">Ластик: большой</option><option value="90">Ластик: огромный</option><option value="obj">Ластик: стирает объект целиком</option></select>
+  <button id="ersb" class="keep tb" title="Какой ластик: размер или «стирает объект целиком»">▾</button>
   <button id="ttext" class="keep tb" title="Печатать текст">T&nbsp;Текст</button>
   <button id="tshape" class="keep tb" title="Линии, фигуры, объёмные тела, координатная плоскость">△&nbsp;Фигуры&nbsp;▾</button>
   <button id="tmv" class="tb" title="Двигать фигуры, текст и картинки">⤧&nbsp;Двигать</button>
@@ -86,6 +93,7 @@ body.focus #main{padding:4px;gap:4px}
   <input type="file" id="fi" accept="image/*" hidden>
  </div>
  <div id="shp" hidden></div>
+ <div id="ersp" hidden></div>
  <div id="set" hidden>
   <h3>Настройки</h3>
   <label>Тема <select id="theme"><option value="auto">Как в системе</option><option value="light">Светлая</option><option value="dark">Тёмная</option></select></label>
@@ -916,7 +924,6 @@ function updTools(){
  const t=tool(),er=isEr(t),pe=$('pe');
  pe.textContent=t==='pen'?'🧽 Ластик':'✏️ Перо';pe.classList.toggle('er',er);
  pe.title=(t==='pen'?'Сейчас перо. Нажмите — ластик':er?'Сейчас ластик. Нажмите — перо':'Взять перо')+' (клавиша E)';
- $('ersm').hidden=!er;
  $('ttext').classList.toggle('on',t==='text');$('tmv').classList.toggle('on',t==='mv');$('thand').classList.toggle('on',t==='hand');
  const it=SHAPE_MENU.flatMap(g=>g[1]).find(x=>x[0]===t);
  $('tshape').classList.toggle('on',!!it);$('tshape').textContent=(it?it[1].replace(/­/g,''):'△ Фигуры')+' ▾';
@@ -949,7 +956,17 @@ function buildShapeMenu(){
   m.appendChild(g)});
 }
 $('pe').onclick=()=>{if(!viewOnly)togglePE()};
-$('ersm').value=S.ers;$('ersm').onchange=()=>{S.ers=$('ersm').value;saveS();setTool(ersTool())};
+// выбор ластика во всплывающем меню: панель не прыгает при переключении перо ⇄ ластик
+const ERS=[['12','Маленький',6],['25','Средний',10],['50','Большой',16],['90','Огромный',24],['obj','Стирает объект целиком',0]];
+$('ersb').onclick=()=>{const m=$('ersp');if(!m.hidden){m.hidden=true;return}
+ m.innerHTML='<h4>Ластик</h4>';
+ ERS.forEach(([v,label,d])=>{const b=document.createElement('button');b.className=v===S.ers?'on':'';
+  const dot=document.createElement('span');dot.className='dot';
+  if(d){const i=document.createElement('i');i.style.width=i.style.height=d+'px';dot.appendChild(i)}else dot.textContent='⌫';
+  const s=document.createElement('span');s.textContent=label;b.append(dot,s);
+  b.onclick=()=>{S.ers=v;saveS();m.hidden=true;setTool(ersTool())};m.appendChild(b)});
+ m.hidden=false;const b=$('pe');
+ m.style.top=(b.offsetTop+b.offsetHeight+4)+'px';m.style.left=Math.max(10,Math.min(b.offsetLeft,$('main').clientWidth-m.offsetWidth-10))+'px'};
 $('ttext').onclick=()=>setTool('text');$('tmv').onclick=()=>setTool('mv');$('thand').onclick=()=>setTool('hand');
 $('tshape').onclick=()=>{const m=$('shp');if(!m.hidden){m.hidden=true;return}
  buildShapeMenu();m.hidden=false;const b=$('tshape');
@@ -981,7 +998,8 @@ if(navigator.maxTouchPoints>0){$('fp').hidden=false;$('fp').onclick=()=>{fingerP
 $('gear').onclick=()=>{$('set').hidden=!$('set').hidden};
 document.addEventListener('pointerdown',e=>{
  if(!$('set').hidden&&!$('set').contains(e.target)&&e.target!==$('gear'))$('set').hidden=true;
- if(!$('shp').hidden&&!$('shp').contains(e.target)&&!$('tshape').contains(e.target))$('shp').hidden=true},true);
+ if(!$('shp').hidden&&!$('shp').contains(e.target)&&!$('tshape').contains(e.target))$('shp').hidden=true;
+ if(!$('ersp').hidden&&!$('ersp').contains(e.target)&&!$('ersb').contains(e.target))$('ersp').hidden=true},true);
 ['snap','press','palm','ring','seec','showme'].forEach(id=>{$(id).checked=!!S[id];$(id).onchange=()=>{S[id]=$(id).checked;saveS();setCursor();drawOverlay()}});
 $('theme').value=S.theme;$('theme').onchange=()=>{S.theme=$('theme').value;saveS();applyTheme()};
 $('bgs').value=S.bg;$('bgs').onchange=()=>{bg=$('bgs').value;S.bg=bg;saveS();redraw()};
