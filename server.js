@@ -7,7 +7,9 @@ const ADMIN = process.env.ADMIN_KEY || '';
 fs.mkdirSync(DIR, { recursive: true });
 const rooms = {};
 const ID = /^[\w-]{1,40}$/, RID = /^[a-z0-9]{4,32}$/;
-const KINDS = ['pen', 'line', 'arrow', 'rect', 'ellipse', 'poly', 'text', 'axes'];
+const KINDS = ['pen', 'ers', 'line', 'arrow', 'rect', 'ellipse', 'poly', 'text', 'axes', 'shape'];
+// готовые фигуры: плоские и объёмные (школьная программа)
+const SHAPES = ['tri', 'rtri', 'square', 'circle', 'para', 'trap', 'rhomb', 'hex', 'cube', 'box', 'prism', 'pyr', 'tetra', 'cyl', 'cone', 'sphere'];
 const ICE = (() => { try { return JSON.parse(process.env.ICE_SERVERS || ''); } catch (e) { return null; } })()
   || [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }];
 const IMG = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/=]+$/;
@@ -49,7 +51,7 @@ function apply(s, op) {
       if (!k || !ID.test(k.id) || !Array.isArray(k.pts) || k.pts.length > 20000 || !/^#[0-9a-f]{3,6}$/i.test(k.c)) return false;
       const kind = KINDS.includes(k.k) ? k.k : 'pen';
       const single = kind === 'text' || kind === 'axes';
-      if (kind === 'poly' ? (k.pts.length < 6 || k.pts.length > 40 || k.pts.length % 2) : single ? k.pts.length !== 2 : (kind !== 'pen' && k.pts.length !== 4)) return false;
+      if (kind === 'poly' ? (k.pts.length < 6 || k.pts.length > 40 || k.pts.length % 2) : single ? k.pts.length !== 2 : (kind !== 'pen' && kind !== 'ers' && k.pts.length !== 4)) return false;
       const pts = k.pts.map(Number);
       if (!pts.every(Number.isFinite)) return false;
       const o = { k: kind, pts, c: k.c, w: num(k.w, 0.05, 300, 4) };
@@ -60,6 +62,10 @@ function apply(s, op) {
       if (kind === 'axes') { // координатная плоскость: «xmin,xmax,ymin,ymax,сетка»
         if (typeof k.s !== 'string' || !/^-?\d+(\.\d+)?(,-?\d+(\.\d+)?){3}(,[01])?$/.test(k.s)) return false;
         o.s = k.s; o.w = num(k.w, 8, 120, 40);
+      }
+      if (kind === 'shape') { // готовая фигура в рамке pts
+        if (!SHAPES.includes(k.s)) return false;
+        o.s = k.s;
       }
       if (kind === 'pen' && Array.isArray(k.pr) && k.pr.length === pts.length / 2 && k.pr.every(v => typeof v === 'number' && v >= 0 && v <= 1)) o.pr = k.pr.map(v => Math.round(v * 100) / 100); // нажим пера
       (st[op.page] = st[op.page] || {})[k.id] = o;
