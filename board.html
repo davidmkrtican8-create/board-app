@@ -561,7 +561,17 @@ function recognize(flat){
  if(Math.hypot(v[v.length-1][0]-v[0][0],v[v.length-1][1]-v[0][1])<.1*D)v.pop();
  for(let ch2=true;ch2&&v.length>3;){ch2=false;
   for(let i=0;i<v.length;i++){
-   const p0=v[(i+v.length-1)%v.length],p1=v[i],p2=v[(i+1)%v.length];
+   const j=(i+1)%v.length,h=(i+v.length-1)%v.length,k2=(j+1)%v.length,el=Math.hypot(v[j][0]-v[i][0],v[j][1]-v[i][1]);
+   let mxE=0;for(let q=0;q<v.length;q++)mxE=Math.max(mxE,Math.hypot(v[(q+1)%v.length][0]-v[q][0],v[(q+1)%v.length][1]-v[q][1]));
+   if(el<.3*mxE){ // короткая сторона, конец которой почти не поворачивает, — лишняя точка на стороне
+    const ai=cornerAng(v[h],v[i],v[j]),aj=cornerAng(v[i],v[j],v[k2]);
+    if(Math.max(ai,aj)>145*DEG){v.splice(ai>aj?i:j,1);ch2=true;break}
+   }
+   const sharp=v.length>3&&el<.3*mxE&&Math.min(cornerAng(v[h],v[i],v[j]),cornerAng(v[i],v[j],v[k2]))<25*DEG; // перо развернулось назад
+   if(el<.08*D||sharp){ // «хвостик» на углу: две близкие вершины — это один угол (там, где сходятся соседние стороны)
+    const X=lineX(v[h],v[i],v[j],v[k2]),mid=[(v[i][0]+v[j][0])/2,(v[i][1]+v[j][1])/2];
+    v[i]=X&&Math.hypot(X[0]-mid[0],X[1]-mid[1])<Math.max(el*2,.1*D)?X:mid;v.splice(j,1);ch2=true;break}
+   const p0=v[(i+v.length-1)%v.length],p1=v[i],p2=v[j];
    let da=Math.abs(Math.atan2(p2[1]-p1[1],p2[0]-p1[0])-Math.atan2(p1[1]-p0[1],p1[0]-p0[0]));if(da>Math.PI)da=2*Math.PI-da;
    if(da<.35){v.splice(i,1);ch2=true;break}}}
  if(v.length===3)return niceTri(v);
@@ -576,6 +586,10 @@ const ADD=(a,u,k)=>[a[0]+u[0]*k,a[1]+u[1]*k],DOT=(a,b)=>a[0]*b[0]+a[1]*b[1];
 const angOf=u=>Math.atan2(u[1],u[0]);
 function lineDiff(t1,t2){let d=Math.abs(t1-t2)%Math.PI;return Math.min(d,Math.PI-d)} // угол между прямыми
 function snapAx(t){const q=Math.round(t/(Math.PI/2))*(Math.PI/2);return Math.abs(t-q)<8*DEG?q:t} // почти по сетке — ровно по сетке
+function lineX(a,b,c,d){ // точка пересечения прямых ab и cd (или null, если почти параллельны)
+ const r=V(a,b),s=V(c,d),den=r[0]*s[1]-r[1]*s[0];if(Math.abs(den)<1e-9*LEN(r)*LEN(s)+1e-12)return null;
+ const t=((c[0]-a[0])*s[1]-(c[1]-a[1])*s[0])/den;return[a[0]+r[0]*t,a[1]+r[1]*t];
+}
 function cornerAng(a,b,c){const u=V(b,a),w=V(b,c);return Math.acos(Math.max(-1,Math.min(1,DOT(u,w)/(LEN(u)*LEN(w)||1))))}
 const mean=v=>{let x=0,y=0;v.forEach(p=>{x+=p[0];y+=p[1]});return[x/v.length,y/v.length]};
 function rotAll(v,c,t){const cs=Math.cos(t),sn=Math.sin(t);return v.map(p=>[c[0]+(p[0]-c[0])*cs-(p[1]-c[1])*sn,c[1]+(p[0]-c[0])*sn+(p[1]-c[1])*cs])}
@@ -585,72 +599,86 @@ function levelPoly(v){ // если одна из сторон почти гор�
  return best?rotAll(v,mean(v),best):v;
 }
 const polyOut=v=>({k:'poly',pts:v.flat()});
+// Каждая «идеальная» фигура подгоняется к нарисованным вершинам; берём самую правильную из тех, что достаточно близки.
+const sizeOf=v=>{let a=1e12,b=1e12,c=-1e12,d=-1e12;v.forEach(p=>{a=Math.min(a,p[0]);c=Math.max(c,p[0]);b=Math.min(b,p[1]);d=Math.max(d,p[1])});return Math.hypot(c-a,d-b)||1};
+const meanSide=v=>v.reduce((a,p,i)=>a+LEN(V(p,v[(i+1)%v.length])),0)/v.length||1;
+const fitErr=(v,W)=>{let m=0;v.forEach((p,i)=>{m=Math.max(m,LEN(V(p,W[i])))});return m/meanSide(v)}; // худшая вершина, в долях средней стороны
+const circMean=(as,k)=>{let x=0,y=0;as.forEach(a=>{x+=Math.cos(k*a);y+=Math.sin(k*a)});return Math.atan2(y,x)/k}; // средний угол с периодом 2π/k
+const orient=v=>{let s=0;v.forEach((p,i)=>{const q=v[(i+1)%v.length];s+=p[0]*q[1]-q[0]*p[1]});return s>0?1:-1};
+const perp=u=>[-u[1],u[0]];
+function rectOut(c,t,w,h){ // прямоугольник/квадрат: ровно по сетке, если почти по сетке
+ t=snapAx(t);t=((t%Math.PI)+Math.PI)%Math.PI;if(t>=Math.PI/2-1e-6){t-=Math.PI/2;const z=w;w=h;h=z}
+ if(t>Math.PI/4&&Math.abs(w-h)<1e-6)t-=Math.PI/2;if(Math.abs(t)<1e-6)t=0;
+ const box=[c[0]-w/2,c[1]-h/2,c[0]+w/2,c[1]+h/2];return t?{k:'rect',pts:box,a:t}:{k:'rect',pts:box};
+}
+// уровни от самых правильных фигур к общим: правильная побеждает, только если почти так же близка к рисунку, как лучшая из всех
+function pickLevels(v,levels){
+ const all=[];levels.forEach(L=>L.c.forEach(c=>{if(c&&c.W){c.e=fitErr(v,c.W);all.push(c)}}));
+ if(!all.length)return null;const best=Math.min(...all.map(c=>c.e));
+ for(const L of levels){let w=null;for(const c of L.c)if(c&&c.W&&c.e<=c.tol&&c.e<=best+L.slack&&(!w||c.e<w.e))w=c;if(w)return w}
+ return null;
+}
+// ---- треугольники ----
+function triEquilateral(v){
+ const G=mean(v),s=orient(v),R=v.reduce((a,p)=>a+LEN(V(G,p)),0)/3;
+ const ph=circMean(v.map((p,i)=>angOf(V(G,p))-s*i*2*Math.PI/3),1);
+ return v.map((p,i)=>ADD(G,DIR(ph+s*i*2*Math.PI/3),R));
+}
+function triRight(v,i){ // прямой угол в вершине i
+ const C=v[i],A=v[(i+1)%3],B=v[(i+2)%3],s=Math.sign((A[0]-C[0])*(B[1]-C[1])-(A[1]-C[1])*(B[0]-C[0]))||1;
+ const t=circMean([angOf(V(C,A)),angOf(V(C,B))-s*Math.PI/2],1),u=DIR(t),n=DIR(t+s*Math.PI/2);
+ let la=Math.max(1,DOT(V(C,A),u)),lb=Math.max(1,DOT(V(C,B),n));
+ const W=[];W[i]=C;W[(i+1)%3]=ADD(C,u,la);W[(i+2)%3]=ADD(C,n,lb);
+ const W2=[];if(Math.abs(la-lb)<.12*Math.max(la,lb)){const m=(la+lb)/2;W2[i]=C;W2[(i+1)%3]=ADD(C,u,m);W2[(i+2)%3]=ADD(C,n,m)}
+ return{W,W2:W2.length?W2:null};
+}
+function triIso(v,i){ // равнобедренный с вершиной i
+ const A=v[i],P1=v[(i+1)%3],P2=v[(i+2)%3],M=ADD(P1,V(P1,P2),.5),half=LEN(V(P1,P2))/2,u=DIR(angOf(V(P1,P2))),n=perp(u),h=DOT(V(M,A),n);
+ const W=[];W[i]=ADD(M,n,h);W[(i+1)%3]=ADD(M,u,-half);W[(i+2)%3]=ADD(M,u,half);return W;
+}
 function niceTri(v){
- const S=[0,1,2].map(i=>LEN(V(v[i],v[(i+1)%3]))),mx=Math.max(...S),mn=Math.min(...S);
- const ang=[0,1,2].map(i=>cornerAng(v[(i+2)%3],v[i],v[(i+1)%3]));
- if(mx/mn<1.15){ // равносторонний
-  const G=mean(v),s=(S[0]+S[1]+S[2])/3,h=s*Math.sqrt(3)/2;
-  let bi=0,bd=9;for(let i=0;i<3;i++){const t=angOf(V(v[i],v[(i+1)%3])),d=Math.abs(snapAx(t)-t)+(snapAx(t)===t?1:0);if(d<bd){bd=d;bi=i}}
-  const u=DIR(snapAx(angOf(V(v[bi],v[(bi+1)%3])))),apex=v[(bi+2)%3];let n=[-u[1],u[0]];
-  const M0=ADD(v[bi],V(v[bi],v[(bi+1)%3]),.5);if(DOT(V(M0,apex),n)<0)n=[-n[0],-n[1]];
-  const M=ADD(G,n,-h/3);return polyOut([ADD(M,u,-s/2),ADD(M,u,s/2),ADD(M,n,h)]);
- }
- const ri=ang.findIndex(a=>Math.abs(a-Math.PI/2)<AT);
- if(ri>=0){ // прямоугольный: ровно 90°, катеты по сетке, если близко
-  const C=v[ri],A=v[(ri+1)%3],B=v[(ri+2)%3];let la=LEN(V(C,A)),lb=LEN(V(C,B));
-  if(Math.abs(la-lb)<.1*Math.max(la,lb))la=lb=(la+lb)/2; // равнобедренный прямоугольный
-  const t=snapAx(angOf(V(C,A))),u=DIR(t);let n=[-u[1],u[0]];if(DOT(V(C,B),n)<0)n=[-n[0],-n[1]];
-  return polyOut([C,ADD(C,u,la),ADD(C,n,lb)]);
- }
- for(let i=0;i<3;i++){ // равнобедренный: две стороны почти равны
-  const a1=S[(i+2)%3],a2=S[i];
-  if(Math.abs(a1-a2)<.1*Math.max(a1,a2)){
-   const apex=v[i],P1=v[(i+1)%3],P2=v[(i+2)%3],M=ADD(P1,V(P1,P2),.5),half=LEN(V(P1,P2))/2;
-   const u=DIR(snapAx(angOf(V(P1,P2))));let n=[-u[1],u[0]];const hh=DOT(V(M,apex),n);
-   return polyOut([ADD(M,n,hh),ADD(M,u,-half),ADD(M,u,half)]); // вершина ровно над серединой основания
-  }
- }
- return polyOut(levelPoly(v));
+ const L1=[{W:triEquilateral(v),tol:.13}],L2=[];
+ for(let i=0;i<3;i++){const r=triRight(v,i);if(r.W2)L1.push({W:r.W2,tol:.1});L2.push({W:r.W,tol:.1})}
+ for(let i=0;i<3;i++)L2.push({W:triIso(v,i),tol:.1});
+ const b=pickLevels(v,[{c:L1,slack:.07},{c:L2,slack:.07}]);return polyOut(levelPoly(b?b.W:v));
+}
+// ---- четырёхугольники ----
+function quadRect(v,sq){
+ const c=mean(v),t=circMean([0,1,2,3].map(i=>angOf(V(v[i],v[(i+1)%4]))),4),u=DIR(t),n=perp(u);
+ const P=v.map(p=>[DOT(V(c,p),u),DOT(V(c,p),n)]),q=new Set(P.map(p=>(p[0]>0?1:0)+(p[1]>0?2:0)));
+ if(q.size<4)return null; // вершины должны лежать в четырёх разных углах
+ let w=P.reduce((a,p)=>a+Math.abs(p[0]),0)/4,h=P.reduce((a,p)=>a+Math.abs(p[1]),0)/4;if(sq)w=h=(w+h)/2;
+ return{W:P.map(p=>ADD(ADD(c,u,Math.sign(p[0])*w),n,Math.sign(p[1])*h)),out:()=>rectOut(c,t,2*w,2*h)};
+}
+function quadRhomb(v){
+ const c=mean(v),t=circMean([angOf(V(v[0],v[2])),angOf(V(v[1],v[3]))-Math.PI/2],2),u=DIR(t),n=perp(u);
+ const P=v.map(p=>[DOT(V(c,p),u),DOT(V(c,p),n)]);
+ if(Math.sign(P[0][0])===Math.sign(P[2][0])||Math.sign(P[1][1])===Math.sign(P[3][1]))return null;
+ const p=(Math.abs(P[0][0])+Math.abs(P[2][0]))/2,q=(Math.abs(P[1][1])+Math.abs(P[3][1]))/2;
+ return{W:[ADD(c,u,Math.sign(P[0][0])*p),ADD(c,n,Math.sign(P[1][1])*q),ADD(c,u,Math.sign(P[2][0])*p),ADD(c,n,Math.sign(P[3][1])*q)]};
+}
+function quadPar(v){
+ const E=[0,1,2,3].map(i=>V(v[i],v[(i+1)%4])),c=mean(v),a=[(E[0][0]-E[2][0])/2,(E[0][1]-E[2][1])/2],b=[(E[1][0]-E[3][0])/2,(E[1][1]-E[3][1])/2];
+ const v0=[c[0]-(a[0]+b[0])/2,c[1]-(a[1]+b[1])/2],v1=ADD(v0,a,1);return{W:[v0,v1,ADD(v1,b,1),ADD(v0,b,1)]};
+}
+function quadTrap(v,i,iso){ // основания: стороны i и i+2
+ const E=[0,1,2,3].map(k=>V(v[k],v[(k+1)%4])),c=mean(v),u=DIR(angOf([(E[i][0]-E[i+2][0])/2,(E[i][1]-E[i+2][1])/2])),n=perp(u);
+ const P=v.map(p=>[DOT(V(c,p),u),DOT(V(c,p),n)]),b1=[i,(i+1)%4],b2=[(i+2)%4,(i+3)%4];
+ const t1=(P[b1[0]][1]+P[b1[1]][1])/2,t2=(P[b2[0]][1]+P[b2[1]][1])/2;b1.forEach(k=>P[k][1]=t1);b2.forEach(k=>P[k][1]=t2);
+ if(iso){const m1=(P[b1[0]][0]+P[b1[1]][0])/2,m2=(P[b2[0]][0]+P[b2[1]][0])/2,m=(m1+m2)/2;b1.forEach(k=>P[k][0]+=m-m1);b2.forEach(k=>P[k][0]+=m-m2)}
+ return{W:P.map(p=>ADD(ADD(c,u,p[0]),n,p[1]))};
 }
 function niceQuad(v){
- const E=[0,1,2,3].map(i=>V(v[i],v[(i+1)%4])),L=E.map(LEN),T=E.map(angOf),c=mean(v);
- const right=[0,1,2,3].every(i=>Math.abs(cornerAng(v[(i+3)%4],v[i],v[(i+1)%4])-Math.PI/2)<AT);
- const par=(i,j)=>lineDiff(T[i],T[j])<AT;
- if(right){ // прямоугольник / квадрат (возможно, повёрнутый)
-  let w=(L[0]+L[2])/2,h=(L[1]+L[3])/2;if(Math.abs(w-h)<.12*Math.max(w,h))w=h=(w+h)/2;
-  let t=snapAx(T[0]);
-  t=((t%Math.PI)+Math.PI)%Math.PI;if(t>=Math.PI/2-1e-6){t-=Math.PI/2;const z=w;w=h;h=z} // угол в пределах 0…90°
-  if(Math.abs(t)<1e-6)t=0;
-  if(t>Math.PI/4&&w===h)t-=Math.PI/2;
-  const box=[c[0]-w/2,c[1]-h/2,c[0]+w/2,c[1]+h/2];
-  return t?{k:'rect',pts:box,a:t}:{k:'rect',pts:box};
- }
- if(par(0,2)&&par(1,3)){
-  if(Math.max(...L)/Math.min(...L)<1.3){ // ромб: диагонали перпендикулярны и делятся пополам
-   const d1=V(v[0],v[2]),d2=V(v[1],v[3]);let p=LEN(d1)/2,q=LEN(d2)/2,t=angOf(LEN(d1)>=LEN(d2)?d1:d2);
-   if(p<q){const z=p;p=q;q=z}
-   t=snapAx(t);const u=DIR(t),n=[-u[1],u[0]];
-   return polyOut([ADD(c,u,p),ADD(c,n,q),ADD(c,u,-p),ADD(c,n,-q)]);
-  }
-  // параллелограмм: противоположные стороны равны и параллельны
-  const t=snapAx(angOf([(E[0][0]-E[2][0])/2,(E[0][1]-E[2][1])/2])),a=ADD([0,0],DIR(t),(L[0]+L[2])/2);
-  const b=[(E[1][0]-E[3][0])/2,(E[1][1]-E[3][1])/2],v0=[c[0]-(a[0]+b[0])/2,c[1]-(a[1]+b[1])/2];
-  const v1=ADD(v0,a,1);return polyOut([v0,v1,ADD(v1,b,1),ADD(v0,b,1)]);
- }
- const pi=par(0,2)?0:par(1,3)?1:-1;
- if(pi>=0){ // трапеция: основания строго параллельны; равнобедренная, если боковые стороны равны
-  const i=pi,t=snapAx(angOf([(E[i][0]-E[i+2][0])/2,(E[i][1]-E[i+2][1])/2])),u=DIR(t),n=[-u[1],u[0]];
-  const loc=p=>[DOT(V(c,p),u),DOT(V(c,p),n)],P=v.map(loc);
-  const b1=[i,(i+1)%4],b2=[(i+2)%4,(i+3)%4],t1=(P[b1[0]][1]+P[b1[1]][1])/2,t2=(P[b2[0]][1]+P[b2[1]][1])/2;
-  b1.forEach(k=>P[k][1]=t1);b2.forEach(k=>P[k][1]=t2);
-  const leg1=L[(i+1)%4],leg2=L[(i+3)%4];
-  if(Math.abs(leg1-leg2)<.15*Math.max(leg1,leg2)){
-   const m1=(P[b1[0]][0]+P[b1[1]][0])/2,m2=(P[b2[0]][0]+P[b2[1]][0])/2,m=(m1+m2)/2;
-   b1.forEach(k=>P[k][0]+=m-m1);b2.forEach(k=>P[k][0]+=m-m2);
-  }
-  return polyOut(P.map(p=>ADD(ADD(c,u,p[0]),n,p[1])));
- }
- return polyOut(levelPoly(v));
+ const S=[0,1,2,3].map(i=>LEN(V(v[i],v[(i+1)%4]))),k=S.indexOf(Math.min(...S));
+ if(S[k]<.1*Math.max(...S)){const j=(k+1)%4,m=[(v[k][0]+v[j][0])/2,(v[k][1]+v[j][1])/2];return niceTri(v.map((p,i)=>i===k?m:p).filter((p,i)=>i!==j))} // очень короткая сторона — это треугольник с «хвостиком»
+ const C=(f,tol)=>f?Object.assign(f,{tol}):null;
+ const b=pickLevels(v,[
+  {c:[C(quadRect(v,true),.07)],slack:.07},                                   // квадрат
+  {c:[C(quadRect(v,false),.07),C(quadRhomb(v),.15)],slack:.07},              // прямоугольник, ромб
+  {c:[C(quadPar(v),.12),C(quadTrap(v,0,true),.12),C(quadTrap(v,1,true),.12)],slack:.05}, // параллелограмм, равнобедренная трапеция
+  {c:[C(quadTrap(v,0,false),.12),C(quadTrap(v,1,false),.12)],slack:1}]);    // трапеция
+ if(!b)return polyOut(levelPoly(v));
+ return b.out?b.out():polyOut(levelPoly(b.W));
 }
 function nicePoly(v){ // правильный пяти-, шести-… угольник, если стороны почти равны
  const n=v.length,S=v.map((p,i)=>LEN(V(p,v[(i+1)%n])));
