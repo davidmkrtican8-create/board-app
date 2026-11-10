@@ -2,7 +2,6 @@
 # Установка доски на свой сервер (Ubuntu 24.04 или Debian 12). Запускать от имени root.
 # Запуск: bash <(curl -fsSL https://raw.githubusercontent.com/davidmkrtican8-create/board-app/main/install.sh)
 set -euo pipefail
-REPO="${REPO:-https://github.com/davidmkrtican8-create/board-app.git}"
 APP=/opt/board
 DATA=/var/lib/board
 
@@ -29,6 +28,8 @@ fi
 
 say "Шаг 2 из 6. Устанавливаю программы (несколько минут)"
 export DEBIAN_FRONTEND=noninteractive
+# у части провайдеров IPv6 не работает, и apt висит на «Waiting for headers»: качаем по IPv4 и не ждём бесконечно
+printf 'Acquire::ForceIPv4 "true";\nAcquire::http::Timeout "25";\nAcquire::https::Timeout "25";\nAcquire::Retries "3";\n' > /etc/apt/apt.conf.d/99board-net
 apt-get update -y
 apt-get install -y curl git ca-certificates
 node_ok(){ command -v node >/dev/null && [ "$(node -p 'process.versions.node.split(".")[0]')" -ge 18 ]; }
@@ -52,12 +53,29 @@ fi
 
 say "Шаг 3 из 6. Скачиваю доску"
 id board >/dev/null 2>&1 || useradd --system --home "$APP" --shell /usr/sbin/nologin board
-if [ -d "$APP/.git" ]; then
-  git -C "$APP" fetch -q
-  git -C "$APP" reset -q --hard '@{u}'
-else
-  git clone -q "$REPO" "$APP"
-fi
+# Файлы берём по одному с raw.githubusercontent.com с повторами: из части российских дата-центров
+# git clone с github.com обрывается по таймауту, а raw-адрес работает.
+cat > /usr/local/bin/board-update <<'EOF'
+#!/usr/bin/env bash
+# Подтягивает новые файлы доски с GitHub и перезапускает доску; данные (/var/lib/board) не трогает.
+set -euo pipefail
+RAW="https://raw.githubusercontent.com/davidmkrtican8-create/board-app/main"
+APP=/opt/board
+T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
+get(){ curl -4 -fsS --retry 4 --retry-delay 3 --retry-all-errors --connect-timeout 15 --max-time 180 "$RAW/$1?t=$(date +%s)" -o "$T/$1"; }
+get files.txt
+FILES="$(grep -E '^[A-Za-z0-9._-]+$' "$T/files.txt" || true)"
+[ -n "$FILES" ] || exit 1
+changed=0
+for f in $FILES; do get "$f"; cmp -s "$T/$f" "$APP/$f" || changed=1; done
+[ "$changed" = 1 ] || exit 0
+mkdir -p "$APP"
+for f in $FILES; do install -m 0644 "$T/$f" "$APP/$f"; done
+[ "${1:-}" = "--no-restart" ] || systemctl restart board
+EOF
+chmod +x /usr/local/bin/board-update
+/usr/local/bin/board-update --no-restart || die "не удалось скачать файлы доски с GitHub. Запустите установку ещё раз через пару минут."
+[ -f "$APP/server.js" ] || die "файлы доски не скачались"
 mkdir -p "$DATA" /var/backups/board
 chown -R board:board "$DATA"
 
@@ -91,18 +109,6 @@ if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then
 fi
 
 say "Шаг 5 из 6. Автообновление и копии"
-cat > /usr/local/bin/board-update <<'EOF'
-#!/usr/bin/env bash
-# Подтягивает новые файлы с GitHub и перезапускает доску; данные не трогает.
-set -e
-cd /opt/board
-git fetch -q
-if [ "$(git rev-parse HEAD)" != "$(git rev-parse '@{u}')" ]; then
-  git reset -q --hard '@{u}'
-  systemctl restart board
-fi
-EOF
-chmod +x /usr/local/bin/board-update
 cat > /etc/cron.d/board <<EOF
 */5 * * * * root /usr/local/bin/board-update >/dev/null 2>&1
 0 4 * * * root tar czf /var/backups/board/board-\$(date +\%F).tgz -C /var/lib board && find /var/backups/board -name 'board-*.tgz' -mtime +14 -delete
