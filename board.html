@@ -847,7 +847,7 @@ function flushErase(){ // стёртое уходит одним сообщен�
 }
 function eraseAt(x,y){
  const ps=strokes[page]||{},rad=16/view.s;let any=false;
- for(const id in ps)if(ps[id].k!=='ers'&&hit(ps[id],x,y,rad,false)){delete ps[id];pendPage=page;pendErase.push(id);any=true}
+ for(const id in ps)if(ps[id].k!=='ers'&&hit(ps[id],x,y,rad,false)){if(cur&&cur.gone)cur.gone.push({id:id,stroke:ps[id]});delete ps[id];pendPage=page;pendErase.push(id);any=true} // стёртое запоминаем для ⌘Z
  // картинки и задачи ластик не трогает — их удаляют кнопкой 🗑 (инструмент «Двигать» → клик по картинке)
  if(any){rd();if(!eraseT)eraseT=setTimeout(flushErase,70)}
 }
@@ -949,7 +949,7 @@ cv.addEventListener('pointerdown',e=>{
    editImg=null;redraw();
   }
  }
- if(t==='er'){cur={erasing:1};eraseAt(p[0],p[1]);return}
+ if(t==='er'){cur={erasing:1,gone:[]};eraseAt(p[0],p[1]);return}
  if(t==='text'){const id=strokeAt(p[0],p[1],true,true);openText(id?strokes[page][id].pts[0]:p[0],id?strokes[page][id].pts[1]:p[1],id);return}
  if(t==='mv'){ // двигать: сначала фигуры/линии/текст, потом картинки; пустое место — листаем доску
   const hh=handleAt(p[0],p[1]);
@@ -1028,7 +1028,7 @@ function end(e){
  if(e.pointerType==='touch'){ptrs.delete(e.pointerId);if(ptrs.size<2)gest=null}
  if(pan&&pan.id===e.pointerId){pan=null;setCursor();return}
  if(cur&&curPid!==null&&e.pointerId!==curPid)return; // ладонь оторвалась — линию пера не обрываем
- clearTimeout(holdT);if(!cur)return;const s=cur;cur=null;curPid=null;if(s.erasing){flushErase();return}
+ clearTimeout(holdT);if(!cur)return;const s=cur;cur=null;curPid=null;if(s.erasing){flushErase();if(s.gone&&s.gone.length){mine.push({page:page,dels:s.gone});redo=[]}return}
  if(s.mvs){const sk=(strokes[page]||{})[s.mvs];if(sk)send({t:'strokeset',page:page,id:s.mvs,pts:sk.pts});return}
  if(s.laser){laserFlush();return}
  if(s.orbit){const sk=(strokes[page]||{})[s.orbit];if(sk)send({t:'stroke',page:page,stroke:clean(sk)});return}
@@ -1155,6 +1155,7 @@ function restoreObj(pg,d){
 }
 function undo(){
  const m=mine.pop();if(!m)return;
+ if(m.dels){m.dels.forEach(d=>restoreObj(m.page,d));redo.push({page:m.page,redels:m.dels});redraw();return} // вернуть стёртое ластиком
  if(m.del){restoreObj(m.page,m.del);redo.push({page:m.page,id:m.id,redel:m.del});redraw();return} // вернуть удалённое
  const o=(strokes[m.page]||{})[m.id],g=(images[m.page]||{})[m.id];
  if(o){redo.push({page:m.page,id:m.id,stroke:o});delete strokes[m.page][m.id]}
@@ -1163,6 +1164,7 @@ function undo(){
 }
 function redoAct(){
  const r=redo.pop();if(!r)return;
+ if(r.redels){const ids=r.redels.map(d=>d.id);ids.forEach(id=>{if(strokes[r.page])delete strokes[r.page][id]});send({t:'erase',page:r.page,ids:ids});mine.push({page:r.page,dels:r.redels});redraw();return}
  if(r.redel){if(strokes[r.page])delete strokes[r.page][r.id];if(images[r.page])delete images[r.page][r.id];send({t:'erase',page:r.page,id:r.id});mine.push({page:r.page,id:r.id,del:r.redel});redraw();return}
  if(r.stroke){(strokes[r.page]=strokes[r.page]||{})[r.id]=r.stroke;send({t:'stroke',page:r.page,stroke:clean(Object.assign({id:r.id},r.stroke))})}
  else{(images[r.page]=images[r.page]||{})[r.id]=r.img;send({t:'image',page:r.page,img:Object.assign({id:r.id},r.img)})}
@@ -1764,6 +1766,12 @@ $('vbadge').onclick=()=>setView(false);
 document.addEventListener('selectstart',e=>{const t=e.target&&e.target.nodeType===1?e.target:(e.target&&e.target.parentElement);if(!t||!/^(INPUT|TEXTAREA)$/.test(t.tagName))e.preventDefault()});
 document.addEventListener('contextmenu',e=>{if(e.target===cv||e.target===rg)e.preventDefault()});
 if('ontouchstart' in window)['gesturestart','gesturechange','gestureend'].forEach(n=>document.addEventListener(n,e=>e.preventDefault()));
+// iPad: смахивание по панели или краю в полноэкранном режиме Safari считает прокруткой страницы и выходит из полного экрана — гасим её (кроме прокручиваемых списков)
+document.addEventListener('touchmove',e=>{
+ if(!(document.fullscreenElement||document.webkitFullscreenElement||window.parent!==window))return;if(e.target===cv)return;
+ for(let n=e.target;n&&n!==document.body;n=n.parentElement){if(n.scrollHeight>n.clientHeight+2&&/(auto|scroll)/.test(getComputedStyle(n).overflowY))return;if(n.tagName==='INPUT')return}
+ e.preventDefault();
+},{passive:false});
 // список досок и режим «фокус» (убирает панели; встроенный полный экран браузера ломает клавиатуру в Safari, поэтому без него)
 function setSide(h){document.body.classList.toggle('noside',h);localStorage.setItem('noside',h?'1':'0')}
 $('hp').onclick=()=>setSide(!document.body.classList.contains('noside'));

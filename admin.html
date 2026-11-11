@@ -426,6 +426,13 @@ $('fsb').onclick=()=>{
 const onFs=()=>{document.body.classList.toggle('admfocus',!!fsEl());$('fsb').textContent=fsEl()?'⤡':'⤢'};
 document.addEventListener('fullscreenchange',onFs);document.addEventListener('webkitfullscreenchange',onFs);
 if(!(de.requestFullscreen||de.webkitRequestFullscreen))$('fsb').hidden=true;
+// iPad: в полноэкранном режиме не даём Safari прокрутить страницу (иначе он выходит из полного экрана); прокручиваемые списки работают
+document.addEventListener('touchmove',e=>{
+ if(!fsEl())return;
+ for(let n=e.target;n&&n!==document.body;n=n.parentElement){if(n.scrollHeight>n.clientHeight+2&&/(auto|scroll)/.test(getComputedStyle(n).overflowY))return;if(n.tagName==='INPUT')return}
+ e.preventDefault();
+},{passive:false});
+if('ontouchstart' in window)['gesturestart','gesturechange'].forEach(n=>document.addEventListener(n,e=>{if(fsEl())e.preventDefault()}));
 // тема кабинета и доски
 let th=localStorage.getItem('admtheme')||'auto';
 function applyTh(){document.documentElement.dataset.theme=th==='auto'?'':th;try{$('fr').contentWindow.postMessage({t:'theme',v:th},location.origin)}catch(e){}}
