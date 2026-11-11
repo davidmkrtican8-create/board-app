@@ -16,7 +16,8 @@
 *{box-sizing:border-box}html,body{height:100%;margin:0}
 html,body{overscroll-behavior:none}
 body{background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
-input,textarea{-webkit-user-select:text;user-select:text}
+#main,#main *,#side,#side *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea,#main input,#main textarea,#side input{-webkit-user-select:text;user-select:text}
 #side{width:200px;background:var(--panel);border-right:1px solid var(--bd);display:flex;flex-direction:column;padding:10px;gap:6px;overflow:auto}
 #who{font-weight:700;padding:4px 6px}
 .pg{padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1765,6 +1766,9 @@ $('vbadge').onclick=()=>setView(false);
 // защита от случайных выделений и меню на телефоне
 document.addEventListener('selectstart',e=>{const t=e.target&&e.target.nodeType===1?e.target:(e.target&&e.target.parentElement);if(!t||!/^(INPUT|TEXTAREA)$/.test(t.tagName))e.preventDefault()});
 document.addEventListener('contextmenu',e=>{if(e.target===cv||e.target===rg)e.preventDefault()});
+// iPad: ладонь на доске — долгое касание. Браузер (Safari, Яндекс) показывал меню «Скопировать / Перевести / Найти» — не даём ему начаться
+cv.addEventListener('touchstart',e=>{if(e.cancelable)e.preventDefault()},{passive:false});
+document.addEventListener('selectionchange',()=>{const a=document.activeElement;if(isTextTarget(a)||(a&&a.isContentEditable))return;const sel=window.getSelection&&getSelection();if(sel&&sel.rangeCount&&!sel.isCollapsed)sel.removeAllRanges()});
 if('ontouchstart' in window)['gesturestart','gesturechange','gestureend'].forEach(n=>document.addEventListener(n,e=>e.preventDefault()));
 // iPad: смахивание по панели или краю в полноэкранном режиме Safari считает прокруткой страницы и выходит из полного экрана — гасим её (кроме прокручиваемых списков)
 document.addEventListener('touchmove',e=>{
