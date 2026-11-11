@@ -3,6 +3,7 @@ admin.html
 board.html
 files.txt
 icon.png
+index.html
 install.sh
 package.json
 pdf.min.mjs
