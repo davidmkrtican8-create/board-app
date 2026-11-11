@@ -68,6 +68,17 @@ body.focus #main{padding:4px;gap:4px}
 #shp .it{display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;font-size:11px;line-height:1.15;text-align:center;border-color:transparent;background:transparent}
 #shp .it:hover{border-color:var(--bd);background:color-mix(in srgb,var(--ac) 8%,transparent)}#shp .it.on{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 16%,transparent)}
 #shp .it canvas{width:56px;height:40px}
+#callb.on{background:#d32f2f;color:#fff;border-color:#d32f2f}#callb.ring{background:#2e7d32;color:#fff;border-color:#2e7d32;animation:ring 1.2s ease-in-out infinite}
+@keyframes ring{50%{box-shadow:0 0 0 6px rgba(46,125,50,.25)}}
+#micb.off,#camb.off{background:color-mix(in srgb,#d32f2f 14%,var(--panel));border-color:#d32f2f;text-decoration:line-through}
+#callbox[hidden]{display:none}
+#callbox{position:absolute;right:12px;top:12px;z-index:6;background:var(--panel);border:1px solid var(--bd);border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.25);padding:6px;max-width:min(360px,calc(100% - 24px));touch-action:none}
+#callhd{display:flex;align-items:center;gap:6px;cursor:move;font-size:12px;color:var(--mut);padding:0 2px 4px}#callhd span{flex:1}#callhd button{padding:0 8px;line-height:20px}
+#tiles{display:flex;flex-wrap:wrap;gap:6px}#callbox.min #tiles{display:none}
+.tile{position:relative;width:160px;height:120px;border-radius:8px;overflow:hidden;background:#2b2638;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;text-align:center}
+.tile.me{width:96px;height:72px}.tile video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.tile.me video{transform:scaleX(-1)}
+.tile .nm{position:absolute;left:4px;bottom:4px;background:rgba(0,0,0,.55);padding:1px 6px;border-radius:6px;font-size:11px;z-index:1}
+.tile.talk{outline:3px solid #2e7d32}
 .ttx{position:absolute;z-index:4;background:transparent;border:1px dashed var(--ac);border-radius:4px;padding:0 2px;margin:0;outline:none;resize:none;overflow:hidden;line-height:1.25;font-family:system-ui,-apple-system,Arial,sans-serif;min-width:40px;-webkit-user-select:text;user-select:text}
 @media (max-width:640px){body{flex-direction:column}#side{width:100%;flex-direction:row;align-items:center;border-right:0;border-bottom:1px solid var(--bd);padding:6px}#pl{display:flex;gap:6px}.pg{flex:none}}
 </style>
@@ -87,6 +98,7 @@ body.focus #main{padding:4px;gap:4px}
   <span id="cols" class="keep"></span>
   <span id="wdw" class="keep" title="Толщина пера"><input type="range" id="wd" min="1" max="10" step="1"><span id="wdv"></span></span>
   <button id="undo" class="keep" title="Отменить (Ctrl+Z)">↶</button><button id="redo" class="keep" title="Вернуть (Ctrl+Shift+Z)">↷</button>
+  <button id="callb" class="keep tb" title="Голосовой звонок прямо на доске">📞&nbsp;Звонок</button><button id="micb" class="keep tb" hidden title="Микрофон вкл/выкл">🎤</button><button id="camb" class="keep tb" hidden title="Камера вкл/выкл">📷</button>
   <button id="zo" title="Уменьшить">−</button><button id="zi" title="Увеличить">+</button><button id="fit">По ширине</button>
   <select id="fm"><option value="">Файл…</option><option value="img">Вставить картинку…</option><option value="pdf1">Скачать PDF: эта доска</option><option value="pdfa">Скачать PDF: все доски</option><option value="clr">Очистить доску…</option><option value="delp">Удалить эту доску…</option></select>
   <button id="gear" title="Настройки">⚙</button>
@@ -114,7 +126,7 @@ body.focus #main{padding:4px;gap:4px}
    <p><b>Android:</b> меню браузера ⋮ → «Установить приложение» или «Добавить на главный экран».</p>
   </details>
  </div>
- <div id="wrap"><canvas id="cv"></canvas><canvas id="ovl"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button><button id="zfit" hidden>↺ Вернуть масштаб</button><div id="zhint" hidden>Страница приближена в браузере. Вернуть: Ctrl+0 (на Mac ⌘0)</div></div>
+ <div id="wrap"><div id="callbox" hidden><div id="callhd"><span id="callst">Звонок</span><button id="callmin" title="Свернуть/развернуть">–</button></div><div id="tiles"></div></div><canvas id="cv"></canvas><canvas id="ovl"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button><button id="zfit" hidden>↺ Вернуть масштаб</button><div id="zhint" hidden>Страница приближена в браузере. Вернуть: Ctrl+0 (на Mac ⌘0)</div></div>
 </div>
 <script>window.addEventListener('error',function(e){if(/ResizeObserver/.test(e.message||''))return;var s=document.getElementById('st');if(s)s.textContent='Ошибка в скрипте: '+(e.message||'')})</script>
 <script>
@@ -475,7 +487,8 @@ function openPage(id){page=id;live={};$('newt').hidden=true;jump=null;editImg=nu
 // ---------- сообщения от сервера ----------
 function onOp(o){
  if(o.from===me&&(o.t==='strokeset'||o.t==='imgset'||o.t==='stroke'))return; // своё эхо со старым положением заставляло объект дёргаться
- if(o.t==='init'){myName=o.name||null;$('who').textContent=o.name?'Кабинет: '+o.name:'Доска';document.title=o.name||'Доска';pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};if(!page||!pages.some(p=>p.id===page))page=pages[0].id;openPage(page);return}
+ if(o.t==='rtc'){onRtc(o);return}
+ if(o.t==='init'){callInit(o.call);myName=o.name||null;$('who').textContent=o.name?'Кабинет: '+o.name:'Доска';document.title=o.name||'Доска';pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};if(!page||!pages.some(p=>p.id===page))page=pages[0].id;openPage(page);return}
  if(o.t==='peers'){$('st').textContent=peersTxt='Онлайн: '+o.n;return}
  if(o.t==='cursor'){if(o.from!==me){cursors[o.from]={x:o.x,y:o.y,page:o.page,label:String(o.label||'Участник'),color:/^#[0-9a-f]{6}$/i.test(o.color)?o.color:'#0e9f8e',t:Date.now()};drawOverlay()}return}
  if(o.t==='live'){if(o.from!==me){live[o.from]={page:o.page,k:o.k,c:o.c,w:o.w,pts:o.pts,s:typeof o.s==='string'?o.s:undefined,a:+o.a||0};redraw()}return}
@@ -1086,6 +1099,117 @@ async function exportPDF(all){
  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);
  $('st').textContent='PDF сохранён';redraw();
 }
+
+// ---------- звонок на доске (WebRTC: звук и видео идут напрямую, через свой TURN, если напрямую нельзя) ----------
+const call={on:false,stream:null,ice:null,peers:new Map(),others:new Map(),mic:true,cam:false};
+const myLabel=()=>isTeacher?'Преподаватель':(myName||'Ученик');
+const sig=(to,kind,data)=>send({t:'rtc',kind:kind,to:to,data:data});
+function callUI(){
+ const b=$('callb'),n=call.others.size;
+ b.classList.toggle('on',call.on);b.classList.toggle('ring',!call.on&&n>0);
+ b.innerHTML=call.on?'⏹&nbsp;Завершить':n?'📞&nbsp;Присоединиться':'📞&nbsp;Звонок';
+ b.title=call.on?'Завершить звонок':n?([...call.others.values()].join(', ')+' на звонке — нажмите, чтобы присоединиться'):'Голосовой звонок прямо на доске';
+ $('micb').hidden=$('camb').hidden=!call.on;$('micb').classList.toggle('off',!call.mic);$('camb').classList.toggle('off',!call.cam);
+ $('callbox').hidden=!call.on;
+ if(call.on){const c=[...call.peers.values()].filter(p=>p.pc.connectionState==='connected').length;
+  $('callst').textContent=call.peers.size?(c?'На связи: '+c:'Соединяюсь…'):'Ждём собеседника…'}
+}
+function tile(id,label,stream,me){
+ let t=document.getElementById('tile-'+id);
+ if(!t){t=document.createElement('div');t.id='tile-'+id;t.className='tile'+(me?' me':'');
+  const v=document.createElement('video');v.autoplay=true;v.playsInline=true;v.muted=true;
+  const nm=document.createElement('span');nm.className='nm';t.append(v,nm);
+  if(!me){const a=document.createElement('audio');a.autoplay=true;t.appendChild(a)}
+  $('tiles').appendChild(t)}
+ t.querySelector('.nm').textContent=label;
+ const v=t.querySelector('video'),a=t.querySelector('audio');
+ if(stream){if(v.srcObject!==stream)v.srcObject=stream;if(a&&a.srcObject!==stream){a.srcObject=stream;a.play().catch(()=>{})}}
+ const hasV=!!stream&&stream.getVideoTracks().some(x=>x.readyState==='live'&&(me?call.cam:!x.muted));
+ v.style.display=hasV?'':'none';if(hasV)v.play().catch(()=>{});
+ return t;
+}
+function dropPeer(id){const p=call.peers.get(id);if(p){try{p.pc.close()}catch(e){}call.peers.delete(id)}const t=document.getElementById('tile-'+id);if(t)t.remove();callUI()}
+function peer(id){
+ if(call.peers.has(id))return call.peers.get(id);
+ const pol=localStorage.getItem('call-relay')==='1'?'relay':'all'; // для проверки ретранслятора
+ const pc=new RTCPeerConnection({iceServers:call.ice||[],iceTransportPolicy:pol});
+ const p={pc:pc,polite:me>id,making:false,ignore:false,stream:new MediaStream()};
+ call.peers.set(id,p);
+ call.stream.getTracks().forEach(t=>pc.addTrack(t,call.stream));
+ pc.onnegotiationneeded=async()=>{try{p.making=true;await pc.setLocalDescription();sig(id,'offer',pc.localDescription)}catch(e){}finally{p.making=false}};
+ pc.onicecandidate=e=>{if(e.candidate)sig(id,'ice',e.candidate)};
+ pc.ontrack=e=>{const s=e.streams[0];if(s)p.stream=s;else p.stream.addTrack(e.track);
+  const upd=()=>tile(id,call.others.get(id)||'Участник',p.stream);e.track.onunmute=upd;e.track.onmute=upd;e.track.onended=upd;upd()};
+ pc.onconnectionstatechange=()=>{if(pc.connectionState==='failed')pc.restartIce();callUI()};
+ tile(id,call.others.get(id)||'Участник',null);callUI();
+ return p;
+}
+async function onRtc(o){
+ if(o.from===me)return;
+ if(o.kind==='hello'){call.others.set(o.from,String((o.data&&o.data.label)||'Участник').slice(0,40));if(call.on){dropPeer(o.from);peer(o.from)}callUI();return}
+ if(o.kind==='bye'){call.others.delete(o.from);dropPeer(o.from);return}
+ if(!call.on||o.to!==me)return;
+ if(!call.others.has(o.from))call.others.set(o.from,'Участник');
+ const p=peer(o.from),pc=p.pc;
+ try{
+  if(o.kind==='offer'||o.kind==='answer'){
+   const d=o.data,clash=d.type==='offer'&&(p.making||pc.signalingState!=='stable');
+   p.ignore=!p.polite&&clash;if(p.ignore)return;
+   await pc.setRemoteDescription(d);
+   if(d.type==='offer'){await pc.setLocalDescription();sig(o.from,'answer',pc.localDescription)}
+  }else if(o.kind==='ice'){try{await pc.addIceCandidate(o.data)}catch(e){if(!p.ignore)throw e}}
+ }catch(e){console.warn('звонок:',e)}
+}
+function callInit(list){ // при (пере)подключении к доске: кто уже на звонке
+ call.others=new Map([...call.others].filter(([k])=>(list||[]).includes(k)));
+ (list||[]).forEach(id=>{if(id!==me&&!call.others.has(id))call.others.set(id,'Участник')});
+ if(call.on&&!(list||[]).includes(me)){[...call.peers.keys()].forEach(dropPeer);sig(null,'hello',{label:myLabel()});call.others.forEach((_,id)=>peer(id))}
+ callUI();
+}
+async function callStart(){
+ if(!navigator.mediaDevices||!window.RTCPeerConnection){await modal('Этот браузер не умеет звонить. Откройте доску в Chrome, Safari или Яндекс Браузере.',{ok:'Понятно'});return}
+ $('callb').disabled=true;
+ try{
+  call.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false});
+  try{call.ice=await (await fetch('/api/ice?r='+room)).json()}catch(e){call.ice=[]}
+  call.on=true;call.mic=true;call.cam=false;
+  tile('me','Вы',call.stream,true);
+  sig(null,'hello',{label:myLabel()});
+  call.others.forEach((_,id)=>peer(id));
+ }catch(e){
+  await modal(e&&e.name==='NotAllowedError'?'Браузер не дал доступ к микрофону. Разрешите его (значок 🎤 или 🔒 рядом с адресом сайта) и нажмите «Звонок» ещё раз.':'Не получилось включить микрофон: '+(e&&e.message||e),{ok:'Понятно'});
+ }finally{$('callb').disabled=false;callUI()}
+}
+function callStop(){
+ if(!call.on)return;sig(null,'bye');call.on=false;
+ [...call.peers.keys()].forEach(dropPeer);
+ if(call.stream)call.stream.getTracks().forEach(t=>t.stop());call.stream=null;
+ const t=document.getElementById('tile-me');if(t)t.remove();callUI();
+}
+async function camToggle(){
+ if(!call.on)return;
+ if(call.cam){
+  call.stream.getVideoTracks().forEach(t=>{t.stop();call.stream.removeTrack(t);call.peers.forEach(p=>{const s=p.pc.getSenders().find(x=>x.track===t);if(s)p.pc.removeTrack(s)})});
+  call.cam=false;
+ }else{
+  try{const v=(await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},height:{ideal:480},facingMode:'user'}})).getVideoTracks()[0];
+   call.stream.addTrack(v);call.peers.forEach(p=>p.pc.addTrack(v,call.stream));call.cam=true}
+  catch(e){await modal('Не получилось включить камеру. Проверьте, что браузеру разрешён доступ к камере.',{ok:'Понятно'})}
+ }
+ tile('me','Вы',call.stream,true);callUI();
+}
+$('callb').onclick=()=>call.on?callStop():callStart();
+$('micb').onclick=()=>{call.mic=!call.mic;if(call.stream)call.stream.getAudioTracks().forEach(t=>t.enabled=call.mic);callUI()};
+$('camb').onclick=camToggle;
+$('callmin').onclick=()=>{$('callbox').classList.toggle('min');$('callmin').textContent=$('callbox').classList.contains('min')?'+':'–'};
+(function(){ // окно звонка можно перетаскивать за заголовок
+ let d=null;const box=$('callbox');
+ $('callhd').addEventListener('pointerdown',e=>{if(e.target.tagName==='BUTTON')return;const r=box.getBoundingClientRect(),w=wrap.getBoundingClientRect();d={x:e.clientX-r.left,y:e.clientY-r.top,w:w};$('callhd').setPointerCapture(e.pointerId)});
+ $('callhd').addEventListener('pointermove',e=>{if(!d)return;const w=d.w;box.style.left=Math.max(0,Math.min(w.width-box.offsetWidth,e.clientX-w.left-d.x))+'px';box.style.top=Math.max(0,Math.min(w.height-box.offsetHeight,e.clientY-w.top-d.y))+'px';box.style.right='auto'});
+ $('callhd').addEventListener('pointerup',()=>{d=null});
+})();
+window.addEventListener('pagehide',()=>{if(call.on)navigator.sendBeacon&&navigator.sendBeacon('/api/'+room+'/op',JSON.stringify({t:'rtc',kind:'bye',from:me}))});
+setInterval(()=>{if(call.on)callUI()},2000);
 
 // ---------- интерфейс ----------
 $('add').onclick=()=>{const id='p'+newId(),d=new Date().toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'});let t=d,n=2;while(pages.some(p=>p.title===t))t=d+' ('+(n++)+')';send({t:'addPage',id:id,title:t});openPage(id)};

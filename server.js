@@ -120,7 +120,18 @@ function apply(s, op) {
 
 // ICE-серверы для звонков: публичные STUN, а при заданных CF_TURN_KEY_ID / CF_TURN_API_TOKEN ещё и TURN от Cloudflare
 let iceCache = { t: 0, v: null };
+// Свой TURN (coturn с use-auth-secret): при заданных TURN_SECRET и TURN_HOST выдаём временные логин/пароль на 12 часов
+function ownTurn() {
+  const s = process.env.TURN_SECRET, h = process.env.TURN_HOST;
+  if (!s || !h) return [];
+  const user = (Math.floor(Date.now() / 1000) + 12 * 3600) + ':board';
+  const credential = crypto.createHmac('sha1', s).update(user).digest('base64');
+  return [{ urls: ['stun:' + h + ':3478'] },
+    { urls: ['turn:' + h + ':3478?transport=udp', 'turn:' + h + ':3478?transport=tcp', 'turns:' + h + ':5349?transport=tcp'], username: user, credential }];
+}
 async function iceServers() {
+  const own = ownTurn();
+  if (own.length) return own.concat(ICE);
   const id = process.env.CF_TURN_KEY_ID, tok = process.env.CF_TURN_API_TOKEN;
   if (!id || !tok) return ICE;
   if (iceCache.v && Date.now() - iceCache.t < 3.6e6) return iceCache.v;
