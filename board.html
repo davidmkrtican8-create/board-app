@@ -56,7 +56,12 @@ body.focus #main{padding:4px;gap:4px}
 .tb.on{background:color-mix(in srgb,var(--ac) 16%,var(--panel));border-color:var(--ac)}
 .tb.pe{width:112px;white-space:nowrap;font-weight:600;border-radius:8px 0 0 8px;margin-right:-6px}.tb.pe.er{background:var(--ac);color:#fff;border-color:var(--ac)}
 #ersb{border-radius:0 8px 8px 0;padding:6px 7px;align-self:stretch}
-#ersp[hidden],#hlp[hidden]{display:none}
+#ersp[hidden],#hlp[hidden],#palp[hidden]{display:none}
+#palp{position:absolute;z-index:10;background:var(--panel);border:1px solid var(--bd);border-radius:12px;padding:10px;box-shadow:0 6px 24px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:8px}
+#palp h4{margin:0 2px;font-size:12px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+#palp .grid{display:grid;grid-template-columns:repeat(6,30px);gap:6px}#palp .pc{width:30px;height:30px;padding:0;border-radius:50%;border:2px solid var(--bd)}#palp .pc.on{outline:2px solid var(--ac);outline-offset:1px}
+#palp .own{display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer}#palp .own input{width:34px;height:28px;padding:0;border:0;background:none;cursor:pointer}
+.sw.pal{display:inline-flex;align-items:center;justify-content:center;font-size:14px;line-height:1}
 #hlp{position:absolute;z-index:10;background:var(--panel);border:1px solid var(--bd);border-radius:12px;padding:10px;box-shadow:0 6px 24px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:8px}
 #hlp h4{margin:0 2px;font-size:12px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
 #hlp .row{display:flex;gap:6px}#hlp .hc{width:34px;height:34px;padding:0;border-radius:8px;border:2px solid transparent}#hlp .hc.on{border-color:var(--tx)}
@@ -132,6 +137,7 @@ body.focus #main{padding:4px;gap:4px}
  <div id="shp" hidden></div>
  <div id="ersp" hidden></div>
  <div id="hlp" hidden></div>
+ <div id="palp" hidden></div>
  <div id="set" hidden>
   <h3>Настройки</h3>
   <label>Тема <select id="theme"><option value="auto">Как в системе</option><option value="light">Светлая</option><option value="dark">Тёмная</option></select></label>
@@ -309,13 +315,14 @@ function drawShape(s,col){
  ctx.restore();
 }
 // обычный ластик: штрих, который вырезает чернила (картинки и задачи под ним не стираются)
-function drawErs(s){ctx.save();ctx.globalCompositeOperation='destination-out';drawPen({pts:s.pts,w:s.w},'#000');ctx.restore()}
+function drawErs(s){ctx.save();ctx.globalCompositeOperation='destination-out';drawPen({pts:s.pts,w:s.w},'#000');ctx.restore();
+ if(hlx&&hlUsed){const keep=ctx;ctx=hlx;ctx.save();ctx.globalCompositeOperation='destination-out';drawPen({pts:s.pts,w:s.w},'#000');ctx.restore();ctx=keep}} // ластик стирает и маркер
 // маркер: полупрозрачная широкая полоса; «умножение» — текст под ним остаётся чётким
 function drawHl(s){ctx.save();ctx.globalAlpha=.42;ctx.globalCompositeOperation='multiply';drawPen({pts:s.pts,w:s.w},s.c);ctx.restore()}
 function drawStroke0(s){
  const p=s.pts,k=s.k||'pen';if(!p||p.length<2)return;
  if(k==='ers'){drawErs(s);return}
- if(k==='hl'){drawHl(s);return}
+ if(k==='hl'){if(hlx){const keep=ctx;ctx=hlx;hlUsed=true;try{drawPen({pts:s.pts,w:s.w},s.c)}finally{ctx=keep}}else drawHl(s);return}
  const col=inkCol(s.c);
  if(k==='shape'){if(s.s)drawShape(s,col);return}
  if(k==='plot'){drawPlot(s,col);return}
@@ -448,10 +455,15 @@ function sheetGrid(y0,s,e){
  ctx.stroke();
 }
 const ink=document.createElement('canvas'),ictx=ink.getContext('2d');
+const hlc=document.createElement('canvas'),hctx=hlc.getContext('2d');let hlx=null,hlUsed=false,hlDirty=true;
 function inkLayer(w,h,tf,draw){
  if(ink.width!==w||ink.height!==h){ink.width=w;ink.height=h}
+ if(hlc.width!==w||hlc.height!==h){hlc.width=w;hlc.height=h;hlDirty=false}
+ if(hlDirty){hctx.setTransform(1,0,0,1,0,0);hctx.clearRect(0,0,w,h);hlDirty=false}
+ hctx.setTransform(...tf);hlx=hctx;hlUsed=false;
  const keep=ctx;ctx=ictx;ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);ctx.setTransform(...tf);ctx.imageSmoothingQuality='high';
- try{draw()}finally{ctx=keep}
+ try{draw()}finally{ctx=keep;hlx=null}
+ if(hlUsed){hlDirty=true;ictx.save();ictx.setTransform(1,0,0,1,0,0);ictx.globalCompositeOperation='destination-over';ictx.globalAlpha=.42;ictx.drawImage(hlc,0,0);ictx.restore()}
  return ink;
 }
 function redraw(){
@@ -1291,18 +1303,20 @@ function micFilter(raw){
  const ac=call.ac||(call.ac=new AC());if(ac.state==='suspended')ac.resume().catch(()=>{});
  const src=ac.createMediaStreamSource(new MediaStream([raw]));
  const bq=(type,f,q)=>{const b=ac.createBiquadFilter();b.type=type;b.frequency.value=f;if(q)b.Q.value=q;return b};
- const hp=bq('highpass',90),lp1=bq('lowpass',3800,.7),lp2=bq('lowpass',3800,.7),gate=ac.createGain(),dst=ac.createMediaStreamDestination();
- src.connect(hp);hp.connect(lp1);lp1.connect(lp2);lp2.connect(gate);gate.connect(dst);
- const vb=bq('bandpass',900,.8),va=ac.createAnalyser(),hb=bq('highpass',4500),ha=ac.createAnalyser();
+ const hp=bq('highpass',100),lp1=bq('lowpass',3600,.7),lp2=bq('lowpass',3600,.7),gate=ac.createGain(),dst=ac.createMediaStreamDestination();
+ const dl=ac.createDelay(.2);dl.delayTime.value=.09; // звук идёт на 0,09 с позже: успеваем понять, речь это или стук, и не съесть начало слова
+ gate.gain.value=.01;src.connect(hp);hp.connect(lp1);lp1.connect(lp2);lp2.connect(dl);dl.connect(gate);gate.connect(dst);
+ const vb=bq('bandpass',1000,.6),va=ac.createAnalyser(),hb=bq('highpass',4500),ha=ac.createAnalyser();
  va.fftSize=ha.fftSize=1024;src.connect(vb);vb.connect(va);src.connect(hb);hb.connect(ha);
  const buf=new Float32Array(1024),rms=a=>{a.getFloatTimeDomainData(buf);let q=0;for(let i=0;i<buf.length;i++)q+=buf[i]*buf[i];return Math.sqrt(q/buf.length)};
- let floor=.002,open=false,last=0;
+ let floor=.002,open=false,last=-1,run=0;
  const t=setInterval(()=>{
   const v=rms(va),h=rms(ha),now=ac.currentTime;
-  floor=v<floor?v:floor*.999+v*.001; // уровень тишины подстраивается сам
-  const voice=v>Math.max(.006,floor*3)&&v>h*.2; // речь: громко в полосе голоса; один скрип (почти весь выше 4 кГц) сюда не проходит
-  if(voice)last=now;const o=now-last<.35; // держим открытым 0,35 с, чтобы не обрезать концы слов
-  if(o!==open){open=o;gate.gain.setTargetAtTime(o?1:.06,now,o?.01:.08)}
+  if(v<floor)floor=v;else if(!open&&run===0)floor=Math.min(.004,floor*.995+v*.005); // уровень тишины комнаты: подстраивается только в тишине и не выше «тихого фона»
+  const loud=v>Math.max(.008,floor*4)&&v>h*.25; // громко в полосе голоса, а не только в «скрипучей»
+  run=loud?run+1:0; // стук и скрип стилуса — короткие щелчки, речь тянется дольше
+  if(run>=4)last=now;const o=last>=0&&now-last<.3; // открываем после 80 мс речи, держим 0,3 с, чтобы не обрезать концы слов
+  if(o!==open){open=o;gate.gain.setTargetAtTime(o?1:.01,now,o?.008:.06)}
  },20);
  const tr=dst.stream.getAudioTracks()[0];
  return{track:tr,close:()=>{clearInterval(t);try{src.disconnect();gate.disconnect()}catch(e){}tr.stop()}};
@@ -1368,16 +1382,22 @@ setInterval(()=>{if(call.on)callUI()},2000);
 
 // ---------- указка: красный след, исчезает через секунду, не сохраняется ----------
 const lasers={},LASER_MS=1100;let laserBuf=[],laserT=0,laserRaf=0;
-function laserPoint(p,from){const k=from||me;(lasers[k]=lasers[k]||{page:page,pts:[]});lasers[k].page=page;lasers[k].pts.push({x:p[0],y:p[1],t:performance.now()});laserLoop()}
+function laserPoint(p,from){const k=from||me,l=(lasers[k]=lasers[k]||{page:page,pts:[]});l.page=page;const q=l.pts[l.pts.length-1],now=performance.now();
+ if(q&&Math.hypot(p[0]-q.x,p[1]-q.y)*view.s<2&&now-q.t<60){q.t=now;return} // точки ближе 2 пикселей не копим
+ l.pts.push({x:p[0],y:p[1],t:now});laserLoop()}
 function laserLoop(){if(laserRaf)return;const f=()=>{laserRaf=0;drawOverlay();if(Object.values(lasers).some(l=>l.pts.length))laserRaf=requestAnimationFrame(f)};laserRaf=requestAnimationFrame(f)}
 function laserFlush(){if(!laserBuf.length)return;send({t:'laser',page:page,pts:laserBuf});laserBuf=[]}
 function drawLasers(c){
  const now=performance.now();
  for(const k in lasers){const l=lasers[k];l.pts=l.pts.filter(q=>now-q.t<LASER_MS);if(l.page!==page||l.pts.length<1)continue;
-  c.save();c.lineCap='round';c.lineJoin='round';c.shadowColor='rgba(255,40,40,.9)';c.shadowBlur=12;
-  for(let i=1;i<l.pts.length;i++){const a=l.pts[i-1],b=l.pts[i],al=1-(now-b.t)/LASER_MS;if(b.t-a.t>250)continue;
-   c.strokeStyle='rgba(255,45,45,'+Math.max(0,al).toFixed(3)+')';c.lineWidth=2+4*al;c.beginPath();
-   c.moveTo((a.x-view.x)*view.s,(a.y-view.y)*view.s);c.lineTo((b.x-view.x)*view.s,(b.y-view.y)*view.s);c.stroke()}
+  c.save();c.lineCap='round';c.lineJoin='round';
+  // след делим на 8 ступеней яркости и рисуем каждую одним путём (раньше — сотни штрихов с размытой тенью, это и тормозило)
+  const B=8,paths=[];for(let j=0;j<B;j++)paths.push(new Path2D());
+  for(let i=1;i<l.pts.length;i++){const a=l.pts[i-1],b=l.pts[i];if(b.t-a.t>250)continue;const al=1-(now-b.t)/LASER_MS;if(al<=0)continue;
+   const P=paths[Math.min(B-1,Math.floor(al*B))];P.moveTo((a.x-view.x)*view.s,(a.y-view.y)*view.s);P.lineTo((b.x-view.x)*view.s,(b.y-view.y)*view.s)}
+  for(let j=0;j<B;j++){const al=(j+.5)/B;
+   c.strokeStyle='rgba(255,45,45,'+(al*.22).toFixed(3)+')';c.lineWidth=8+8*al;c.stroke(paths[j]); // мягкое свечение
+   c.strokeStyle='rgba(255,45,45,'+al.toFixed(3)+')';c.lineWidth=2+4*al;c.stroke(paths[j])}
   const h=l.pts[l.pts.length-1],al=1-(now-h.t)/LASER_MS;
   c.fillStyle='rgba(255,60,60,'+Math.max(0,al).toFixed(3)+')';c.beginPath();c.arc((h.x-view.x)*view.s,(h.y-view.y)*view.s,5,0,6.2832);c.fill();c.restore()}
 }
@@ -1670,10 +1690,26 @@ $('fm').onchange=async()=>{
  else if(v==='clr'&&!viewOnly&&await modal('Очистить эту доску для всех? Вернуть нельзя.',{ok:'Очистить'})){strokes[page]={};images[page]={};redraw();send({t:'clear',page:page})}
 };
 $('cp').onclick=()=>{const t=location.href;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{$('cp').textContent='Скопировано'},()=>{prompt('Ссылка:',t)});setTimeout(()=>{$('cp').textContent='Копировать ссылку'},1500)};
+function setColor(c){ // выбрать цвет пера (из быстрых кружков или палитры 🎨)
+ color=c;if(['er','ers','mv','hand','hl'].includes(tool()))setTool('pen');setCursor();
+ let q=false;document.querySelectorAll('#cols .sw').forEach(x=>{const on=x.dataset.c===c;x.classList.toggle('on',on);if(on)q=true});
+ const pb=$('palb');pb.classList.toggle('on',!q);pb.style.background=q?'':c;pb.textContent=q?'🎨':'';
+}
 ['#1a1a1a','#d32f2f','#1565c0','#2e7d32','#ef6c00','#7b1fa2'].forEach((c,i)=>{
- const b=document.createElement('button');b.className='sw'+(i?'':' on');b.style.background=c;
- b.onclick=()=>{color=c;if(['er','ers','mv','hand','hl'].includes(tool()))setTool('pen');setCursor();document.querySelectorAll('.sw').forEach(x=>x.classList.remove('on'));b.classList.add('on')};
- $('cols').appendChild(b)});
+ const b=document.createElement('button');b.className='sw'+(i?'':' on');b.style.background=c;b.dataset.c=c;
+ b.onclick=()=>setColor(c);$('cols').appendChild(b)});
+{const pb=document.createElement('button');pb.id='palb';pb.className='sw pal';pb.textContent='🎨';pb.title='Больше цветов';$('cols').appendChild(pb);
+ const PAL=['#1a1a1a','#616161','#9e9e9e','#795548','#d32f2f','#e91e63','#ff5c8a','#c2185b','#ef6c00','#ff9800','#fbc02d','#9e9d24',
+  '#2e7d32','#43a047','#00897b','#00acc1','#1565c0','#2196f3','#3f51b5','#039be5','#7b1fa2','#9c27b0','#673ab7','#9575cd'];
+ pb.onclick=()=>{const m=$('palp');if(!m.hidden){m.hidden=true;return}
+  m.innerHTML='<h4>Цвет пера</h4>';const g=document.createElement('div');g.className='grid';
+  PAL.forEach(c=>{const b=document.createElement('button');b.className='pc'+(c===color?' on':'');b.style.background=c;b.title=c;
+   b.onclick=()=>{setColor(c);m.hidden=true};g.appendChild(b)});
+  const own=document.createElement('label');own.className='own';const inp=document.createElement('input');inp.type='color';inp.value=/^#[0-9a-f]{6}$/i.test(color)?color:'#1a1a1a';
+  inp.oninput=()=>setColor(inp.value.toLowerCase());own.append(inp,document.createTextNode(' Свой цвет…'));
+  m.append(g,own);m.hidden=false;
+  m.style.top=(pb.offsetTop+pb.offsetHeight+4)+'px';m.style.left=Math.max(10,Math.min(pb.offsetLeft-100,$('main').clientWidth-m.offsetWidth-10))+'px'};
+ document.addEventListener('pointerdown',e=>{const m=$('palp');if(!m.hidden&&!m.contains(e.target)&&e.target!==pb)m.hidden=true},true)}
 $('edone').onclick=()=>{editImg=null;editStroke=null;redraw()};
 $('edel').onclick=()=>{delSel()};
 $('zfit').onclick=()=>{fit()};
