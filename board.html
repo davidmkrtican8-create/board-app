@@ -172,7 +172,8 @@ body.focus #main{padding:4px;gap:4px}
  </div>
  <div id="wrap"><div id="plots"></div><div id="solidbar" hidden><span>Тяните внутри фигуры — вращать</span><button id="sletters" title="Подписать вершины буквами">A B C</button><button id="sreset" title="Вернуть исходный вид">↺ Вид</button></div><button id="followb" hidden></button><div id="callbox" hidden><div id="callhd"><span id="callst">Звонок</span><button id="callmin" title="Свернуть/развернуть">–</button></div><div id="tiles"></div></div><canvas id="cv"></canvas><canvas id="ovl"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edel" hidden title="Удалить выделенное (клавиша Delete)">🗑 Удалить</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button><button id="zfit" hidden>↺ Вернуть масштаб</button><div id="zhint" hidden>Страница приближена в браузере. Вернуть: Ctrl+0 (на Mac ⌘0)</div></div>
 </div>
-<script>window.addEventListener('error',function(e){if(/ResizeObserver/.test(e.message||''))return;var s=document.getElementById('st');if(s)s.textContent='Ошибка в скрипте: '+(e.message||'')})</script>
+<script>var errN=0;window.addEventListener('error',function(e){if(/ResizeObserver/.test(e.message||''))return;var s=document.getElementById('st');if(s)s.textContent='Ошибка в скрипте: '+(e.message||'');
+ if(errN++<5)try{fetch('/api/log',{method:'POST',body:JSON.stringify({m:String(e.message||'').slice(0,300),l:e.lineno,c:e.colno,s:String(e.error&&e.error.stack||'').slice(0,800),u:navigator.userAgent.slice(0,200),p:location.pathname.slice(0,40)})}).catch(function(){})}catch(_){}})</script>
 <script>
 (function(){
 const cv=document.getElementById('cv'),rg=document.getElementById('ovl'),wrap=document.getElementById('wrap');
@@ -182,7 +183,7 @@ const isTeacher=window.self!==window.top;
 let pages=[],strokes={},images={},page=null,live={},color='#1a1a1a',bg='grid',cur=null,lastEmit=0,mine=[],redo=[];
 let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,lastP=[0,0],editImg=null,editStroke=null,jump=null,fingerPan=false;
 let rectC=null,rq=0,pendErase=[],pendPage=null,eraseT=0,peersTxt='';
-let curPid=null,curPen=false,viewOnly=false,dark=false,penSeen=(()=>{try{return localStorage.getItem('penSeen')==='1'}catch(e){return false}})(),myName=null,ptr=null,curTool='pen',lastCur=0,lastCurP=[-9,-9];
+let curPid=null,curPen=false,curT0=0,curX=0,curY=0,curTr=0,viewOnly=false,dark=false,penSeen=(()=>{try{return localStorage.getItem('penSeen')==='1'}catch(e){return false}})(),myName=null,ptr=null,curTool='pen',lastCur=0,lastCurP=[-9,-9];
 const views={},imgEl={},ptrs=new Map(),cursors={};
 const $=i=>document.getElementById(i),tool=()=>curTool;
 const send=op=>{op.from=me;return fetch('/api/'+room+'/op',{method:'POST',body:JSON.stringify(op)}).catch(()=>{$('st').textContent='Нет связи с сервером'})};
@@ -908,7 +909,14 @@ cv.addEventListener('pointerdown',e=>{
   if(pan&&pan.touch){pan=null;ptrs.clear();gest=null}} // ладонь начала двигать доску, а потом коснулось перо — доску больше не двигаем
  if(e.pointerType==='touch'){
   if(cur&&curPen)return; // пока пишет стилус, касания ладони и пальцев не считаем
-  if(penSeen&&S.palm&&Math.max(e.width||0,e.height||0)>60)return; // широкое касание — это ладонь
+  if(S.palm&&Math.max(e.width||0,e.height||0)>60)return; // широкое касание — это ладонь
+  // простой стилус (без Bluetooth) iPad видит как палец. Ладонь лежит НИЖЕ кончика стилуса — из нескольких касаний рисует верхнее
+  const tDraw=S.palm&&!fingerPan&&!penSeen&&tool()!=='hand'&&!viewOnly&&!space,now=performance.now();
+  if(tDraw&&cur&&curPid!==null&&curPid!==e.pointerId&&!(now-curT0<120&&curTr<15&&ptrs.size===1)){ // уже рисует одно касание, пришло второе (жест двумя пальцами — только если оба почти одновременно и первое ещё не рисовало)
+   if(e.clientY<curY-25&&(now-curT0<600||curTr<40)){ptrs.clear();if(cur.pts)clearLive();cur=null;curPid=null;redraw()} // новое выше, а «рисовала» неподвижная ладонь — убираем её след, рисует новое
+   else return; // новое ниже — это ладонь, не считаем
+  }
+  if(tDraw&&ptrs.size>=2&&e.clientY<Math.min(...[...ptrs.values()].map(q=>q.y))-25){ptrs.clear();gest=null;pan=null} // ладонь двумя местами, потом стилус сверху — рисуем стилусом
   ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(ptrs.size===2){clearTimeout(holdT);if(cur&&cur.pts)clearLive();cur=null;curPid=null;pan=null;beginGesture();return}
   if(ptrs.size>2)return;
@@ -917,7 +925,7 @@ cv.addEventListener('pointerdown',e=>{
  const t=tool();
  const panMode=e.button===1||space||t==='hand'||viewOnly||(e.pointerType==='touch'&&(fingerPan||(S.palm&&penSeen)));
  if(panMode){pan={id:e.pointerId,touch:e.pointerType==='touch',x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};cv.style.cursor='grabbing';return}
- curPid=e.pointerId;curPen=e.pointerType==='pen'; // рисует только это касание; другие (ладонь) линию не трогают
+ curPid=e.pointerId;curPen=e.pointerType==='pen';curT0=performance.now();curX=e.clientX;curY=e.clientY;curTr=0; // рисует только это касание; другие (ладонь) линию не трогают
  const p=pos(e);lastP=p;
  if(t==='laser'){editStroke=null;editImg=null;cur={laser:1};laserBuf.push(p[0],p[1]);laserPoint(p);return}
  if(e.altKey&&t!=='er'){const ia=imgAt(p[0],p[1]);if(ia){editImg=ia;redraw();return}} // Alt+клик по картинке — править её
@@ -969,6 +977,7 @@ cv.addEventListener('pointermove',e=>{
  }
  if(pan&&pan.id===e.pointerId){view.x=pan.vx-(e.clientX-pan.x)/view.s;view.y=pan.vy-(e.clientY-pan.y)/view.s;redraw();userView();return}
  if(cur&&curPid!==null&&e.pointerId!==curPid)return; // чужое касание (ладонь) не дорисовывает линию
+ if(cur&&e.pointerId===curPid){curTr+=Math.hypot(e.clientX-curX,e.clientY-curY);curX=e.clientX;curY=e.clientY}
  if(!cur&&editStroke&&e.pointerType!=='touch'&&!space){
   const q=pos(e),sk=(strokes[page]||{})[editStroke];
   if(sk)cv.style.cursor=onRotHandle(sk,q)?'grab':inBox(strokeBox(sk),q[0],q[1])?'move':(S.ring&&ringTools.includes(tool())?'none':'crosshair');

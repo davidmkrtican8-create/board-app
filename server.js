@@ -237,6 +237,7 @@ function account(req, res, u) { // вход и регистрация (без а
   res.writeHead(404); res.end();
 }
 const json = (res, v) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(v)); };
+let logMin = 0, logN = 0;
 function body(req, res, lim, cb) {
   let b = '';
   req.on('data', c => { b += c; if (b.length > lim) req.destroy(); });
@@ -340,6 +341,11 @@ http.createServer((req, res) => {
     const rr = String(u.searchParams.get('r') || '');
     if (!RID.test(rr) || !room(rr)) { res.writeHead(404); return res.end(); }
     return iceServers().then(v => json(res, v));
+  }
+  if (req.method === 'POST' && u.pathname === '/api/log') { // ошибки скрипта у пользователей — в журнал сервера (journalctl -u board)
+    const mn = Math.floor(Date.now() / 60000); if (logMin !== mn) { logMin = mn; logN = 0; }
+    if (++logN > 60) { res.writeHead(204); return res.end(); }
+    return body(req, res, 4000, j => { console.log('client-error', JSON.stringify(j).slice(0, 1500)); res.writeHead(204); res.end(); });
   }
   const m = u.pathname.match(/^\/api\/([a-z0-9]{4,32})\/(events|op)$/);
   if (m) {
