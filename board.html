@@ -1074,7 +1074,8 @@ function restoreObj(pg,d){
 }
 function undo(){
  const m=mine.pop();if(!m)return;
- if(m.del){restoreObj(m.page,m.del);redo.push({page:m.page,id:m.id,redel:m.del});redraw();return} // вернуть удалённоеconst o=(strokes[m.page]||{})[m.id],g=(images[m.page]||{})[m.id];
+ if(m.del){restoreObj(m.page,m.del);redo.push({page:m.page,id:m.id,redel:m.del});redraw();return} // вернуть удалённое
+ const o=(strokes[m.page]||{})[m.id],g=(images[m.page]||{})[m.id];
  if(o){redo.push({page:m.page,id:m.id,stroke:o});delete strokes[m.page][m.id]}
  else if(g){redo.push({page:m.page,id:m.id,img:g});delete images[m.page][m.id]}else return;
  send({t:'erase',page:m.page,id:m.id});redraw();
