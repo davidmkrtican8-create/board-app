@@ -7,7 +7,7 @@ const ADMIN = process.env.ADMIN_KEY || '';
 fs.mkdirSync(DIR, { recursive: true });
 const rooms = {};
 const ID = /^[\w-]{1,40}$/, RID = /^[a-z0-9]{4,32}$/;
-const KINDS = ['pen', 'ers', 'line', 'arrow', 'rect', 'ellipse', 'poly', 'text', 'axes', 'shape', 'plot', 'solid'];
+const KINDS = ['pen', 'ers', 'line', 'arrow', 'rect', 'ellipse', 'poly', 'text', 'axes', 'shape', 'plot', 'solid', 'hl'];
 const SOLIDS = ['cube', 'box', 'prism', 'pyr', 'tetra', 'cyl', 'cone', 'sphere']; // вращаемые 3D-тела
 // готовые фигуры: плоские и объёмные (школьная программа)
 const SHAPES = ['tri', 'rtri', 'square', 'circle', 'para', 'trap', 'rhomb', 'hex', 'cube', 'box', 'prism', 'pyr', 'tetra', 'cyl', 'cone', 'sphere'];
@@ -53,7 +53,7 @@ function apply(s, op) {
       if (!k || typeof k.id !== 'string' || !ID.test(k.id) || !Array.isArray(k.pts) || k.pts.length > 20000 || !/^#[0-9a-f]{3,6}$/i.test(k.c)) return false;
       const kind = KINDS.includes(k.k) ? k.k : 'pen';
       const single = kind === 'text' || kind === 'axes' || kind === 'plot';
-      if (kind === 'poly' ? (k.pts.length < 6 || k.pts.length > 40 || k.pts.length % 2) : single ? k.pts.length !== 2 : (kind !== 'pen' && kind !== 'ers' && k.pts.length !== 4)) return false;
+      if (kind === 'poly' ? (k.pts.length < 6 || k.pts.length > 40 || k.pts.length % 2) : single ? k.pts.length !== 2 : (kind !== 'pen' && kind !== 'ers' && kind !== 'hl' && k.pts.length !== 4)) return false;
       const pts = k.pts.map(Number);
       if (!pts.every(Number.isFinite)) return false;
       const o = { k: kind, pts, c: k.c, w: num(k.w, 0.05, 300, 4) };
