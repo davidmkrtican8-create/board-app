@@ -30,6 +30,18 @@ button{cursor:pointer}
 button.pri{background:var(--ac);color:#fff;border-color:var(--ac)}
 #main{flex:1;min-width:0;display:flex;flex-direction:column;padding:10px;gap:8px;position:relative}
 #bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#more{display:none}
+/* планшет (iPad): крупные кнопки под палец, редкие — под «⋯», у кнопок только значки */
+body.compact #more{display:inline-block}
+body.compact #bar .opt{display:none;order:10}body.compact #title{max-width:220px}body.compact.moreopen #bar .opt{display:revert}body.compact.moreopen #more{background:color-mix(in srgb,var(--ac) 16%,transparent);border-color:var(--ac)}
+body.compact .lbl{display:none}
+body.compact #bar{gap:5px}
+body.compact #bar>button,body.compact #bar>select{min-height:42px;min-width:42px;padding:6px 8px;font-size:17px}
+body.compact .tb.pe{width:52px}
+body.compact #undo,body.compact #redo{font-size:22px;min-width:46px}
+body.compact .sw{width:32px;height:32px}
+body.compact #wd{width:64px}body.compact #wdv{display:none}
+body.compact #main{padding:6px;gap:6px}
 #title{flex:1;min-width:120px;font-weight:600}
 .sw{width:26px;height:26px;border-radius:50%;padding:0;border:2px solid var(--bd)}.sw.on{outline:2px solid var(--ac)}
 #wrap{flex:1;min-height:0;position:relative;overflow:hidden;border:1px solid var(--bd);border-radius:10px;background:var(--sur)}
@@ -113,25 +125,26 @@ body.focus #main{padding:4px;gap:4px}
 <div id="main">
  <div id="bar">
   <button id="hp" title="Скрыть или показать список досок">◧</button>
-  <input id="title" placeholder="Название доски">
+  <input id="title" class="opt" placeholder="Название доски">
   <button id="pe" class="keep tb pe" title="Переключить перо ⇄ ластик (E — ластик, P — перо)"></button>
   <button id="ersb" class="keep tb" title="Какой ластик: размер или «стирает объект целиком»">▾</button>
   <button id="thl" class="keep tb" title="Маркер: выделить или подчеркнуть (клавиша H). Ровная полоса — если вести прямо">🖍&nbsp;Маркер&nbsp;▾</button>
-  <button id="ttext" class="keep tb" title="Печатать текст">T&nbsp;Текст</button>
+  <button id="ttext" class="keep tb" title="Печатать текст">T<span class="lbl">&nbsp;Текст</span></button>
   <button id="tshape" class="keep tb" title="Линии, фигуры, объёмные тела, координатная плоскость">△&nbsp;Фигуры&nbsp;▾</button>
-  <button id="tmv" class="tb" title="Двигать фигуры, текст и картинки">⤧&nbsp;Двигать</button>
-  <button id="thand" class="tb" title="Двигать доску (или пробел + мышь)">✋&nbsp;Рука</button>
-  <button id="tlaser" class="keep tb" title="Указка: красный след исчезает через секунду (клавиша L)">🔴&nbsp;Указка</button>
-  <button id="leadb" class="keep tb" hidden title="Ученик будет видеть то же место доски, что и вы">👁&nbsp;За&nbsp;мной</button>
+  <button id="tmv" class="tb" title="Двигать фигуры, текст и картинки">⤧<span class="lbl">&nbsp;Двигать</span></button>
+  <button id="thand" class="tb" title="Двигать доску (или пробел + мышь)">✋<span class="lbl">&nbsp;Рука</span></button>
+  <button id="tlaser" class="keep tb" title="Указка: красный след исчезает через секунду (клавиша L)">🔴<span class="lbl">&nbsp;Указка</span></button>
+  <button id="leadb" class="keep tb" hidden title="Ученик будет видеть то же место доски, что и вы">👁<span class="lbl">&nbsp;За&nbsp;мной</span></button>
   <span id="cols" class="keep"></span>
   <span id="wdw" class="keep" title="Толщина пера"><input type="range" id="wd" min="1" max="10" step="1"><span id="wdv"></span></span>
   <button id="undo" class="keep" title="Отменить (Ctrl+Z)">↶</button><button id="redo" class="keep" title="Вернуть (Ctrl+Shift+Z)">↷</button>
-  <button id="callb" class="keep tb" title="Голосовой звонок прямо на доске">📞&nbsp;Звонок</button><button id="micb" class="keep tb" hidden title="Микрофон вкл/выкл">🎤</button><button id="camb" class="keep tb" hidden title="Камера вкл/выкл">📷</button>
-  <button id="zo" title="Уменьшить">−</button><button id="zi" title="Увеличить">+</button><button id="fit">По ширине</button>
-  <select id="fm"><option value="">Файл…</option><option value="img">Вставить картинку…</option><option value="pdf1">Скачать PDF: эта доска</option><option value="pdfa">Скачать PDF: все доски</option><option value="clr">Очистить доску…</option><option value="delp">Удалить эту доску…</option></select>
-  <button id="gear" title="Настройки">⚙</button>
-  <button id="fs2" class="keep" title="Фокус: убрать панели">⛶</button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button>
-  <span id="st">Подключение…</span>
+  <button id="callb" class="keep tb" title="Голосовой звонок прямо на доске">📞<span class="lbl">&nbsp;Звонок</span></button><button id="micb" class="keep tb" hidden title="Микрофон вкл/выкл">🎤</button><button id="camb" class="keep tb" hidden title="Камера вкл/выкл">📷</button>
+  <button id="more" class="keep" title="Ещё: масштаб, файл, настройки, весь экран">⋯</button>
+  <button id="zo" class="opt" title="Уменьшить">−</button><button id="zi" class="opt" title="Увеличить">+</button><button id="fit" class="opt">По ширине</button>
+  <select id="fm" class="opt"><option value="">Файл…</option><option value="img">Вставить картинку…</option><option value="pdf1">Скачать PDF: эта доска</option><option value="pdfa">Скачать PDF: все доски</option><option value="clr">Очистить доску…</option><option value="delp">Удалить эту доску…</option></select>
+  <button id="gear" class="opt" title="Настройки">⚙</button>
+  <button id="fs2" class="keep opt" title="Фокус: убрать панели">⛶</button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button>
+  <span id="st" class="opt">Подключение…</span>
   <input type="file" id="fi" accept="image/*" hidden>
  </div>
  <div id="shp" hidden></div>
@@ -169,7 +182,7 @@ const isTeacher=window.self!==window.top;
 let pages=[],strokes={},images={},page=null,live={},color='#1a1a1a',bg='grid',cur=null,lastEmit=0,mine=[],redo=[];
 let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,lastP=[0,0],editImg=null,editStroke=null,jump=null,fingerPan=false;
 let rectC=null,rq=0,pendErase=[],pendPage=null,eraseT=0,peersTxt='';
-let viewOnly=false,dark=false,penSeen=false,myName=null,ptr=null,curTool='pen',lastCur=0,lastCurP=[-9,-9];
+let curPid=null,curPen=false,viewOnly=false,dark=false,penSeen=(()=>{try{return localStorage.getItem('penSeen')==='1'}catch(e){return false}})(),myName=null,ptr=null,curTool='pen',lastCur=0,lastCurP=[-9,-9];
 const views={},imgEl={},ptrs=new Map(),cursors={};
 const $=i=>document.getElementById(i),tool=()=>curTool;
 const send=op=>{op.from=me;return fetch('/api/'+room+'/op',{method:'POST',body:JSON.stringify(op)}).catch(()=>{$('st').textContent='Нет связи с сервером'})};
@@ -891,16 +904,20 @@ cv.addEventListener('pointerdown',e=>{
  if(e.pointerType==='mouse'&&e.button===2)return;
  if(tbox&&e.target===cv)closeText();
  try{cv.setPointerCapture(e.pointerId)}catch(_){}
- if(e.pointerType==='pen')penSeen=true;
+ if(e.pointerType==='pen'){if(!penSeen){penSeen=true;try{localStorage.setItem('penSeen','1')}catch(_){}} // запоминаем: на этом планшете есть стилус
+  if(pan&&pan.touch){pan=null;ptrs.clear();gest=null}} // ладонь начала двигать доску, а потом коснулось перо — доску больше не двигаем
  if(e.pointerType==='touch'){
+  if(cur&&curPen)return; // пока пишет стилус, касания ладони и пальцев не считаем
+  if(penSeen&&S.palm&&Math.max(e.width||0,e.height||0)>60)return; // широкое касание — это ладонь
   ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(ptrs.size===2){clearTimeout(holdT);if(cur&&cur.pts)clearLive();cur=null;pan=null;beginGesture();return}
+  if(ptrs.size===2){clearTimeout(holdT);if(cur&&cur.pts)clearLive();cur=null;curPid=null;pan=null;beginGesture();return}
   if(ptrs.size>2)return;
  }
  if(!page)return;
  const t=tool();
  const panMode=e.button===1||space||t==='hand'||viewOnly||(e.pointerType==='touch'&&(fingerPan||(S.palm&&penSeen)));
- if(panMode){pan={id:e.pointerId,x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};cv.style.cursor='grabbing';return}
+ if(panMode){pan={id:e.pointerId,touch:e.pointerType==='touch',x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};cv.style.cursor='grabbing';return}
+ curPid=e.pointerId;curPen=e.pointerType==='pen'; // рисует только это касание; другие (ладонь) линию не трогают
  const p=pos(e);lastP=p;
  if(t==='laser'){editStroke=null;editImg=null;cur={laser:1};laserBuf.push(p[0],p[1]);laserPoint(p);return}
  if(e.altKey&&t!=='er'){const ia=imgAt(p[0],p[1]);if(ia){editImg=ia;redraw();return}} // Alt+клик по картинке — править её
@@ -951,6 +968,7 @@ cv.addEventListener('pointermove',e=>{
   if(gest&&ptrs.size>=2){doGesture();return}
  }
  if(pan&&pan.id===e.pointerId){view.x=pan.vx-(e.clientX-pan.x)/view.s;view.y=pan.vy-(e.clientY-pan.y)/view.s;redraw();userView();return}
+ if(cur&&curPid!==null&&e.pointerId!==curPid)return; // чужое касание (ладонь) не дорисовывает линию
  if(!cur&&editStroke&&e.pointerType!=='touch'&&!space){
   const q=pos(e),sk=(strokes[page]||{})[editStroke];
   if(sk)cv.style.cursor=onRotHandle(sk,q)?'grab':inBox(strokeBox(sk),q[0],q[1])?'move':(S.ring&&ringTools.includes(tool())?'none':'crosshair');
@@ -1000,7 +1018,8 @@ cv.addEventListener('pointermove',e=>{
 function end(e){
  if(e.pointerType==='touch'){ptrs.delete(e.pointerId);if(ptrs.size<2)gest=null}
  if(pan&&pan.id===e.pointerId){pan=null;setCursor();return}
- clearTimeout(holdT);if(!cur)return;const s=cur;cur=null;if(s.erasing){flushErase();return}
+ if(cur&&curPid!==null&&e.pointerId!==curPid)return; // ладонь оторвалась — линию пера не обрываем
+ clearTimeout(holdT);if(!cur)return;const s=cur;cur=null;curPid=null;if(s.erasing){flushErase();return}
  if(s.mvs){const sk=(strokes[page]||{})[s.mvs];if(sk)send({t:'strokeset',page:page,id:s.mvs,pts:sk.pts});return}
  if(s.laser){laserFlush();return}
  if(s.orbit){const sk=(strokes[page]||{})[s.orbit];if(sk)send({t:'stroke',page:page,stroke:clean(sk)});return}
@@ -1236,7 +1255,7 @@ const sig=(to,kind,data)=>send({t:'rtc',kind:kind,to:to,data:data});
 function callUI(){
  const b=$('callb'),n=call.others.size;
  b.classList.toggle('on',call.on);b.classList.toggle('ring',!call.on&&n>0);
- b.innerHTML=call.on?'⏹&nbsp;Завершить':n?'📞&nbsp;Присоединиться':'📞&nbsp;Звонок';
+ b.innerHTML=call.on?'⏹<span class="lbl">&nbsp;Завершить</span>':n?'📞<span class="lbl">&nbsp;Присоединиться</span>':'📞<span class="lbl">&nbsp;Звонок</span>';
  b.title=call.on?'Завершить звонок':n?([...call.others.values()].join(', ')+' на звонке — нажмите, чтобы присоединиться'):'Голосовой звонок прямо на доске';
  $('micb').hidden=$('camb').hidden=!call.on;$('micb').classList.toggle('off',!call.mic);$('camb').classList.toggle('off',!call.cam);
  $('callbox').hidden=!call.on;
@@ -1614,11 +1633,12 @@ function setTool(v){
 function togglePE(){setTool(tool()==='pen'?ersTool():'pen')} // перо ⇄ ластик одной кнопкой
 function updTools(){
  const t=tool(),er=isEr(t),pe=$('pe');
- pe.textContent=t==='pen'?'🧽 Ластик':'✏️ Перо';pe.classList.toggle('er',er);
+ const cmp=document.body.classList.contains('compact');
+ pe.textContent=t==='pen'?(cmp?'🧽':'🧽 Ластик'):(cmp?'✏️':'✏️ Перо');pe.classList.toggle('er',er);
  pe.title=(t==='pen'?'Сейчас перо. Нажмите — ластик':er?'Сейчас ластик. Нажмите — перо':'Взять перо')+' (E — ластик, P — перо)';
- $('ttext').classList.toggle('on',t==='text');$('thl').classList.toggle('on',t==='hl');$('thl').innerHTML='<i style="background:'+hlC()+'"></i>Маркер&nbsp;▾';$('tmv').classList.toggle('on',t==='mv');$('tlaser').classList.toggle('on',t==='laser');$('thand').classList.toggle('on',t==='hand');
+ $('ttext').classList.toggle('on',t==='text');$('thl').classList.toggle('on',t==='hl');$('thl').innerHTML='<i style="background:'+hlC()+'"></i>'+(cmp?'▾':'Маркер&nbsp;▾');$('tmv').classList.toggle('on',t==='mv');$('tlaser').classList.toggle('on',t==='laser');$('thand').classList.toggle('on',t==='hand');
  const it=SHAPE_MENU.flatMap(g=>g[1]).find(x=>x[0]===t);
- $('tshape').classList.toggle('on',!!it);$('tshape').textContent=(it?it[1].replace(/­/g,''):'△ Фигуры')+' ▾';
+ $('tshape').classList.toggle('on',!!it);$('tshape').textContent=cmp?'△ ▾':(it?it[1].replace(/­/g,''):'△ Фигуры')+' ▾';
  document.querySelectorAll('#shp .it').forEach(b=>b.classList.toggle('on',b.dataset.v===t));
 }
 const SHAPE_MENU=[
@@ -1739,6 +1759,12 @@ if('ontouchstart' in window)['gesturestart','gesturechange','gestureend'].forEac
 function setSide(h){document.body.classList.toggle('noside',h);localStorage.setItem('noside',h?'1':'0')}
 $('hp').onclick=()=>setSide(!document.body.classList.contains('noside'));
 if(localStorage.getItem('noside')==='1')setSide(true);
+// планшет/телефон (палец вместо мыши): компактная панель; список досок по умолчанию скрыт (◧ — показать)
+const coarse=window.matchMedia?matchMedia('(pointer:coarse)'):null;
+function applyCompact(){document.body.classList.toggle('compact',!!(coarse&&coarse.matches));updTools();setTimeout(resize,30)}
+if(coarse){applyCompact();if(coarse.addEventListener)coarse.addEventListener('change',applyCompact);
+ if(coarse.matches&&localStorage.getItem('noside')===null)document.body.classList.add('noside')}
+$('more').onclick=()=>{document.body.classList.toggle('moreopen');setTimeout(resize,30)};
 $('fs2').onclick=()=>{document.body.classList.toggle('focus');setTimeout(resize,30)};
 if(isTeacher)$('fs2').hidden=true; // в кабинете преподавателя эта кнопка есть сверху
 // настоящий полный экран: панели браузера исчезают, вместе с ним включается «фокус»; выход — Esc или ещё раз ⤢
