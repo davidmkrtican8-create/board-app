@@ -79,6 +79,19 @@ body.focus #main{padding:4px;gap:4px}
 .tile.me{width:96px;height:72px}.tile video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.tile.me video{transform:scaleX(-1)}
 .tile .nm{position:absolute;left:4px;bottom:4px;background:rgba(0,0,0,.55);padding:1px 6px;border-radius:6px;font-size:11px;z-index:1}
 .tile.talk{outline:3px solid #2e7d32}
+#leadb.on{background:#2e7d32;color:#fff;border-color:#2e7d32}
+#followb{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:5;border-radius:999px;font-size:13px;padding:5px 12px;box-shadow:0 2px 10px rgba(0,0,0,.2)}
+#followb.go{background:var(--ac);color:#fff;border-color:var(--ac)}
+#plots{position:absolute;inset:0;pointer-events:none;z-index:4;overflow:hidden}
+.plotp{position:absolute;pointer-events:auto;background:color-mix(in srgb,var(--panel) 94%,transparent);border:1px solid var(--bd);border-radius:10px;padding:6px 8px;font-size:13px;box-shadow:0 3px 12px rgba(0,0,0,.15);min-width:190px;max-width:260px}
+.plotp .ph{display:flex;align-items:center;gap:6px;font-weight:600;margin-bottom:2px}.plotp .ph span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plotp .ph button{padding:0 7px;line-height:18px;font-size:12px}
+.plotp label{display:flex;align-items:center;gap:6px;margin:3px 0}.plotp label b{width:12px;font-style:italic}.plotp input[type=range]{flex:1;min-width:0;padding:0;border:0;background:none;accent-color:var(--ac)}
+.plotp output{width:40px;text-align:right;font-variant-numeric:tabular-nums}
+.plotp.min label{display:none}
+#solidbar[hidden]{display:none}
+#solidbar{position:absolute;z-index:5;display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:4px 6px;font-size:12px;color:var(--mut);box-shadow:0 3px 12px rgba(0,0,0,.15);white-space:nowrap}
+#solidbar button{font-size:12px;padding:2px 8px}#solidbar button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
 .ttx{position:absolute;z-index:4;background:transparent;border:1px dashed var(--ac);border-radius:4px;padding:0 2px;margin:0;outline:none;resize:none;overflow:hidden;line-height:1.25;font-family:system-ui,-apple-system,Arial,sans-serif;min-width:40px;-webkit-user-select:text;user-select:text}
 @media (max-width:640px){body{flex-direction:column}#side{width:100%;flex-direction:row;align-items:center;border-right:0;border-bottom:1px solid var(--bd);padding:6px}#pl{display:flex;gap:6px}.pg{flex:none}}
 </style>
@@ -95,6 +108,8 @@ body.focus #main{padding:4px;gap:4px}
   <button id="tshape" class="keep tb" title="Линии, фигуры, объёмные тела, координатная плоскость">△&nbsp;Фигуры&nbsp;▾</button>
   <button id="tmv" class="tb" title="Двигать фигуры, текст и картинки">⤧&nbsp;Двигать</button>
   <button id="thand" class="tb" title="Двигать доску (или пробел + мышь)">✋&nbsp;Рука</button>
+  <button id="tlaser" class="keep tb" title="Указка: красный след исчезает через секунду (клавиша L)">🔴&nbsp;Указка</button>
+  <button id="leadb" class="keep tb" hidden title="Ученик будет видеть то же место доски, что и вы">👁&nbsp;За&nbsp;мной</button>
   <span id="cols" class="keep"></span>
   <span id="wdw" class="keep" title="Толщина пера"><input type="range" id="wd" min="1" max="10" step="1"><span id="wdv"></span></span>
   <button id="undo" class="keep" title="Отменить (Ctrl+Z)">↶</button><button id="redo" class="keep" title="Вернуть (Ctrl+Shift+Z)">↷</button>
@@ -126,7 +141,7 @@ body.focus #main{padding:4px;gap:4px}
    <p><b>Android:</b> меню браузера ⋮ → «Установить приложение» или «Добавить на главный экран».</p>
   </details>
  </div>
- <div id="wrap"><div id="callbox" hidden><div id="callhd"><span id="callst">Звонок</span><button id="callmin" title="Свернуть/развернуть">–</button></div><div id="tiles"></div></div><canvas id="cv"></canvas><canvas id="ovl"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button><button id="zfit" hidden>↺ Вернуть масштаб</button><div id="zhint" hidden>Страница приближена в браузере. Вернуть: Ctrl+0 (на Mac ⌘0)</div></div>
+ <div id="wrap"><div id="plots"></div><div id="solidbar" hidden><span>Тяните внутри фигуры — вращать</span><button id="sletters" title="Подписать вершины буквами">A B C</button><button id="sreset" title="Вернуть исходный вид">↺ Вид</button></div><button id="followb" hidden></button><div id="callbox" hidden><div id="callhd"><span id="callst">Звонок</span><button id="callmin" title="Свернуть/развернуть">–</button></div><div id="tiles"></div></div><canvas id="cv"></canvas><canvas id="ovl"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button><button id="zfit" hidden>↺ Вернуть масштаб</button><div id="zhint" hidden>Страница приближена в браузере. Вернуть: Ctrl+0 (на Mac ⌘0)</div></div>
 </div>
 <script>window.addEventListener('error',function(e){if(/ResizeObserver/.test(e.message||''))return;var s=document.getElementById('st');if(s)s.textContent='Ошибка в скрипте: '+(e.message||'')})</script>
 <script>
@@ -272,6 +287,8 @@ function drawStroke0(s){
  if(k==='ers'){drawErs(s);return}
  const col=inkCol(s.c);
  if(k==='shape'){if(s.s)drawShape(s,col);return}
+ if(k==='plot'){drawPlot(s,col);return}
+ if(k==='solid'){drawSolid(s,col);return}
  if(k==='text'){if(!s.s)return;ctx.fillStyle=col;ctx.font=s.w+'px '+FONT;ctx.textBaseline='top';ctx.textAlign='left';s.s.split('\n').forEach((l,i)=>ctx.fillText(l,p[0],p[1]+i*s.w*1.25));return}
  if(k==='axes'){if(s.s)drawAxes(s,col);return}
  if(k==='pen'){drawPen(s,col);return}
@@ -306,17 +323,18 @@ function samples0(s){ // контур объекта точками (ласти�
  const rect=b=>{seg(b[0],b[1],b[2],b[1]);seg(b[2],b[1],b[2],b[3]);seg(b[2],b[3],b[0],b[3]);seg(b[0],b[3],b[0],b[1])};
  if(k==='text'){if(!s.s)return p;rect(textBox(s));return o}
  if(k==='axes'){if(!s.s)return p;const b=axesBox(s),c=axesCfg(s);rect(b);seg(b[0],c.oy,b[2],c.oy);seg(c.ox,b[1],c.ox,b[3]);return o}
+ if(k==='plot'){const ps=plotPolys(s,160);return ps.length?[].concat(...ps):[]}
  if(k==='pen'||k==='ers'||p.length<4)return p;
  const x0=p[0],y0=p[1],x1=p[2],y1=p[3];
- if(k==='shape'){rect([Math.min(x0,x1),Math.min(y0,y1),Math.max(x0,x1),Math.max(y0,y1)]);return o}
+ if(k==='shape'||k==='solid'){rect([Math.min(x0,x1),Math.min(y0,y1),Math.max(x0,x1),Math.max(y0,y1)]);return o}
  if(k==='poly'){for(let i=0;i<p.length;i+=2){const j=(i+2)%p.length;seg(p[i],p[i+1],p[j],p[j+1])}}
  else if(k==='line'||k==='arrow')seg(x0,y0,x1,y1);
  else if(k==='rect')rect([x0,y0,x1,y1]);
  else for(let i=0;i<=48;i++){const t=i/48*6.2832;o.push((x0+x1)/2+Math.cos(t)*(x1-x0)/2,(y0+y1)/2+Math.sin(t)*(y1-y0)/2)}
  return o;
 }
-const smp=s=>s._sm||(s._sm=samples(s));
-function bbox(sk){if(!sk._bb){const q=smp(sk);let a=1e12,b=1e12,c=-1e12,d=-1e12;for(let i=0;i<q.length;i+=2){if(q[i]<a)a=q[i];if(q[i]>c)c=q[i];if(q[i+1]<b)b=q[i+1];if(q[i+1]>d)d=q[i+1]}sk._bb=[a,b,c,d]}return sk._bb}
+const smp=s=>s.k==='plot'?samples(s):(s._sm||(s._sm=samples(s)));
+function bbox(sk){if(!sk._bb||sk.k==='plot'){const q=smp(sk);let a=1e12,b=1e12,c=-1e12,d=-1e12;for(let i=0;i<q.length;i+=2){if(q[i]<a)a=q[i];if(q[i]>c)c=q[i];if(q[i+1]<b)b=q[i+1];if(q[i+1]>d)d=q[i+1]}sk._bb=[a,b,c,d]}return sk._bb}
 const inval=s=>{s._my=undefined;s._tb=undefined;s._bb=undefined;s._sm=undefined};
 function rd(){if(rq)return;rq=requestAnimationFrame(()=>{rq=0;redraw()})} // не чаще одного раза за кадр
 const objBox=s=>s.k==='text'?textBox(s):axesBox(s);
@@ -428,6 +446,7 @@ function redraw(){
  if(editStroke&&strokes[page]&&strokes[page][editStroke]){ // пунктирная рамка вокруг только что созданного объекта
   const bb=strokeBox(strokes[page][editStroke]);ctx.save();ctx.strokeStyle='rgba(106,63,196,.9)';ctx.lineWidth=2/s;ctx.setLineDash([8/s,6/s]);
   ctx.strokeRect(bb[0],bb[1],bb[2]-bb[0],bb[3]-bb[1]);ctx.restore();
+  if(strokes[page][editStroke].k==='solid')drawSolidHandle(strokes[page][editStroke]);
   const h=rotHandle(strokes[page][editStroke]);
   if(h){ // кружок со стрелкой: тянуть — вращать фигуру
    const r=12/s,mx=(bb[0]+bb[2])/2,my=h[1]<bb[1]?bb[1]:bb[3];
@@ -438,12 +457,13 @@ function redraw(){
    ctx.restore();
   }
  }
- placeDone();drawOverlay();
+ placeDone();drawOverlay();syncPlotPanels();placeSolidBar();sendView();
  const zf=view.s>fitS()*1.3;if($('zfit').hidden===zf)$('zfit').hidden=!zf;
 }
 // верхний слой: круглый курсор и курсоры других участников
 function drawOverlay(){
  const c=rctx;c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,rg.width,rg.height);c.setTransform(dpr,0,0,dpr,0,0);
+ drawLasers(c);
  if(S.seec){
   const now=Date.now();
   for(const id in cursors){const o=cursors[id];
@@ -488,11 +508,15 @@ function openPage(id){page=id;live={};$('newt').hidden=true;jump=null;editImg=nu
 function onOp(o){
  if(o.from===me&&(o.t==='strokeset'||o.t==='imgset'||o.t==='stroke'))return; // своё эхо со старым положением заставляло объект дёргаться
  if(o.t==='rtc'){onRtc(o);return}
- if(o.t==='init'){callInit(o.call);myName=o.name||null;$('who').textContent=o.name?'Кабинет: '+o.name:'Доска';document.title=o.name||'Доска';pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};if(!page||!pages.some(p=>p.id===page))page=pages[0].id;openPage(page);return}
- if(o.t==='peers'){$('st').textContent=peersTxt='Онлайн: '+o.n;return}
+ if(o.t==='init'){callInit(o.call);myName=o.name||null;$('who').textContent=o.name?'Кабинет: '+o.name:'Доска';document.title=o.name||'Доска';pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};for(const pg in strokes)for(const id in strokes[pg])strokes[pg][id].id=id; // у загруженных объектов нет поля id — проставляем
+ if(!page||!pages.some(p=>p.id===page))page=pages[0].id;openPage(page);return}
+ if(o.t==='peers'){$('st').textContent=peersTxt='Онлайн: '+o.n;if(lead)sendView(true);return}
+ if(o.t==='laser'){if(o.from!==me&&Array.isArray(o.pts)){const l=(lasers[o.from]=lasers[o.from]||{page:o.page,pts:[]}),n0=performance.now();l.page=o.page;
+  for(let i=0;i+1<o.pts.length;i+=2)l.pts.push({x:+o.pts[i],y:+o.pts[i+1],t:n0+i*4});laserLoop()}return}
+ if(o.t==='view'){if(o.from===me)return;if(o.stop){leaderView=null;detached=false}else{leaderView={page:o.page,x:+o.x,y:+o.y,w:+o.w,h:+o.h};applyLeader()}followUI();return}
  if(o.t==='cursor'){if(o.from!==me){cursors[o.from]={x:o.x,y:o.y,page:o.page,label:String(o.label||'Участник'),color:/^#[0-9a-f]{6}$/i.test(o.color)?o.color:'#0e9f8e',t:Date.now()};drawOverlay()}return}
  if(o.t==='live'){if(o.from!==me){live[o.from]={page:o.page,k:o.k,c:o.c,w:o.w,pts:o.pts,s:typeof o.s==='string'?o.s:undefined,a:+o.a||0};redraw()}return}
- if(o.t==='stroke'){(strokes[o.page]=strokes[o.page]||{})[o.stroke.id]=o.stroke;delete live[o.from]}
+ if(o.t==='stroke'){(strokes[o.page]=strokes[o.page]||{})[o.stroke.id]=o.stroke;inval(o.stroke);delete live[o.from]}
  if(o.t==='strokeset'&&strokes[o.page]&&strokes[o.page][o.id]){const sk=strokes[o.page][o.id];sk.pts=o.pts;if(o.a!==undefined){if(+o.a)sk.a=+o.a;else delete sk.a}inval(sk)}
  if(o.t==='image'){(images[o.page]=images[o.page]||{})[o.img.id]=o.img;if(o.from!==me&&o.page===page)notifyNew(o.img)}
  if(o.t==='imgset'&&images[o.page]&&images[o.page][o.id]){const g=images[o.page][o.id];g.x=o.x;g.y=o.y;g.w=o.w;g.h=o.h}
@@ -512,23 +536,23 @@ setInterval(()=>{if(Object.keys(cursors).length)drawOverlay()},1000);
 // ---------- камера ----------
 function zoomAt(px,py,f){
  const lim=fitS(),ns=Math.min(lim*4,Math.max(lim*.6,view.s*f)),wx=px/view.s+view.x,wy=py/view.s+view.y;
- view.s=ns;view.x=wx-px/ns;view.y=wy-py/ns;redraw();
+ view.s=ns;view.x=wx-px/ns;view.y=wy-py/ns;redraw();userView();
 }
-function fit(){view.s=fitS();redraw()} // «По ширине»
+function fit(){view.s=fitS();redraw();userView()} // «По ширине»
 function beginGesture(){
  const a=[...ptrs.values()],r=cv.getBoundingClientRect(),mx=(a[0].x+a[1].x)/2-r.left,my=(a[0].y+a[1].y)/2-r.top;
  gest={d:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)||1,s:view.s,wx:mx/view.s+view.x,wy:my/view.s+view.y};
 }
 function doGesture(){
  const a=[...ptrs.values()],r=cv.getBoundingClientRect(),mx=(a[0].x+a[1].x)/2-r.left,my=(a[0].y+a[1].y)/2-r.top,d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)||1;
- const lim=fitS(),ns=Math.min(lim*4,Math.max(lim*.6,gest.s*d/gest.d));view.s=ns;view.x=gest.wx-mx/ns;view.y=gest.wy-my/ns;redraw();
+ const lim=fitS(),ns=Math.min(lim*4,Math.max(lim*.6,gest.s*d/gest.d));view.s=ns;view.x=gest.wx-mx/ns;view.y=gest.wy-my/ns;redraw();userView();
 }
 cv.addEventListener('wheel',e=>{
  e.preventDefault();const r=cv.getBoundingClientRect(),m=e.deltaMode===1?16:1,dy=e.deltaY*m,dx=e.deltaX*m;
  if(e.ctrlKey||e.metaKey){ // щелчок колеса мыши = +12%, щипок на тачпаде = плавно
   const f=Math.abs(dy)>=50?(dy<0?1.12:1/1.12):Math.exp(-Math.max(-25,Math.min(25,dy))*.012);
   zoomAt(e.clientX-r.left,e.clientY-r.top,f)}
- else{view.x+=dx/view.s;view.y+=dy/view.s;redraw()}
+ else{view.x+=dx/view.s;view.y+=dy/view.s;redraw();userView()}
 },{passive:false});
 if(!('ontouchstart' in window)){ // щипок на трекпаде Safari
  let gs=1;
@@ -748,12 +772,13 @@ function hit(sk,x,y,rad,forMove){
  const B=bbox(sk);if(x<B[0]-rad||x>B[2]+rad||y<B[1]-rad||y>B[3]+rad)return false; // быстрый отсев
  if(sk.k==='text'&&sk.s)return inBox(textBox(sk),x,y);
  if(sk.k==='axes'&&sk.s&&forMove)return inBox(axesBox(sk),x,y);
+ if(sk.k==='solid')return inBox(bbox(sk),x,y);
  if(sk.k==='shape'&&sk.s)return forMove?inBox(bbox(sk),x,y):shapeGeo(sk).some(g=>near(rotFlat(g.p,sk),x,y,rad));
  return near(smp(sk),x,y,rad);
 }
 function strokeAt(x,y,forMove,onlyText){
  const ps=strokes[page]||{},rad=(forMove?14:16)/view.s;let f=null;
- for(const id in ps){const sk=ps[id];if(sk.k==='ers'||(onlyText&&sk.k!=='text'))continue;if(hit(sk,x,y,rad,forMove))f=id}
+ for(const id in ps){const sk=ps[id];if(sk.k==='ers'||(forMove&&sk.k==='plot')||(onlyText&&sk.k!=='text'))continue;if(hit(sk,x,y,rad,forMove))f=id}
  return f;
 }
 function flushErase(){ // стёртое уходит одним сообщением, а не десятками
@@ -832,11 +857,14 @@ cv.addEventListener('pointerdown',e=>{
  const panMode=e.button===1||space||t==='hand'||viewOnly||(e.pointerType==='touch'&&(fingerPan||(S.palm&&penSeen)));
  if(panMode){pan={id:e.pointerId,x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};cv.style.cursor='grabbing';return}
  const p=pos(e);lastP=p;
+ if(t==='laser'){editStroke=null;editImg=null;cur={laser:1};laserBuf.push(p[0],p[1]);laserPoint(p);return}
  if(e.altKey&&t!=='er'){const ia=imgAt(p[0],p[1]);if(ia){editImg=ia;redraw();return}} // Alt+клик по картинке — править её
  if(editStroke){ // сразу после создания фигуры/оси: можно перенести, клик в стороне — выход
   const sk=(strokes[page]||{})[editStroke];
   if(!sk||t==='er'){editStroke=null;redraw()}
   else{const bb=strokeBox(sk);
+   if(sk.k==='solid'&&inBox(bb,p[0],p[1])){if(solidMoveAt(sk,p)){cur={mvs:editStroke,sx:p[0],sy:p[1],orig:sk.pts.slice()};return}
+    const j=solidJ(sk);cur={orbit:editStroke,x:e.clientX,y:e.clientY,y0:+j.y||0,p0:+j.p||0};return}
    if(onRotHandle(sk,p)){const c=rawC(sk);cur={rot:editStroke,c:c,a0:sk.a||0,st:Math.atan2(p[1]-c[1],p[0]-c[0])};return}
    if(inBox(bb,p[0],p[1])){cur={mvs:editStroke,sx:p[0],sy:p[1],orig:sk.pts.slice()};return}
    editStroke=null;redraw();}
@@ -866,6 +894,7 @@ cv.addEventListener('pointerdown',e=>{
  cur=t==='pen'?{id:newId(),k:'pen',pts:[p[0],p[1]],c:color,w:w,pr:(e.pointerType==='pen'&&S.press)?[pn(e)]:null}
     :t==='ers'?{id:newId(),k:'ers',pts:[p[0],p[1]],c:'#000000',w:ersW()}
     :t.startsWith('sh:')?{id:newId(),k:'shape',s:t.slice(3),pts:[p[0],p[1],p[0],p[1]],c:color,w:w}
+    :t.startsWith('3d:')?{id:newId(),k:'solid',s:JSON.stringify({t:t.slice(3),y:-.6,p:.35,l:0}),pts:[p[0],p[1],p[0],p[1]],c:color,w:w}
               :{id:newId(),k:t,pts:[p[0],p[1],p[0],p[1]],c:color,w:w};
  redraw();
 });
@@ -875,7 +904,7 @@ cv.addEventListener('pointermove',e=>{
   ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(gest&&ptrs.size>=2){doGesture();return}
  }
- if(pan&&pan.id===e.pointerId){view.x=pan.vx-(e.clientX-pan.x)/view.s;view.y=pan.vy-(e.clientY-pan.y)/view.s;redraw();return}
+ if(pan&&pan.id===e.pointerId){view.x=pan.vx-(e.clientX-pan.x)/view.s;view.y=pan.vy-(e.clientY-pan.y)/view.s;redraw();userView();return}
  if(!cur&&editStroke&&e.pointerType!=='touch'&&!space){
   const q=pos(e),sk=(strokes[page]||{})[editStroke];
   if(sk)cv.style.cursor=onRotHandle(sk,q)?'grab':inBox(strokeBox(sk),q[0],q[1])?'move':(S.ring&&ringTools.includes(tool())?'none':'crosshair');
@@ -888,6 +917,9 @@ cv.addEventListener('pointermove',e=>{
  if(cur.snapped){adjust(pos(e));return}
  const evs=(e.getCoalescedEvents&&e.getCoalescedEvents())||[];if(!evs.length)evs.push(e);
  if(cur.erasing){evs.forEach(v=>{const p=pos(v);eraseAt(p[0],p[1])});return}
+ if(cur.laser){evs.forEach(v=>{const p=pos(v);laserBuf.push(p[0],p[1]);laserPoint(p)});const t2=Date.now();if(t2-laserT>50){laserT=t2;laserFlush()}return}
+ if(cur.orbit){const sk=(strokes[page]||{})[cur.orbit];if(!sk)return;
+  setSolid(sk,{y:r2(cur.y0+(e.clientX-cur.x)*.01),p:r2(Math.max(-1.5,Math.min(1.5,cur.p0+(e.clientY-cur.y)*.01)))});return}
  if(cur.rot){const p=pos(e),sk=(strokes[page]||{})[cur.rot];if(!sk)return;
   let a=cur.a0+Math.atan2(p[1]-cur.c[1],p[0]-cur.c[0])-cur.st;
   a=Math.atan2(Math.sin(a),Math.cos(a));const q=Math.round(a/(15*DEG))*15*DEG;if(Math.abs(a-q)<3*DEG||e.shiftKey)a=q; // «магнит» каждые 15°
@@ -906,7 +938,7 @@ cv.addEventListener('pointermove',e=>{
   const min=1.5/view.s;
   evs.forEach(v=>{const p=pos(v),n=cur.pts.length;
    if(n<19000&&Math.hypot(p[0]-cur.pts[n-2],p[1]-cur.pts[n-1])>=min){cur.pts.push(p[0],p[1]);if(cur.pr)cur.pr.push(pn(v))}});
- }else{const p=pos(e);let x=p[0],y=p[1];const R=cur.k==='shape'&&RATIO[cur.s];
+ }else{const p=pos(e);let x=p[0],y=p[1];const R=(cur.k==='shape'&&RATIO[cur.s])||(cur.k==='solid'?1:0);
   if(R){const dx=x-cur.pts[0],dy=y-cur.pts[1],m=Math.max(Math.abs(dx),Math.abs(dy)/R); // круг, квадрат, куб, шар — без искажений
    x=r2(cur.pts[0]+(dx<0?-m:m));y=r2(cur.pts[1]+(dy<0?-m*R:m*R))}
   cur.pts[2]=x;cur.pts[3]=y}
@@ -920,6 +952,8 @@ function end(e){
  if(pan&&pan.id===e.pointerId){pan=null;setCursor();return}
  clearTimeout(holdT);if(!cur)return;const s=cur;cur=null;if(s.erasing){flushErase();return}
  if(s.mvs){const sk=(strokes[page]||{})[s.mvs];if(sk)send({t:'strokeset',page:page,id:s.mvs,pts:sk.pts});return}
+ if(s.laser){laserFlush();return}
+ if(s.orbit){const sk=(strokes[page]||{})[s.orbit];if(sk)send({t:'stroke',page:page,stroke:clean(sk)});return}
  if(s.rot){const sk=(strokes[page]||{})[s.rot];if(sk)send({t:'strokeset',page:page,id:s.rot,pts:sk.pts,a:sk.a||0});setTimeout(()=>{$('st').textContent=peersTxt},1200);return}
  if(s.mv){const g=images[page][s.mv];send({t:'imgset',page:page,id:s.mv,x:r2(g.x),y:r2(g.y),w:r2(g.w),h:r2(g.h)});return}
  if(s.k==='pen'||s.k==='ers'){
@@ -928,7 +962,7 @@ function end(e){
  }
  else if(!s.snapped&&(Math.abs(s.pts[2]-s.pts[0])+Math.abs(s.pts[3]-s.pts[1]))*view.s<4){clearLive();redraw();return}
  const o={id:s.id,k:s.k,pts:s.pts,c:s.c,w:s.w};if(s.pr)o.pr=s.pr;if(s.s)o.s=s.s;if(s.a)o.a=s.a;
- if(s.snapped||canRot(o))editStroke=s.id; // новую фигуру сразу можно двигать и вращать
+ if(s.snapped||canRot(o)||o.k==='solid')editStroke=s.id; // новую фигуру сразу можно двигать и вращать
  addObj(o);
 }
 cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
@@ -945,6 +979,7 @@ document.addEventListener('keydown',e=>{
  const plain=!e.metaKey&&!e.ctrlKey&&!e.altKey&&tg!=='SELECT'&&!viewOnly; // быстрые клавиши (работают в любой раскладке)
  if(plain&&e.code==='KeyE'){setTool(isEr(tool())?'pen':ersTool());return} // E — ластик (ещё раз — обратно перо)
  if(plain&&(e.code==='KeyP'||e.code==='KeyB')){setTool('pen');return} // P или B — перо
+ if(plain&&e.code==='KeyL'){setTool(tool()==='laser'?'pen':'laser');return} // L — указка
  if(plain&&(e.key==='Delete'||e.key==='Backspace')&&editStroke&&(strokes[page]||{})[editStroke]){ // удалить выделенную фигуру
   const id=editStroke;delete strokes[page][id];editStroke=null;send({t:'erase',page:page,id:id});redraw();e.preventDefault();return}
  const z=e.code==='KeyZ',y=e.code==='KeyY';
@@ -1211,12 +1246,229 @@ $('callmin').onclick=()=>{$('callbox').classList.toggle('min');$('callmin').text
 window.addEventListener('pagehide',()=>{if(call.on)navigator.sendBeacon&&navigator.sendBeacon('/api/'+room+'/op',JSON.stringify({t:'rtc',kind:'bye',from:me}))});
 setInterval(()=>{if(call.on)callUI()},2000);
 
+// ---------- указка: красный след, исчезает через секунду, не сохраняется ----------
+const lasers={},LASER_MS=1100;let laserBuf=[],laserT=0,laserRaf=0;
+function laserPoint(p,from){const k=from||me;(lasers[k]=lasers[k]||{page:page,pts:[]});lasers[k].page=page;lasers[k].pts.push({x:p[0],y:p[1],t:performance.now()});laserLoop()}
+function laserLoop(){if(laserRaf)return;const f=()=>{laserRaf=0;drawOverlay();if(Object.values(lasers).some(l=>l.pts.length))laserRaf=requestAnimationFrame(f)};laserRaf=requestAnimationFrame(f)}
+function laserFlush(){if(!laserBuf.length)return;send({t:'laser',page:page,pts:laserBuf});laserBuf=[]}
+function drawLasers(c){
+ const now=performance.now();
+ for(const k in lasers){const l=lasers[k];l.pts=l.pts.filter(q=>now-q.t<LASER_MS);if(l.page!==page||l.pts.length<1)continue;
+  c.save();c.lineCap='round';c.lineJoin='round';c.shadowColor='rgba(255,40,40,.9)';c.shadowBlur=12;
+  for(let i=1;i<l.pts.length;i++){const a=l.pts[i-1],b=l.pts[i],al=1-(now-b.t)/LASER_MS;if(b.t-a.t>250)continue;
+   c.strokeStyle='rgba(255,45,45,'+Math.max(0,al).toFixed(3)+')';c.lineWidth=2+4*al;c.beginPath();
+   c.moveTo((a.x-view.x)*view.s,(a.y-view.y)*view.s);c.lineTo((b.x-view.x)*view.s,(b.y-view.y)*view.s);c.stroke()}
+  const h=l.pts[l.pts.length-1],al=1-(now-h.t)/LASER_MS;
+  c.fillStyle='rgba(255,60,60,'+Math.max(0,al).toFixed(3)+')';c.beginPath();c.arc((h.x-view.x)*view.s,(h.y-view.y)*view.s,5,0,6.2832);c.fill();c.restore()}
+}
+
+// ---------- «следуй за мной»: ученик видит то же место доски, что и преподаватель ----------
+let lead=false,leaderView=null,detached=false,applyingView=false,lastViewSend=0;
+function sendView(force){
+ if(!lead||!page)return;const n=Date.now();if(!force&&n-lastViewSend<120)return;lastViewSend=n;
+ send({t:'view',page:page,x:r2(view.x),y:r2(view.y),w:r2(cw/view.s),h:r2(ch/view.s)});
+}
+function applyLeader(){
+ const v=leaderView;if(!v||detached)return;applyingView=true;
+ try{if(v.page!==page&&pages.some(p=>p.id===v.page))openPage(v.page);
+  view.s=Math.max(.05,cw/Math.max(1,v.w));view.x=v.x;view.y=v.y;redraw()}finally{applyingView=false}
+}
+function userView(){ // ученик сам подвинул доску — отходим от преподавателя
+ if(applyingView)return;
+ if(leaderView&&!detached){detached=true;followUI()}
+ if(lead)sendView();
+}
+function followUI(){
+ const b=$('followb');
+ if(!leaderView||lead){b.hidden=true;return}
+ b.hidden=false;b.classList.toggle('go',detached);
+ b.textContent=detached?'↩ К преподавателю':'👁 Вы смотрите туда же, куда преподаватель';
+ b.title=detached?'Показать то место доски, где сейчас преподаватель':'Подвигайте доску сами, чтобы смотреть свободно';
+}
+$('followb').onclick=()=>{if(detached){detached=false;applyLeader()}else{detached=true}followUI()};
+$('leadb').hidden=!isTeacher;
+$('leadb').onclick=()=>{lead=!lead;$('leadb').classList.toggle('on',lead);
+ $('leadb').title=lead?'Ученик сейчас видит то же, что и вы. Нажмите, чтобы отпустить':'Ученик будет видеть то же место доски, что и вы';
+ if(lead)sendView(true);else send({t:'view',stop:true});followUI()};
+
+// ---------- формулы: безопасный разбор (без eval) ----------
+const FUNCS={sin:Math.sin,cos:Math.cos,tg:Math.tan,tan:Math.tan,ctg:x=>1/Math.tan(x),cot:x=>1/Math.tan(x),sqrt:Math.sqrt,abs:Math.abs,
+ ln:Math.log,lg:Math.log10,log:Math.log10,exp:Math.exp,arcsin:Math.asin,asin:Math.asin,arccos:Math.acos,acos:Math.acos,arctg:Math.atan,atan:Math.atan,arcctg:x=>Math.PI/2-Math.atan(x)};
+const FNAMES=Object.keys(FUNCS).sort((a,b)=>b.length-a.length);
+function parseFormula(src){
+ const s=String(src).toLowerCase().replace(/^\s*y\s*=\s*/,'').replace(/[−–—]/g,'-').replace(/[·×∙⋅]/g,'*').replace(/÷/g,'/').replace(/²/g,'^2').replace(/³/g,'^3')
+  .replace(/π/g,'pi').replace(/√/g,'sqrt').replace(/,/g,'.').replace(/\s+/g,'');
+ const tk=[];let i=0;
+ while(i<s.length){const ch=s[i];
+  if(/[0-9.]/.test(ch)){let j=i;while(j<s.length&&/[0-9.]/.test(s[j]))j++;const v=parseFloat(s.slice(i,j));if(!isFinite(v))throw Error('число');tk.push({n:v});i=j;continue}
+  if(/[a-zа-яё]/.test(ch)){const f=FNAMES.find(n=>s.startsWith(n,i));
+   if(f){tk.push({f:f});i+=f.length;continue}
+   if(s.startsWith('pi',i)){tk.push({n:Math.PI});i+=2;continue}
+   tk.push({v:ch});i++;continue}
+  if('+-*/^()|'.includes(ch)){tk.push({o:ch});i++;continue}
+  throw Error('Непонятный символ «'+ch+'»');
+ }
+ let k=0;const params=new Set();
+ const peek=()=>tk[k],isO=c=>tk[k]&&tk[k].o===c;
+ const starts=()=>{const t=tk[k];return t&&(t.n!==undefined||t.v||t.f||t.o==='(')};
+ function expr(){let a=term();while(isO('+')||isO('-')){const o=tk[k++].o,b=term(),x=a;a=o==='+'?(X,P)=>x(X,P)+b(X,P):(X,P)=>x(X,P)-b(X,P)}return a}
+ function term(){let a=unary();for(;;){if(isO('*')||isO('/')){const o=tk[k++].o,b=unary(),x=a;a=o==='*'?(X,P)=>x(X,P)*b(X,P):(X,P)=>x(X,P)/b(X,P)}
+  else if(starts()){const b=power(),x=a;a=(X,P)=>x(X,P)*b(X,P)}else break}return a}
+ function unary(){if(isO('-')){k++;const a=unary();return(X,P)=>-a(X,P)}if(isO('+')){k++;return unary()}return power()}
+ function power(){const b=primary();if(isO('^')){k++;const e=unary();return(X,P)=>Math.pow(b(X,P),e(X,P))}return b}
+ function primary(){const t=tk[k++];if(!t)throw Error('Формула оборвалась');
+  if(t.n!==undefined){const v=t.n;return()=>v}
+  if(t.v){if(t.v==='x')return X=>X;if(t.v==='e')return()=>Math.E;const nm=t.v;params.add(nm);return(X,P)=>P[nm]}
+  if(t.f){const fn=FUNCS[t.f],a=isO('(')?primary():power();return(X,P)=>fn(a(X,P))}
+  if(t.o==='('){const a=expr();if(!isO(')'))throw Error('Не хватает «)»');k++;return a}
+  if(t.o==='|'){const a=expr();if(!isO('|'))throw Error('Не хватает «|»');k++;return(X,P)=>Math.abs(a(X,P))}
+  throw Error('Лишний знак «'+t.o+'»');
+ }
+ const fn=expr();if(k<tk.length)throw Error('Лишнее в конце формулы');
+ return{fn:fn,params:[...params]};
+}
+const fCache=new Map();
+function compiled(f){if(!fCache.has(f)){try{fCache.set(f,parseFormula(f))}catch(e){fCache.set(f,null)}}return fCache.get(f)}
+
+// ---------- живые графики: kind 'plot', привязан к координатной плоскости ----------
+const plotJ=s=>{try{return JSON.parse(s.s)}catch(e){return null}};
+function findStroke(id){for(const pid in strokes){const o=strokes[pid]&&strokes[pid][id];if(o)return o}return null}
+function plotPolys(s,N){ // точки кривой в координатах листа, с разрывами
+ const j=plotJ(s);if(!j)return[];const ax=findStroke(j.ax);if(!ax||ax.k!=='axes')return[];const c=axesCfg(ax),pf=compiled(j.f);if(!pf)return[];
+ const out=[];let cur=null;const span=c.yb-c.ya;
+ for(let i=0;i<=N;i++){const x=c.xa+(c.xb-c.xa)*i/N;let y;try{y=pf.fn(x,j.p||{})}catch(e){y=NaN}
+  if(!isFinite(y)||y<c.ya-.6||y>c.yb+.6){cur=null;continue}
+  const X=c.ox+x*c.u,Y=c.oy-y*c.u;
+  if(cur&&Math.abs(cur[cur.length-1]-Y)>span*c.u*.6){cur=null}
+  if(!cur){cur=[];out.push(cur)}cur.push(X,Y)}
+ return out.filter(p=>p.length>=4);
+}
+function drawPlot(s,col){
+ const polys=plotPolys(s,700);if(!polys.length)return;
+ ctx.save();ctx.strokeStyle=col;ctx.lineWidth=s.w;ctx.lineCap='round';ctx.lineJoin='round';
+ polys.forEach(p=>{ctx.beginPath();ctx.moveTo(p[0],p[1]);for(let i=2;i<p.length;i+=2)ctx.lineTo(p[i],p[i+1]);ctx.stroke()});
+ const j=plotJ(s),last=polys[polys.length-1],ax=findStroke(j.ax),u=ax?ax.w:30;
+ ctx.fillStyle=col;ctx.font='italic '+Math.max(12,u*.42)+'px '+FONT;ctx.textBaseline='bottom';ctx.textAlign='right';
+ ctx.fillText('y = '+prettyF(j.f),last[last.length-2],last[last.length-1]-6);ctx.restore();
+}
+const prettyF=f=>String(f).replace(/^\s*y\s*=\s*/i,'').replace(/\^2/g,'²').replace(/\^3/g,'³').replace(/\*/g,'·').replace(/sqrt/g,'√').replace(/pi/g,'π').replace(/-/g,'−');
+function syncPlotPanels(){
+ const box=$('plots'),seen=new Set(),ps=strokes[page]||{},stack={}; // панели одной плоскости — друг под другом
+ for(const id in ps){const s=ps[id];if(s.k!=='plot')continue;const j=plotJ(s),pf=j&&compiled(j.f);if(!pf||!pf.params.length)continue;
+  const ax=findStroke(j.ax);if(!ax)continue;const b=axesBox(ax);
+  const L=(b[2]-view.x)*view.s,T=(b[1]-view.y)*view.s;if(L<40||T>ch-20||(b[3]-view.y)*view.s<0||(b[0]-view.x)*view.s>cw)continue;
+  seen.add(id);let el=box.querySelector('[data-id="'+id+'"]');
+  if(!el){el=document.createElement('div');el.className='plotp';el.dataset.id=id;
+   const hd=document.createElement('div');hd.className='ph';const t=document.createElement('span');const mn=document.createElement('button');mn.textContent='–';mn.title='Свернуть';
+   mn.onclick=()=>{el.classList.toggle('min');mn.textContent=el.classList.contains('min')?'+':'–'};hd.append(t,mn);el.appendChild(hd);box.appendChild(el)}
+  el.querySelector('.ph span').textContent='y = '+prettyF(j.f);el.querySelector('.ph span').style.color=inkCol(s.c);
+  pf.params.forEach(nm=>{let r=el.querySelector('label[data-p="'+nm+'"]');
+   if(!r){r=document.createElement('label');r.dataset.p=nm;const b2=document.createElement('b');b2.textContent=nm;
+    const inp=document.createElement('input');inp.type='range';inp.min=-10;inp.max=10;inp.step=.1;const o=document.createElement('output');
+    inp.oninput=()=>{const sk=(strokes[page]||{})[id];if(!sk||viewOnly)return;const jj=plotJ(sk);jj.p=jj.p||{};jj.p[nm]=+(+inp.value).toFixed(2);sk.s=JSON.stringify(jj);inval(sk);o.textContent=fmtP(jj.p[nm]);rd();
+     const t2=Date.now();if(t2-lastEmit>70){lastEmit=t2;send({t:'stroke',page:page,stroke:clean(sk)})}};
+    inp.onchange=()=>{const sk=(strokes[page]||{})[id];if(sk)send({t:'stroke',page:page,stroke:clean(sk)})};
+    r.append(b2,inp,o);el.appendChild(r)}
+   const inp=r.querySelector('input'),v=+((j.p||{})[nm]??1);if(document.activeElement!==inp)inp.value=v;r.querySelector('output').textContent=fmtP(v)});
+  const top=Math.max(4,T)+(stack[j.ax]||0);stack[j.ax]=(stack[j.ax]||0)+el.offsetHeight+6;
+  el.style.left=Math.max(4,Math.min(cw-el.offsetWidth-4,L-el.offsetWidth))+'px';el.style.top=Math.max(4,Math.min(ch-el.offsetHeight-4,top))+'px';
+ }
+ box.querySelectorAll('.plotp').forEach(el=>{if(!seen.has(el.dataset.id))el.remove()});
+}
+const fmtP=v=>(Math.round(v*100)/100).toString().replace('-','−');
+async function insertPlot(){
+ const b=document.createElement('div');b.className='af';b.style.gridTemplateColumns='1fr';
+ b.innerHTML='<label>y = <input id="pf" placeholder="например: a*x^2 + b*x + c" autocomplete="off"></label><div id="pex" style="display:flex;flex-wrap:wrap;gap:6px"></div><div id="perr" style="color:#d32f2f;font-size:13px;min-height:18px"></div><div style="font-size:12px;color:var(--mut)">Буквы, кроме x, станут ползунками. Можно: + − · / ^ ( ) | | sin cos tg √ (sqrt) ln, числа π и e.</div>';
+ const ex=['a*x^2 + b*x + c','k*x + b','a*sin(b*x)','sqrt(x)','|x - a| + b','a/x','2^x'];
+ const pf=b.querySelector('#pf');ex.forEach(t=>{const e=document.createElement('button');e.type='button';e.textContent=prettyF(t);e.onclick=()=>{pf.value=t;pf.focus()};b.querySelector('#pex').appendChild(e)});
+ setTimeout(()=>pf.focus(),50);
+ for(;;){
+  if(!await modal('График функции',{body:b,ok:'Построить'}))return;
+  const f=pf.value.trim();let pr;try{pr=parseFormula(f);if(!f)throw Error('Введите формулу')}catch(e){b.querySelector('#perr').textContent=e.message||'Ошибка в формуле';continue}
+  let ax=null;const ps=strokes[page]||{},cx=view.x+cw/view.s/2,cy=view.y+ch/view.s/2;let bd=1e18;
+  for(const id in ps){const s=ps[id];if(s.k!=='axes')continue;const bb=axesBox(s),d=Math.hypot((bb[0]+bb[2])/2-cx,(bb[1]+bb[3])/2-cy);if(d<bd){bd=d;ax=s}}
+  if(!ax){const u=40,xa=-6,xb=6,ya=-5,yb=5,ox=PW/2,oy=Math.max((yb-ya+2.1)*u/2+10,cy)+((ya+yb)/2)*u;
+   ax={id:newId(),k:'axes',pts:[r2(ox),r2(oy)],c:'#1a1a1a',w:u,s:[xa,xb,ya,yb,0].join(',')};addObj(ax)}
+  const p={};pr.params.forEach(n=>{p[n]=n==='a'||n==='k'?1:0});if(pr.params.length===1)p[pr.params[0]]=1;
+  const COLS=['#1565c0','#d32f2f','#2e7d32','#ef6c00','#7b1fa2'],n=Object.values(ps).filter(s=>s.k==='plot').length;
+  addObj({id:newId(),k:'plot',pts:[0,0],c:color==='#1a1a1a'?COLS[n%COLS.length]:color,w:3,s:JSON.stringify({ax:ax.id,f:f,p:p})});
+  return;
+ }
+}
+
+// ---------- вращаемые 3D-тела: kind 'solid', невидимые рёбра пунктиром ----------
+const SOLID_NAMES={cube:'Куб',box:'Параллеле­пипед',prism:'Призма',pyr:'Пирамида',tetra:'Тетраэдр',cyl:'Цилиндр',cone:'Конус',sphere:'Шар'};
+const solidJ=s=>{try{return JSON.parse(s.s)}catch(e){return{t:'cube',y:-.6,p:.35}}};
+const models={};
+function solidModel(t){
+ if(models[t])return models[t];
+ let V=[],F=[],L=null;const smooth=new Set(),N=36;
+ const box=(a,b,c)=>{V=[[-a,-b,c],[a,-b,c],[a,-b,-c],[-a,-b,-c],[-a,b,c],[a,b,c],[a,b,-c],[-a,b,-c]];F=[[0,1,2,3],[4,5,6,7],[0,1,5,4],[1,2,6,5],[2,3,7,6],[3,0,4,7]];L=['A','B','C','D','A₁','B₁','C₁','D₁']};
+ const ring=(r,y)=>{const o=[];for(let i=0;i<N;i++){const a=i/N*2*Math.PI;o.push([r*Math.cos(a),y,r*Math.sin(a)])}return o};
+ if(t==='cube')box(1,1,1);
+ else if(t==='box')box(1.35,.8,.85);
+ else if(t==='prism'){const tri=[90,210,330].map(d=>[Math.cos(d*DEG),Math.sin(d*DEG)]);V=tri.map(q=>[q[0],-1,q[1]]).concat(tri.map(q=>[q[0],1,q[1]]));F=[[0,1,2],[3,4,5],[0,1,4,3],[1,2,5,4],[2,0,3,5]];L=['A','B','C','A₁','B₁','C₁']}
+ else if(t==='pyr'){V=[[-1,-.8,1],[1,-.8,1],[1,-.8,-1],[-1,-.8,-1],[0,1.15,0]];F=[[0,1,2,3],[0,1,4],[1,2,4],[2,3,4],[3,0,4]];L=['A','B','C','D','S']}
+ else if(t==='tetra'){V=[90,210,330].map(d=>[1.15*Math.cos(d*DEG),-.75,1.15*Math.sin(d*DEG)]).concat([[0,1.15,0]]);F=[[0,1,2],[0,1,3],[1,2,3],[2,0,3]];L=['A','B','C','S']}
+ else if(t==='cyl'){V=ring(.9,-1.1).concat(ring(.9,1.1));F.push([...Array(N).keys()]);F.push([...Array(N).keys()].map(i=>N+i));
+  for(let i=0;i<N;i++){const j=(i+1)%N;F.push([i,j,N+j,N+i]);smooth.add(Math.min(i,N+i)+'-'+Math.max(i,N+i))}}
+ else if(t==='cone'){V=ring(1,-.9).concat([[0,1.25,0]]);F.push([...Array(N).keys()]);for(let i=0;i<N;i++){const j=(i+1)%N;F.push([i,j,N]);smooth.add(i+'-'+N)}}
+ const C=V.reduce((a,v)=>[a[0]+v[0]/V.length,a[1]+v[1]/V.length,a[2]+v[2]/V.length],[0,0,0]);
+ const norms=F.map(f=>{let n=[0,0,0];for(let i=0;i<f.length;i++){const a=V[f[i]],b=V[f[(i+1)%f.length]];n[0]+=(a[1]-b[1])*(a[2]+b[2]);n[1]+=(a[2]-b[2])*(a[0]+b[0]);n[2]+=(a[0]-b[0])*(a[1]+b[1])}
+  const m=f.reduce((a,i)=>[a[0]+V[i][0]/f.length,a[1]+V[i][1]/f.length,a[2]+V[i][2]/f.length],[0,0,0]);
+  if(n[0]*(m[0]-C[0])+n[1]*(m[1]-C[1])+n[2]*(m[2]-C[2])<0)n=n.map(v=>-v);return n});
+ const E=new Map();F.forEach((f,fi)=>{for(let i=0;i<f.length;i++){const a=f[i],b=f[(i+1)%f.length],key=Math.min(a,b)+'-'+Math.max(a,b);if(!E.has(key))E.set(key,{a:a,b:b,f:[]});E.get(key).f.push(fi)}});
+ const R=Math.max(...V.map(v=>Math.hypot(v[0],v[1],v[2])),1);
+ return(models[t]={V:V,F:F,N:norms,E:[...E.entries()].map(([k,e])=>Object.assign(e,{sm:smooth.has(k)})),L:L,R:R});
+}
+function rot3(v,yw,pt){const x=v[0]*Math.cos(yw)+v[2]*Math.sin(yw),z=-v[0]*Math.sin(yw)+v[2]*Math.cos(yw);return[x,v[1]*Math.cos(pt)-z*Math.sin(pt),v[1]*Math.sin(pt)+z*Math.cos(pt)]}
+function solidFrame(s){const p=s.pts,x0=Math.min(p[0],p[2]),y0=Math.min(p[1],p[3]),w=Math.abs(p[2]-p[0]),h=Math.abs(p[3]-p[1]);return{cx:x0+w/2,cy:y0+h/2,r:Math.min(w,h)/2}}
+function drawSolid(s,col){
+ const j=solidJ(s),fr=solidFrame(s),yw=+j.y||0,pt=+j.p||0,lw=s.w,dash=[Math.max(4,lw*2.4),Math.max(4,lw*2)];
+ ctx.save();ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=lw;ctx.lineCap='round';ctx.lineJoin='round';
+ const seg=(a,b,hid)=>{ctx.setLineDash(hid?dash:[]);ctx.globalAlpha=hid?.75:1;ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke()};
+ if(j.t==='sphere'){
+  const R=fr.r*.95,P=v=>{const q=rot3(v,yw,pt);return[fr.cx+q[0]*R,fr.cy-q[1]*R,q[2]]};
+  ctx.beginPath();ctx.arc(fr.cx,fr.cy,R,0,6.2832);ctx.stroke();
+  [[1,0],[0,1]].forEach(([eq])=>{const pts=[];for(let i=0;i<=72;i++){const a=i/72*2*Math.PI;pts.push(P(eq?[Math.cos(a),0,Math.sin(a)]:[0,Math.cos(a),Math.sin(a)]))}
+   for(let i=1;i<pts.length;i++)seg(pts[i-1],pts[i],(pts[i-1][2]+pts[i][2])/2<0)});
+  ctx.setLineDash([]);ctx.globalAlpha=1;ctx.beginPath();ctx.arc(fr.cx,fr.cy,Math.max(1.5,lw*.8),0,6.2832);ctx.fill();
+  ctx.restore();return}
+ const m=solidModel(j.t),sc=fr.r*.95/m.R;
+ const P=m.V.map(v=>{const q=rot3(v,yw,pt);return[fr.cx+q[0]*sc,fr.cy-q[1]*sc,q[2]]});
+ const front=m.N.map(n=>rot3(n,yw,pt)[2]>1e-6);
+ const hidden=[],shown=[];
+ m.E.forEach(e=>{const fa=e.f.map(i=>front[i]),any=fa.some(Boolean),diff=fa.length===2&&fa[0]!==fa[1];
+  if(e.sm){if(diff)shown.push(e)}else(any?shown:hidden).push(e)});
+ hidden.forEach(e=>seg(P[e.a],P[e.b],true));shown.forEach(e=>seg(P[e.a],P[e.b],false));
+ if(j.l&&m.L){ctx.setLineDash([]);ctx.globalAlpha=1;ctx.font='italic '+Math.max(13,sc*.32)+'px '+FONT;ctx.textAlign='center';ctx.textBaseline='middle';
+  const cx=P.reduce((a,q)=>a+q[0],0)/P.length,cy=P.reduce((a,q)=>a+q[1],0)/P.length;
+  m.L.forEach((t,i)=>{const q=P[i];let dx=q[0]-cx,dy=q[1]-cy;const d=Math.hypot(dx,dy)||1;ctx.fillText(t,q[0]+dx/d*sc*.22,q[1]+dy/d*sc*.22)})}
+ ctx.restore();
+}
+function solidMoveAt(sk,p){const bb=strokeBox(sk),z=24/view.s;return p[0]>=bb[0]&&p[0]<=bb[0]+z&&p[1]>=bb[1]&&p[1]<=bb[1]+z}
+function drawSolidHandle(sk){const bb=strokeBox(sk),s=view.s,z=24/s,c=z/2,a=z*.3;
+ ctx.save();ctx.fillStyle='rgba(106,63,196,.92)';ctx.fillRect(bb[0],bb[1],z,z);ctx.strokeStyle='#fff';ctx.lineWidth=2/s;ctx.lineCap='round';ctx.beginPath();
+ ctx.moveTo(bb[0]+c-a,bb[1]+c);ctx.lineTo(bb[0]+c+a,bb[1]+c);ctx.moveTo(bb[0]+c,bb[1]+c-a);ctx.lineTo(bb[0]+c,bb[1]+c+a);ctx.stroke();ctx.restore()}
+function placeSolidBar(){
+ const bar=$('solidbar'),sk=editStroke&&(strokes[page]||{})[editStroke];
+ if(!sk||sk.k!=='solid'||viewOnly){bar.hidden=true;return}
+ bar.hidden=false;const bb=strokeBox(sk),j=solidJ(sk);$('sletters').classList.toggle('on',!!j.l);$('sletters').hidden=j.t==='sphere'||!solidModel(j.t==='sphere'?'cube':j.t).L||['cyl','cone'].includes(j.t);
+ let x=(bb[0]-view.x)*view.s,y=(bb[1]-view.y)*view.s-bar.offsetHeight-8;if(y<4)y=(bb[3]-view.y)*view.s+8;
+ bar.style.left=Math.max(4,Math.min(cw-bar.offsetWidth-4,x))+'px';bar.style.top=Math.max(4,Math.min(ch-bar.offsetHeight-4,y))+'px';
+}
+function setSolid(sk,patch,final){const j=Object.assign(solidJ(sk),patch);sk.s=JSON.stringify(j);inval(sk);rd();
+ const t2=Date.now();if(final||t2-lastEmit>70){lastEmit=t2;send({t:'stroke',page:page,stroke:clean(sk)})}}
+$('sletters').onclick=()=>{const sk=(strokes[page]||{})[editStroke];if(sk&&sk.k==='solid')setSolid(sk,{l:solidJ(sk).l?0:1},true)};
+$('sreset').onclick=()=>{const sk=(strokes[page]||{})[editStroke];if(sk&&sk.k==='solid')setSolid(sk,{y:-.6,p:.35},true)};
+
 // ---------- интерфейс ----------
 $('add').onclick=()=>{const id='p'+newId(),d=new Date().toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'});let t=d,n=2;while(pages.some(p=>p.title===t))t=d+' ('+(n++)+')';send({t:'addPage',id:id,title:t});openPage(id)};
 $('title').onchange=()=>send({t:'title',id:page,title:$('title').value.trim()||'Без названия'});
 // ---------- панель инструментов ----------
 function setTool(v){
  if(v==='axes'){insertAxes();return}
+ if(v==='plot'){insertPlot();return}
  curTool=v;closeText();updTools();setCursor();drawOverlay();redraw();
 }
 function togglePE(){setTool(tool()==='pen'?ersTool():'pen')} // перо ⇄ ластик одной кнопкой
@@ -1224,7 +1476,7 @@ function updTools(){
  const t=tool(),er=isEr(t),pe=$('pe');
  pe.textContent=t==='pen'?'🧽 Ластик':'✏️ Перо';pe.classList.toggle('er',er);
  pe.title=(t==='pen'?'Сейчас перо. Нажмите — ластик':er?'Сейчас ластик. Нажмите — перо':'Взять перо')+' (E — ластик, P — перо)';
- $('ttext').classList.toggle('on',t==='text');$('tmv').classList.toggle('on',t==='mv');$('thand').classList.toggle('on',t==='hand');
+ $('ttext').classList.toggle('on',t==='text');$('tmv').classList.toggle('on',t==='mv');$('tlaser').classList.toggle('on',t==='laser');$('thand').classList.toggle('on',t==='hand');
  const it=SHAPE_MENU.flatMap(g=>g[1]).find(x=>x[0]===t);
  $('tshape').classList.toggle('on',!!it);$('tshape').textContent=(it?it[1].replace(/­/g,''):'△ Фигуры')+' ▾';
  document.querySelectorAll('#shp .it').forEach(b=>b.classList.toggle('on',b.dataset.v===t));
@@ -1232,14 +1484,17 @@ function updTools(){
 const SHAPE_MENU=[
  ['Линии',[['line','Линия'],['arrow','Стрелка']]],
  ['Плоские фигуры',[['rect','Прямо­угольник'],['sh:square',SHP.square],['sh:circle',SHP.circle],['ellipse','Эллипс'],['sh:tri',SHP.tri],['sh:rtri',SHP.rtri],['sh:para',SHP.para],['sh:trap',SHP.trap],['sh:rhomb',SHP.rhomb],['sh:hex',SHP.hex]]],
- ['Объёмные фигуры',[['sh:cube',SHP.cube],['sh:box',SHP.box],['sh:prism',SHP.prism],['sh:pyr',SHP.pyr],['sh:tetra',SHP.tetra],['sh:cyl',SHP.cyl],['sh:cone',SHP.cone],['sh:sphere',SHP.sphere]]],
- ['Графики',[['axes','Координат­ная плоскость']]]
+ ['Объёмные — можно вращать',[['3d:cube',SOLID_NAMES.cube],['3d:box',SOLID_NAMES.box],['3d:prism',SOLID_NAMES.prism],['3d:pyr',SOLID_NAMES.pyr],['3d:tetra',SOLID_NAMES.tetra],['3d:cyl',SOLID_NAMES.cyl],['3d:cone',SOLID_NAMES.cone],['3d:sphere',SOLID_NAMES.sphere]]],
+ ['Графики',[['plot','График функции…'],['axes','Координат­ная плоскость']]]
 ];
 function shapeIcon(v,c,col){ // маленькая картинка фигуры тем же кодом, что рисует доску
  const d=2,W=56,H=40;c.width=W*d;c.height=H*d;const keep=ctx;ctx=c.getContext('2d');ctx.scale(d,d);
  try{
   if(v==='axes'){ctx.strokeStyle=ctx.fillStyle=col;ctx.lineWidth=1.6;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(8,24);ctx.lineTo(48,24);ctx.moveTo(24,36);ctx.lineTo(24,4);ctx.stroke();
    ctx.beginPath();ctx.moveTo(50,24);ctx.lineTo(45,21.5);ctx.lineTo(45,26.5);ctx.fill();ctx.beginPath();ctx.moveTo(24,2);ctx.lineTo(21.5,7);ctx.lineTo(26.5,7);ctx.fill();return}
+  if(v==='plot'){ctx.strokeStyle=col;ctx.lineWidth=1.3;ctx.globalAlpha=.6;ctx.beginPath();ctx.moveTo(6,26);ctx.lineTo(50,26);ctx.moveTo(28,4);ctx.lineTo(28,38);ctx.stroke();
+   ctx.globalAlpha=1;ctx.strokeStyle='#1565c0';ctx.lineWidth=2;ctx.beginPath();for(let i=0;i<=40;i++){const X=8+i,Y=34-((i-20)/8)**2*3.2;i?ctx.lineTo(X,Y):ctx.moveTo(X,Y)}ctx.stroke();return}
+  if(v.startsWith('3d:')){drawStroke({k:'solid',s:JSON.stringify({t:v.slice(3),y:-.6,p:.35}),pts:[11,3,45,37],c:col,w:1.4});return}
   const n=v.startsWith('sh:')?v.slice(3):null,R=n&&RATIO[n];let bw=44,bh=30;if(R){bh=Math.min(30,44*R);bw=bh/R}
   const x=(W-bw)/2,y=(H-bh)/2,pts=v==='line'||v==='arrow'?[x,y+bh,x+bw,y]:[x,y,x+bw,y+bh];
   drawStroke(n?{k:'shape',s:n,pts:pts,c:col,w:1.5}:{k:v,pts:pts,c:col,w:1.6});
@@ -1267,7 +1522,7 @@ $('ersb').onclick=()=>{const m=$('ersp');if(!m.hidden){m.hidden=true;return}
   b.onclick=()=>{S.ers=v;saveS();m.hidden=true;setTool(ersTool())};m.appendChild(b)});
  m.hidden=false;const b=$('pe');
  m.style.top=(b.offsetTop+b.offsetHeight+4)+'px';m.style.left=Math.max(10,Math.min(b.offsetLeft,$('main').clientWidth-m.offsetWidth-10))+'px'};
-$('ttext').onclick=()=>setTool('text');$('tmv').onclick=()=>setTool('mv');$('thand').onclick=()=>setTool('hand');
+$('ttext').onclick=()=>setTool('text');$('tlaser').onclick=()=>setTool(tool()==='laser'?'pen':'laser');$('tmv').onclick=()=>setTool('mv');$('thand').onclick=()=>setTool('hand');
 $('tshape').onclick=()=>{const m=$('shp');if(!m.hidden){m.hidden=true;return}
  buildShapeMenu();m.hidden=false;const b=$('tshape');
  m.style.top=(b.offsetTop+b.offsetHeight+4)+'px';m.style.left=Math.max(10,Math.min(b.offsetLeft,$('main').clientWidth-m.offsetWidth-10))+'px'};

@@ -7,7 +7,8 @@ const ADMIN = process.env.ADMIN_KEY || '';
 fs.mkdirSync(DIR, { recursive: true });
 const rooms = {};
 const ID = /^[\w-]{1,40}$/, RID = /^[a-z0-9]{4,32}$/;
-const KINDS = ['pen', 'ers', 'line', 'arrow', 'rect', 'ellipse', 'poly', 'text', 'axes', 'shape'];
+const KINDS = ['pen', 'ers', 'line', 'arrow', 'rect', 'ellipse', 'poly', 'text', 'axes', 'shape', 'plot', 'solid'];
+const SOLIDS = ['cube', 'box', 'prism', 'pyr', 'tetra', 'cyl', 'cone', 'sphere']; // вращаемые 3D-тела
 // готовые фигуры: плоские и объёмные (школьная программа)
 const SHAPES = ['tri', 'rtri', 'square', 'circle', 'para', 'trap', 'rhomb', 'hex', 'cube', 'box', 'prism', 'pyr', 'tetra', 'cyl', 'cone', 'sphere'];
 const ICE = (() => { try { return JSON.parse(process.env.ICE_SERVERS || ''); } catch (e) { return null; } })()
@@ -30,6 +31,7 @@ function room(id) {
     s = { pages: [{ id: 'p1', title: 'Доска 1' }], strokes: {} };
   }
   s.images = s.images || {};
+  for (const pg in s.strokes || {}) delete s.strokes[pg].undefined; // объекты без номера (старая ошибка правки после перезагрузки)
   return (rooms[id] = { id, s, clients: new Set(), timer: null, call: new Set() });
 }
 function save(r) {
@@ -48,9 +50,9 @@ function apply(s, op) {
   switch (op.t) {
     case 'stroke': {
       const k = op.stroke;
-      if (!k || !ID.test(k.id) || !Array.isArray(k.pts) || k.pts.length > 20000 || !/^#[0-9a-f]{3,6}$/i.test(k.c)) return false;
+      if (!k || typeof k.id !== 'string' || !ID.test(k.id) || !Array.isArray(k.pts) || k.pts.length > 20000 || !/^#[0-9a-f]{3,6}$/i.test(k.c)) return false;
       const kind = KINDS.includes(k.k) ? k.k : 'pen';
-      const single = kind === 'text' || kind === 'axes';
+      const single = kind === 'text' || kind === 'axes' || kind === 'plot';
       if (kind === 'poly' ? (k.pts.length < 6 || k.pts.length > 40 || k.pts.length % 2) : single ? k.pts.length !== 2 : (kind !== 'pen' && kind !== 'ers' && k.pts.length !== 4)) return false;
       const pts = k.pts.map(Number);
       if (!pts.every(Number.isFinite)) return false;
@@ -65,6 +67,15 @@ function apply(s, op) {
       }
       if (kind === 'shape') { // готовая фигура в рамке pts
         if (!SHAPES.includes(k.s)) return false;
+        o.s = k.s;
+      }
+      if (kind === 'plot' || kind === 'solid') { // параметры в JSON: график {ax, f, p} или 3D-тело {t, y, p, l}
+        if (typeof k.s !== 'string' || k.s.length > 600) return false;
+        let j; try { j = JSON.parse(k.s); } catch (e) { return false; }
+        if (!j || typeof j !== 'object') return false;
+        if (kind === 'plot' && (typeof j.f !== 'string' || j.f.length > 200 || !ID.test(String(j.ax || '')) || !j.p || typeof j.p !== 'object'
+          || Object.keys(j.p).length > 8 || !Object.entries(j.p).every(([a, v]) => /^[a-zа-яё]$/i.test(a) && Number.isFinite(+v)))) return false;
+        if (kind === 'solid' && (!SOLIDS.includes(j.t) || !Number.isFinite(+j.y) || !Number.isFinite(+j.p))) return false;
         o.s = k.s;
       }
       if (['line', 'arrow', 'rect', 'ellipse', 'poly', 'shape'].includes(kind) && Number.isFinite(+k.a) && +k.a) o.a = num(k.a, -7, 7, 0); // поворот фигуры, радианы
@@ -114,6 +125,8 @@ function apply(s, op) {
     case 'rtc': return ['hello', 'here', 'offer', 'answer', 'ice', 'bye'].includes(op.kind) && RID.test(String(op.from)) && (!op.to || RID.test(String(op.to))) && JSON.stringify(op.data || null).length < 30000;
     case 'cursor': return Number.isFinite(+op.x) && Number.isFinite(+op.y) && String(op.label || '').length <= 40;
     case 'live': return true;
+    case 'laser': return Array.isArray(op.pts) && op.pts.length <= 400 && op.pts.every(v => Number.isFinite(+v)); // указка: не сохраняется
+    case 'view': return !!op.stop || ['x', 'y', 'w', 'h'].every(k => Number.isFinite(+op[k])); // «следуй за мной»: не сохраняется
   }
   return false;
 }
@@ -349,7 +362,7 @@ http.createServer((req, res) => {
       if (!apply(r.s, op)) { res.writeHead(400); return res.end(); }
       if (op.t === 'rtc') { if (op.kind === 'hello') r.call.add(op.from); if (op.kind === 'bye') r.call.delete(op.from); }
       bcast(r, op);
-      if (op.t !== 'live' && op.t !== 'rtc' && op.t !== 'cursor') save(r);
+      if (!['live', 'rtc', 'cursor', 'laser', 'view'].includes(op.t)) save(r);
       res.writeHead(204); res.end();
     });
   }
