@@ -22,6 +22,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .pg{padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pg.on{background:color-mix(in srgb,var(--ac) 16%,transparent);border-color:var(--ac)}
 .pg{display:flex;align-items:center;gap:4px}.pgt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.pg:not(.on) .pgx{opacity:.35}.pg:hover .pgx{opacity:1}
 .pgx{flex:none;padding:0 6px;font-size:12px;line-height:20px;border-color:transparent;background:transparent;color:var(--mut)}.pgx:hover{color:#d32f2f;border-color:#d32f2f}
 button,select,input,textarea{font:inherit;color:var(--tx);background:var(--panel);border:1px solid var(--bd);border-radius:8px;padding:6px 10px}
 button,select,label{touch-action:manipulation}
@@ -490,15 +491,15 @@ function setCursor(){const t=tool();cv.style.cursor=(space||t==='hand'||viewOnly
 function renderPages(){const b=$('pl');b.innerHTML='';
  pages.forEach(p=>{const d=document.createElement('div');d.className='pg'+(p.id===page?' on':'');
   const t=document.createElement('span');t.className='pgt';t.textContent=p.title||'Без названия';d.appendChild(t);d.onclick=()=>openPage(p.id);
-  if(isTeacher&&p.id===page&&pages.length>1){const x=document.createElement('button');x.className='pgx';x.textContent='✕';x.title='Удалить эту доску';
-   x.onclick=e=>{e.stopPropagation();delPage()};d.appendChild(x)}
+  if(isTeacher&&pages.length>1){const x=document.createElement('button');x.className='pgx';x.textContent='✕';x.title='Удалить эту доску';
+   x.onclick=e=>{e.stopPropagation();delPage(p.id)};d.appendChild(x)}
   b.appendChild(d)})}
-async function delPage(){ // удалить одну доску ученика (только у преподавателя)
+async function delPage(id){ // удалить одну доску ученика (только у преподавателя); без id — открытую
  if(!isTeacher)return;
  if(pages.length<=1){await modal('Это единственная доска ученика, её нельзя удалить. Можно очистить: «Файл… → Очистить доску».',{ok:'Понятно'});return}
- const p=pages.find(x=>x.id===page),nm=(p&&p.title)||'Без названия';
+ id=id||page;const p=pages.find(x=>x.id===id),nm=(p&&p.title)||'Без названия';
  if(!await modal('Удалить доску «'+nm+'» вместе со всем, что на ней? Вернуть нельзя. Остальные доски ученика останутся.',{ok:'Удалить'}))return;
- const id=page;send({t:'delPage',id:id});removePage(id);
+ if(!pages.some(x=>x.id===id)||pages.length<=1)return;send({t:'delPage',id:id});removePage(id);
 }
 function removePage(id){
  pages=pages.filter(x=>x.id!==id);delete strokes[id];delete images[id];delete views[id];
