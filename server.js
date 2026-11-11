@@ -135,10 +135,82 @@ async function iceServers() {
     return iceCache.v;
   } catch (e) { console.log('TURN недоступен: ' + e.message); return ICE; }
 }
-function isAdmin(req) {
-  if (!ADMIN) return false;
-  const h = x => crypto.createHash('sha256').update(String(x)).digest();
-  return crypto.timingSafeEqual(h(req.headers['x-admin'] || ''), h(ADMIN));
+// ---------- аккаунты преподавателей ----------
+// Владелец (id 'owner', логин admin): пароль из ADMIN_KEY, пока владелец не сменит его в кабинете.
+// Остальные преподаватели регистрируются по одноразовой ссылке-приглашению от владельца.
+const TF = path.join(DIR, '_teachers.json');
+let T = { teachers: [], invites: [] };
+try { T = Object.assign(T, JSON.parse(fs.readFileSync(TF, 'utf8'))); } catch (e) {}
+const saveT = () => fs.writeFileSync(TF, JSON.stringify(T));
+index.students.forEach(s => { if (!s.owner) s.owner = 'owner'; }); // ученики, созданные до аккаунтов, — владельца
+const SECRET = (() => {
+  const f = path.join(DIR, '_secret');
+  try { const s = fs.readFileSync(f); if (s.length >= 32) return s; } catch (e) {}
+  const s = crypto.randomBytes(32); fs.writeFileSync(f, s, { mode: 0o600 }); return s;
+})();
+const LOGIN = /^[a-z0-9._-]{3,32}$/;
+const hashPw = (p, salt) => crypto.scryptSync(String(p), salt, 32).toString('hex');
+const eq = (a, b) => { const h = x => crypto.createHash('sha256').update(String(x)).digest(); return crypto.timingSafeEqual(h(a), h(b)); };
+const teachersOnly = () => T.teachers.filter(t => t.id !== 'owner');
+function owner() {
+  const o = T.teachers.find(t => t.id === 'owner') || {};
+  return { id: 'owner', role: 'owner', login: o.login || 'admin', name: o.name || 'Владелец', salt: o.salt, hash: o.hash, pv: o.pv || 0 };
+}
+const byId = id => id === 'owner' ? owner() : teachersOnly().find(t => t.id === id);
+function byLogin(l) { l = String(l || '').trim().toLowerCase(); return owner().login === l ? owner() : teachersOnly().find(t => t.login === l); }
+function checkPw(t, p) {
+  if (t.hash) return eq(hashPw(p, t.salt), t.hash);
+  return t.id === 'owner' && !!ADMIN && eq(p, ADMIN);
+}
+const pvOf = t => t.hash ? 'h' + (t.pv || 0) : 'e' + crypto.createHash('sha256').update(ADMIN).digest('hex').slice(0, 8); // смена пароля отзывает старые входы
+const sign = s => crypto.createHmac('sha256', SECRET).update(s).digest('base64url');
+function makeToken(t) { const b = t.id + '.' + (Date.now() + 90 * 864e5); return b + '.' + sign(b + '.' + pvOf(t)); }
+function auth(req) {
+  const x = req.headers['x-admin']; // вход по старой схеме (пароль владельца в заголовке)
+  if (x && ADMIN && !owner().hash && eq(x, ADMIN)) return owner();
+  const [id, exp, sig] = String(req.headers['x-token'] || '').split('.');
+  if (!id || !exp || !sig || +exp < Date.now()) return null;
+  const t = byId(id);
+  return t && eq(sig, sign(id + '.' + exp + '.' + pvOf(t))) ? t : null;
+}
+function setPw(t, p) { // сохранить новый пароль (у владельца — запись 'owner' в _teachers.json)
+  let rec = T.teachers.find(x => x.id === t.id);
+  if (!rec) { rec = { id: 'owner', login: 'admin', name: 'Владелец' }; T.teachers.push(rec); }
+  rec.salt = crypto.randomBytes(16).toString('hex'); rec.hash = hashPw(p, rec.salt); rec.pv = (rec.pv || 0) + 1;
+  saveT(); return byId(t.id);
+}
+const fails = new Map(); // защита от подбора пароля: не больше 10 ошибок за 10 минут с одного адреса
+const ipOf = req => String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+const recent = req => (fails.get(ipOf(req)) || []).filter(t => Date.now() - t < 6e5);
+const limited = req => recent(req).length >= 10;
+const fail = req => fails.set(ipOf(req), recent(req).concat(Date.now()));
+const validInvite = c => T.invites.find(i => i.code === String(c || '') && !i.used && Date.now() - i.created < 14 * 864e5);
+const who = t => ({ name: t.name, login: t.login, role: t.role || 'teacher' });
+const randPw = () => crypto.randomBytes(9).toString('base64').replace(/[^A-Za-z0-9]/g, '').slice(0, 10) || 'board' + Date.now();
+
+function account(req, res, u) { // вход и регистрация (без авторизации)
+  if (req.method === 'POST' && u.pathname === '/api/login') return body(req, res, 4000, j => {
+    if (limited(req)) { res.writeHead(429); return res.end(); }
+    const t = byLogin(j.login);
+    if (!t || !checkPw(t, String(j.password || ''))) { fail(req); res.writeHead(401); return res.end(); }
+    json(res, Object.assign({ token: makeToken(t) }, who(t)));
+  });
+  if (req.method === 'GET' && u.pathname === '/api/invite') return json(res, { ok: !!validInvite(u.searchParams.get('code')) });
+  if (req.method === 'POST' && u.pathname === '/api/register') return body(req, res, 4000, j => {
+    if (limited(req)) { res.writeHead(429); return res.end(); }
+    const inv = validInvite(j.code);
+    if (!inv) { fail(req); return json(res, { error: 'Приглашение недействительно или уже использовано. Попросите новое.' }); }
+    const login = String(j.login || '').trim().toLowerCase(), name = String(j.name || '').trim().slice(0, 60), pw = String(j.password || '');
+    if (!name) return json(res, { error: 'Укажите имя' });
+    if (!LOGIN.test(login)) return json(res, { error: 'Логин: от 3 до 32 латинских букв или цифр (можно . _ -)' });
+    if (byLogin(login)) return json(res, { error: 'Такой логин уже занят, придумайте другой' });
+    if (pw.length < 8 || pw.length > 200) return json(res, { error: 'Пароль должен быть не короче 8 символов' });
+    const salt = crypto.randomBytes(16).toString('hex');
+    const t = { id: 't' + crypto.randomBytes(6).toString('hex'), login, name, salt, hash: hashPw(pw, salt), pv: 0, created: Date.now() };
+    T.teachers.push(t); inv.used = Date.now(); inv.usedBy = t.id; saveT();
+    json(res, Object.assign({ token: makeToken(t) }, who(t)));
+  });
+  res.writeHead(404); res.end();
 }
 const json = (res, v) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(v)); };
 function body(req, res, lim, cb) {
@@ -148,34 +220,73 @@ function body(req, res, lim, cb) {
 }
 const PAGE = f => (req, res) => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); fs.createReadStream(path.join(__dirname, f)).pipe(res); };
 
+function dropRoom(id) { // удалить доску ученика целиком
+  const r = rooms[id]; if (r) { r.clients.forEach(c => c.end()); delete rooms[id]; }
+  if (RID.test(String(id))) fs.unlink(path.join(DIR, id + '.json'), () => {});
+}
 function admin(req, res, u) {
-  if (!ADMIN) { res.writeHead(503); return res.end(); }
-  if (!isAdmin(req)) { res.writeHead(401); return res.end(); }
-  if (req.method === 'GET' && u.pathname === '/api/admin/students') return json(res, index.students);
+  const me = auth(req);
+  if (!me) { res.writeHead(ADMIN || teachersOnly().length ? 401 : 503); return res.end(); }
+  const mine = () => index.students.filter(s => s.owner === me.id);
+  const isOwner = me.id === 'owner';
+  if (req.method === 'GET' && u.pathname === '/api/admin/me') return json(res, who(me));
+  if (req.method === 'GET' && u.pathname === '/api/admin/students') return json(res, mine());
   if (req.method === 'GET' && u.pathname === '/api/admin/backup') {
-    const all = {}; index.students.forEach(s => { const r = room(s.id); if (r) all[s.id] = r.s; });
-    return json(res, { index, rooms: all });
+    const all = {}; mine().forEach(s => { const r = room(s.id); if (r) all[s.id] = r.s; });
+    return json(res, { index: { students: mine() }, rooms: all });
+  }
+  if (req.method === 'GET' && u.pathname === '/api/admin/teachers') {
+    if (!isOwner) { res.writeHead(403); return res.end(); }
+    return json(res, {
+      teachers: teachersOnly().map(t => ({ id: t.id, name: t.name, login: t.login, created: t.created, students: index.students.filter(s => s.owner === t.id).length })),
+      invites: T.invites.filter(i => !i.used && Date.now() - i.created < 14 * 864e5).map(i => ({ code: i.code, created: i.created }))
+    });
   }
   if (req.method === 'POST' && u.pathname === '/api/admin/op') return body(req, res, 60e6, j => {
     const nm = String(j.name || '').trim().slice(0, 60);
+    const own = id => index.students.find(x => x.id === id && x.owner === me.id);
+    // --- аккаунт ---
+    if (j.t === 'passwd') {
+      if (!checkPw(me, String(j.old || ''))) return json(res, { error: 'Текущий пароль указан неверно' });
+      const p = String(j.password || '');
+      if (p.length < 8 || p.length > 200) return json(res, { error: 'Новый пароль должен быть не короче 8 символов' });
+      return json(res, { token: makeToken(setPw(me, p)) });
+    }
+    if (['invite', 'invite-del', 'teacher-del', 'teacher-reset'].includes(j.t)) {
+      if (!isOwner) { res.writeHead(403); return res.end(); }
+      if (j.t === 'invite') {
+        if (T.invites.filter(i => !i.used).length >= 50) T.invites = T.invites.filter(i => i.used || Date.now() - i.created < 14 * 864e5);
+        const code = crypto.randomBytes(12).toString('base64url');
+        T.invites.push({ code, created: Date.now() }); saveT(); return json(res, { code });
+      }
+      if (j.t === 'invite-del') { T.invites = T.invites.filter(i => i.code !== j.code); saveT(); return json(res, { ok: true }); }
+      const t = teachersOnly().find(x => x.id === j.id);
+      if (!t) return json(res, { error: 'Преподаватель не найден' });
+      if (j.t === 'teacher-reset') { const p = randPw(); setPw(t, p); return json(res, { password: p }); }
+      index.students.filter(s => s.owner === t.id).forEach(s => dropRoom(s.id)); // teacher-del: вместе с его учениками
+      index.students = index.students.filter(s => s.owner !== t.id); saveIndex();
+      T.teachers = T.teachers.filter(x => x.id !== t.id); saveT(); return json(res, { ok: true });
+    }
+    // --- ученики ---
     if (j.t === 'add' && nm) {
+      if (mine().length >= 300) return json(res, { error: 'Слишком много учеников' });
       const id = crypto.randomBytes(6).toString('hex');
-      index.students.push({ id, name: nm, color: COLORS[index.students.length % COLORS.length] });
+      index.students.push({ id, name: nm, color: COLORS[mine().length % COLORS.length], owner: me.id });
       saveIndex(); save(room(id));
     } else if (j.t === 'rename' && nm) {
-      const s = index.students.find(x => x.id === j.id); if (s) { s.name = nm; saveIndex(); }
+      const s = own(j.id); if (s) { s.name = nm; saveIndex(); }
     } else if (j.t === 'delete') {
-      index.students = index.students.filter(x => x.id !== j.id); saveIndex();
-      const r = rooms[j.id]; if (r) { r.clients.forEach(c => c.end()); delete rooms[j.id]; }
-      if (RID.test(String(j.id))) fs.unlink(path.join(DIR, j.id + '.json'), () => {});
+      if (own(j.id)) { index.students = index.students.filter(x => x.id !== j.id); saveIndex(); dropRoom(j.id); }
     } else if (j.t === 'restore' && j.data && j.data.index && Array.isArray(j.data.index.students)) {
-      const inc = j.data.index.students.filter(s => RID.test(String(s.id))).map(s => ({ id: s.id, name: String(s.name || '').slice(0, 60), color: String(s.color || '#888').slice(0, 9) }));
+      const taken = new Set(index.students.filter(s => s.owner !== me.id).map(s => s.id)); // чужих учеников копия не трогает
+      const inc = j.data.index.students.filter(s => RID.test(String(s.id)) && !taken.has(s.id))
+        .map(s => ({ id: s.id, name: String(s.name || '').slice(0, 60), color: String(s.color || '#888').slice(0, 9), owner: me.id }));
       let todo = inc;
       if (j.merge) { // вернуть только недостающих, существующих не трогать
-        const have = new Set(index.students.map(x => x.id));
+        const have = new Set(mine().map(x => x.id));
         todo = inc.filter(s => !have.has(s.id));
-        index = { students: index.students.concat(todo) };
-      } else index = { students: inc };
+        index.students = index.students.concat(todo);
+      } else index.students = index.students.filter(s => s.owner !== me.id).concat(inc);
       saveIndex();
       todo.forEach(s => {
         const st = (j.data.rooms || {})[s.id];
@@ -185,7 +296,7 @@ function admin(req, res, u) {
         if (rooms[s.id]) { rooms[s.id].s = st; bcast(rooms[s.id], { t: 'init', s: st, name: s.name }); }
       });
     } else { res.writeHead(400); return res.end(); }
-    json(res, index.students);
+    json(res, mine());
   });
   res.writeHead(404); res.end();
 }
@@ -193,6 +304,7 @@ function admin(req, res, u) {
 http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   if (u.pathname.startsWith('/api/admin/')) return admin(req, res, u);
+  if (['/api/login', '/api/register', '/api/invite'].includes(u.pathname)) return account(req, res, u);
   const pj = u.pathname.match(/^\/pdfjs\/(pdf(?:\.worker)?\.min\.mjs)$/);
   if (pj) { // pdf.js для просмотра сборников задач в кабинете преподавателя
     const f = path.join(__dirname, pj[1]);
@@ -261,7 +373,7 @@ a.btn{display:inline-block;padding:11px 18px;border-radius:10px;background:var(-
  <h1>Доска репетитора</h1>
  <p class="sub">Общая доска для занятий: преподаватель и ученик рисуют вместе.</p>
  <div class="card"><h2>Я ученик</h2><p>Откройте личную ссылку на свою доску, которую прислал преподаватель (она выглядит как адрес этого сайта и набор букв и цифр в конце). Без неё зайти на доску нельзя. Если ссылки нет, напишите преподавателю.</p></div>
- <div class="card"><h2>Я преподаватель</h2><p>Вход по вашему паролю: там вы создаёте учеников, открываете их доски и добавляете задачи.</p><a class="btn" href="/t">Войти в кабинет</a></div>
+ <div class="card"><h2>Я преподаватель</h2><p>Вход по логину и паролю: там вы создаёте учеников, открываете их доски и добавляете задачи. Аккаунт выдаётся по приглашению от владельца сайта.</p><a class="btn" href="/t">Войти в кабинет</a></div>
 </main></html>`);
   }
   const b = u.pathname.match(/^\/b\/([a-z0-9]{4,32})$/);

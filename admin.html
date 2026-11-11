@@ -23,6 +23,7 @@ button,input{font:inherit;color:var(--tx);background:var(--panel);border:1px sol
 #msg{min-height:20px}#msg.err{color:#d32f2f}
 #lf details{color:var(--mut);font-size:14px}#lf summary{cursor:pointer}#lf details p{margin:8px 0 0}
 #app{height:100%;display:flex}
+#app[hidden],#login[hidden],#lf [hidden]{display:none}
 #side{width:250px;background:var(--panel);border-right:1px solid var(--bd);display:flex;flex-direction:column;padding:10px;gap:8px}
 .top{display:flex;justify-content:space-between;align-items:center}
 #list{flex:1;overflow:auto;display:flex;flex-direction:column;gap:2px}
@@ -52,6 +53,12 @@ button,input{font:inherit;color:var(--tx);background:var(--panel);border:1px sol
 .selbar{position:absolute;display:flex;gap:6px;z-index:3}
 @media (max-width:700px){#tasks{position:absolute;inset:0;width:auto;max-width:none;z-index:5;border-left:0}}
 #msg{color:var(--mut)}
+.dlg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.dlg>div{background:var(--panel);color:var(--tx);border:1px solid var(--bd);border-radius:14px;padding:18px;width:100%;max-width:520px;max-height:90vh;overflow:auto;display:flex;flex-direction:column;gap:10px}
+.dlg h2{margin:0;font-size:18px}.dlg .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--bd)}
+.dlg .row .grow{flex:1;min-width:160px}.dlg .mut{color:var(--mut);font-size:13px}.dlg input{width:100%;padding:9px;font-size:15px}
+.dlg .pri,#lf .pri{background:var(--ac);color:#fff;border-color:var(--ac)}.dlg .err{color:#d32f2f;min-height:18px}
+.dlg code{font-size:12px;word-break:break-all;background:color-mix(in srgb,var(--ac) 10%,transparent);padding:4px 6px;border-radius:6px}
 body.nosidebar #side{display:none}
 @media (max-width:700px){#app{flex-direction:column}#side{width:100%;max-height:34%;border-right:0;border-bottom:1px solid var(--bd)}}
 </style>
@@ -59,17 +66,22 @@ body.nosidebar #side{display:none}
 <body>
 <div id="login" hidden>
  <form id="lf" autocomplete="on">
-  <h1>Вход для преподавателя</h1>
-  <p class="lead">Здесь вы создаёте личные доски для учеников и открываете их. Введите свой пароль, чтобы войти.</p>
-  <input type="text" name="username" value="преподаватель" autocomplete="username" aria-hidden="true" tabindex="-1" style="position:absolute;left:-9999px">
+  <h1 id="lh">Вход для преподавателя</h1>
+  <p class="lead" id="ll">Здесь вы создаёте личные доски для учеников и открываете их.</p>
+  <label for="rn" class="reg" hidden>Ваше имя</label>
+  <input id="rn" class="reg" hidden autocomplete="name" placeholder="Например, Анна Сергеевна" maxlength="60">
+  <label for="lg">Логин</label>
+  <input id="lg" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Логин" autofocus>
   <label for="pw">Пароль</label>
-  <input id="pw" name="password" type="password" autocomplete="current-password" placeholder="Введите пароль" autofocus>
+  <input id="pw" name="password" type="password" autocomplete="current-password" placeholder="Пароль">
+  <label for="pw2" class="reg" hidden>Пароль ещё раз</label>
+  <input id="pw2" class="reg" hidden type="password" autocomplete="new-password" placeholder="Повторите пароль">
   <label class="chk"><input type="checkbox" id="showpw"> Показать пароль</label>
   <button id="go" type="submit">Войти</button>
   <div id="msg" role="alert"></div>
-  <details>
-   <summary>Где взять пароль?</summary>
-   <p>Пароль вы придумали сами, когда настраивали сайт: он записан в Render (сайт render.com) → ваш сервис → <b>Environment</b> → переменная <b>ADMIN_KEY</b>. Нажмите «Show» (показать), и вы увидите свой пароль. Если забыли, там же можно задать новый и сохранить: после этого Render сам обновит сайт.</p>
+  <details id="lhelp">
+   <summary>Забыли пароль?</summary>
+   <p>Напишите владельцу сайта: он выдаст вам новый пароль.</p>
    <p>Ученикам пароль не нужен: они открывают только свою личную ссылку.</p>
   </details>
  </form>
@@ -78,7 +90,8 @@ body.nosidebar #side{display:none}
  <div id="side">
   <div class="top"><b>Ученики</b><button id="addS">+ Ученик</button></div>
   <div id="list"></div>
-  <div class="foot"><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden><button id="lo" title="Выйти из кабинета на этом устройстве">Выйти</button><button id="rb" title="Вернуть учеников и доски из копии, которую кабинет сам сохраняет в вашем браузере">Восстановить из автокопии</button><div id="bkst" style="font-size:12px;color:var(--mut);width:100%"></div></div>
+  <div id="whoami" style="font-size:12px;color:var(--mut)"></div>
+  <div class="foot"><button id="tch" hidden title="Пригласить репетиторов и управлять их аккаунтами">Репетиторы</button><button id="cpw" title="Сменить свой пароль">Пароль</button><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden><button id="lo" title="Выйти из кабинета на этом устройстве">Выйти</button><button id="rb" title="Вернуть учеников и доски из копии, которую кабинет сам сохраняет в вашем браузере">Восстановить из автокопии</button><div id="bkst" style="font-size:12px;color:var(--mut);width:100%"></div></div>
  </div>
  <div id="main">
   <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk" class="keep">Задачи</button><button id="fs" class="keep" title="Фокус: убрать панели">⛶</button><button id="th" class="keep" title="Тема: как в системе / светлая / тёмная">◐</button><button id="lnk">Ссылка ученика</button><button id="ren">Переименовать</button><button id="del">Удалить</button></div>
@@ -97,30 +110,60 @@ body.nosidebar #side{display:none}
 <script>
 (function(){
 const $=i=>document.getElementById(i);
-let key=localStorage.getItem('adm')||'',students=[],cur=null;
-const api=(p,o)=>fetch(p,Object.assign({headers:{'X-Admin':key,'Content-Type':'application/json'}},o));
-function showLogin(t,bad){$('app').hidden=true;$('login').hidden=false;$('msg').textContent=t||'';$('msg').className=bad?'err':'';$('go').disabled=false;$('pw').focus()}
+let tok=localStorage.getItem('tok')||'',students=[],cur=null,me=null,regMode=false;
+const invite=new URLSearchParams(location.search).get('invite');
+const api=window.boardApi=(p,o)=>fetch(p,Object.assign({},o,{headers:{'X-Token':tok,'Content-Type':'application/json'}}));
+const post=(p,b)=>fetch(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+function setTok(j){tok=j.token;localStorage.setItem('tok',tok);if(j.login)localStorage.setItem('tlogin',j.login)}
+function setReg(on){regMode=on;document.querySelectorAll('#lf .reg').forEach(e=>e.hidden=!on);
+ $('lh').textContent=on?'Регистрация преподавателя':'Вход для преподавателя';
+ $('ll').textContent=on?'Вас пригласили на доску. Придумайте логин и пароль — с ними вы будете входить в свой кабинет.':'Здесь вы создаёте личные доски для учеников и открываете их.';
+ $('go').textContent=on?'Создать аккаунт':'Войти';$('pw').autocomplete=on?'new-password':'current-password';$('lhelp').hidden=on}
+function showLogin(t,bad){$('app').hidden=true;$('login').hidden=false;$('msg').textContent=t||'';$('msg').className=bad?'err':'';$('go').disabled=false;(regMode?$('rn'):$('lg')).focus()}
 async function load(){
- const r=await api('/api/admin/students');
- if(r.status===503)return showLogin('На сайте ещё не задан пароль. Откройте Render → ваш сервис → Environment, добавьте переменную ADMIN_KEY (это и будет ваш пароль), сохраните и подождите пару минут.',true);
- if(r.status===401){const had=!!key;localStorage.removeItem('adm');key='';return showLogin(had?'Пароль не подошёл. Проверьте раскладку клавиатуры и большие/маленькие буквы.':'',had)}
- students=await r.json();$('login').hidden=true;$('app').hidden=false;render();
- if(!cur&&students.length)pick(localStorage.getItem('last')&&students.some(s=>s.id===localStorage.getItem('last'))?localStorage.getItem('last'):students[0].id);
+ const r=await api('/api/admin/me');
+ if(r.status===503)return showLogin('На сервере не задан пароль владельца (ADMIN_KEY).',true);
+ if(r.status===401){const had=!!tok;tok='';localStorage.removeItem('tok');return showLogin(had?'Вход устарел или пароль сменили. Войдите снова.':'',had)}
+ me=await r.json();localStorage.setItem('tlogin',me.login);
+ students=await (await api('/api/admin/students')).json();
+ $('login').hidden=true;$('app').hidden=false;$('tch').hidden=me.role!=='owner';$('whoami').textContent='Вы вошли как '+me.name+' ('+me.login+')';render();
+ const last=localStorage.getItem('last:'+me.login);
+ if(!cur&&students.length)pick(students.some(s=>s.id===last)?last:students[0].id);
 }
 function render(){const l=$('list');l.innerHTML='';
+ if(!students.length){const d=document.createElement('div');d.className='st';d.style.color='var(--mut)';d.textContent='Пока нет учеников. Нажмите «+ Ученик».';l.appendChild(d)}
  students.forEach(s=>{const d=document.createElement('div');d.className='st'+(s.id===cur?' on':'');
   const dot=document.createElement('span');dot.className='dot';dot.style.background=s.color;
   const t=document.createElement('span');t.textContent=s.name;d.append(dot,t);d.onclick=()=>pick(s.id);l.appendChild(d)})}
-function pick(id){cur=id;localStorage.setItem('last',id);const s=students.filter(x=>x.id===id)[0];
+function pick(id){cur=id;if(me)localStorage.setItem('last:'+me.login,id);const s=students.filter(x=>x.id===id)[0];
  if(!s){cur=null;$('nm').textContent='Выберите ученика';$('fr').src='about:blank';render();return}
  $('nm').textContent=s.name;$('fr').src='/b/'+id;render()}
-async function op(o){const r=await api('/api/admin/op',{method:'POST',body:JSON.stringify(o)});if(r.ok)students=await r.json();else alert('Не получилось');render()}
-$('lf').onsubmit=e=>{e.preventDefault();const v=$('pw').value;if(!v){showLogin('Введите пароль',true);return}
- key=v;localStorage.setItem('adm',key);$('go').disabled=true;$('msg').className='';$('msg').textContent='Проверяю…';load()};
-$('showpw').onchange=()=>{$('pw').type=$('showpw').checked?'text':'password'};
-$('lo').onclick=()=>{if(confirm('Выйти из кабинета на этом устройстве? Автокопия досок останется.')){localStorage.removeItem('adm');location.reload()}};
+async function op(o){const r=await api('/api/admin/op',{method:'POST',body:JSON.stringify(o)});
+ const j=r.ok?await r.json():null;if(!j||j.error){alert(j&&j.error||'Не получилось');return false}
+ if(Array.isArray(j))students=j;render();return j}
+$('lf').onsubmit=async e=>{e.preventDefault();
+ const login=$('lg').value.trim().toLowerCase(),pw=$('pw').value;$('msg').className='';
+ if(regMode){
+  const name=$('rn').value.trim();
+  if(!name)return showLogin('Укажите имя',true);
+  if(!/^[a-z0-9._-]{3,32}$/.test(login))return showLogin('Логин: от 3 до 32 латинских букв или цифр (можно . _ -)',true);
+  if(pw.length<8)return showLogin('Пароль должен быть не короче 8 символов',true);
+  if(pw!==$('pw2').value)return showLogin('Пароли не совпадают',true);
+  $('go').disabled=true;$('msg').textContent='Создаю аккаунт…';
+  const r=await post('/api/register',{code:invite,login,name,password:pw}),j=r.ok?await r.json():{error:r.status===429?'Слишком много попыток, подождите 10 минут':'Не получилось'};
+  if(j.error)return showLogin(j.error,true);
+  setTok(j);history.replaceState(null,'','/t');setReg(false);return load();
+ }
+ if(!login||!pw)return showLogin('Введите логин и пароль',true);
+ $('go').disabled=true;$('msg').textContent='Проверяю…';
+ const r=await post('/api/login',{login,password:pw});
+ if(r.status===429)return showLogin('Слишком много попыток. Подождите 10 минут.',true);
+ if(!r.ok)return showLogin('Неверный логин или пароль. Проверьте раскладку клавиатуры и большие/маленькие буквы.',true);
+ setTok(await r.json());$('pw').value='';load()};
+$('showpw').onchange=()=>{const t=$('showpw').checked?'text':'password';$('pw').type=t;$('pw2').type=t};
+$('lo').onclick=()=>{if(confirm('Выйти из кабинета на этом устройстве? Автокопия досок останется.')){localStorage.removeItem('tok');location.reload()}};
 $('addS').onclick=async()=>{const n=prompt('Имя ученика (можно с классом, например «Миша 8кл»):');if(!n||!n.trim())return;
- await op({t:'add',name:n});pick(students[students.length-1].id)};
+ if(await op({t:'add',name:n}))pick(students[students.length-1].id)};
 $('ren').onclick=async()=>{if(!cur)return;const s=students.filter(x=>x.id===cur)[0];const n=prompt('Новое имя:',s.name);if(!n||!n.trim())return;await op({t:'rename',id:cur,name:n});pick(cur)};
 $('del').onclick=async()=>{if(!cur)return;const s=students.filter(x=>x.id===cur)[0];
  if(!confirm('Удалить ученика «'+s.name+'» вместе со всеми его досками? Это нельзя отменить.'))return;
@@ -128,12 +171,61 @@ $('del').onclick=async()=>{if(!cur)return;const s=students.filter(x=>x.id===cur)
 $('lnk').onclick=()=>{if(!cur)return;const t=location.origin+'/b/'+cur;
  (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{$('lnk').textContent='Скопировано';setTimeout(()=>{$('lnk').textContent='Ссылка ученика'},1500)},()=>prompt('Ссылка ученика:',t))};
 $('bk').onclick=async()=>{const r=await api('/api/admin/backup');if(!r.ok)return alert('Не получилось');
- const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());a.download='board-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click()};
+ const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());a.download='board-backup-'+(me?me.login+'-':'')+new Date().toISOString().slice(0,10)+'.json';a.click()};
 $('rs').onclick=()=>$('rf').click();
 $('rf').onchange=async()=>{const f=$('rf').files[0];$('rf').value='';if(!f)return;
- if(!confirm('Загрузить копию? Список учеников и их доски будут заменены данными из файла.'))return;
- try{const data=JSON.parse(await f.text());await op({t:'restore',data:data});cur=null;pick(students.length?students[0].id:null)}catch(e){alert('Файл не подходит')}};
-if(key)load();else showLogin('');
+ if(!confirm('Загрузить копию? Ваш список учеников и их доски будут заменены данными из файла.'))return;
+ try{const data=JSON.parse(await f.text());if(await op({t:'restore',data:data})){cur=null;pick(students.length?students[0].id:null)}}catch(e){alert('Файл не подходит')}};
+
+// ---------- окна: смена пароля и панель владельца ----------
+function dlg(title){const o=document.createElement('div');o.className='dlg';const b=document.createElement('div');
+ const h=document.createElement('h2');h.textContent=title;b.appendChild(h);o.appendChild(b);
+ o.addEventListener('pointerdown',e=>{if(e.target===o)o.remove()});document.body.appendChild(o);return{o,b,close:()=>o.remove()}}
+const el=(tag,props,...kids)=>{const e=Object.assign(document.createElement(tag),props||{});kids.forEach(k=>e.append(k));return e};
+$('cpw').onclick=()=>{const d=dlg('Сменить пароль');
+ const o1=el('input',{type:'password',placeholder:'Текущий пароль',autocomplete:'current-password'}),n1=el('input',{type:'password',placeholder:'Новый пароль (от 8 символов)',autocomplete:'new-password'}),n2=el('input',{type:'password',placeholder:'Новый пароль ещё раз',autocomplete:'new-password'});
+ const err=el('div',{className:'err'}),ok=el('button',{className:'pri',textContent:'Сохранить'}),no=el('button',{textContent:'Отмена',onclick:d.close});
+ ok.onclick=async()=>{if(n1.value.length<8){err.textContent='Новый пароль должен быть не короче 8 символов';return}if(n1.value!==n2.value){err.textContent='Новые пароли не совпадают';return}
+  const r=await api('/api/admin/op',{method:'POST',body:JSON.stringify({t:'passwd',old:o1.value,password:n1.value})}),j=r.ok?await r.json():{error:'Не получилось'};
+  if(j.error){err.textContent=j.error;return}setTok(j);d.close();alert('Пароль изменён. На других устройствах нужно будет войти заново.')};
+ d.b.append(o1,n1,n2,err,el('div',{className:'row'},ok,no));o1.focus()};
+const fmtD=t=>t?new Date(t).toLocaleDateString('ru-RU'):'';
+const inviteLink=c=>location.origin+'/t?invite='+c;
+function copy(t,btn){(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{const o=btn.textContent;btn.textContent='Скопировано';setTimeout(()=>{btn.textContent=o},1500)},()=>prompt('Скопируйте:',t))}
+async function teachers(d){
+ const r=await api('/api/admin/teachers');if(!r.ok){alert('Не получилось');return}const data=await r.json();
+ if(!d)d=dlg('Репетиторы');while(d.b.children.length>1)d.b.lastChild.remove();
+ d.b.append(el('div',{className:'mut',textContent:'Каждый репетитор видит только своих учеников. Отправьте коллеге ссылку-приглашение: по ней он сам придумает логин и пароль. Ссылка одноразовая и действует 14 дней.'}));
+ const inv=el('button',{className:'pri',textContent:'+ Пригласить репетитора'});
+ inv.onclick=async()=>{const r=await api('/api/admin/op',{method:'POST',body:JSON.stringify({t:'invite'})});const j=r.ok?await r.json():{};if(!j.code){alert('Не получилось');return}
+  await teachers(d);copy(inviteLink(j.code),inv)};
+ d.b.append(inv);
+ if(data.invites.length){d.b.append(el('b',{textContent:'Неиспользованные приглашения'}));
+  data.invites.forEach(i=>{const c=el('button',{textContent:'Копировать'}),x=el('button',{textContent:'Отменить'});c.onclick=()=>copy(inviteLink(i.code),c);
+   x.onclick=async()=>{await api('/api/admin/op',{method:'POST',body:JSON.stringify({t:'invite-del',code:i.code})});teachers(d)};
+   d.b.append(el('div',{className:'row'},el('div',{className:'grow'},el('code',{textContent:inviteLink(i.code)}),el('div',{className:'mut',textContent:'создано '+fmtD(i.created)})),c,x))})}
+ d.b.append(el('b',{textContent:'Репетиторы ('+data.teachers.length+')'}));
+ if(!data.teachers.length)d.b.append(el('div',{className:'mut',textContent:'Пока никого. Пригласите первого коллегу кнопкой выше.'}));
+ data.teachers.forEach(t=>{const rs=el('button',{textContent:'Новый пароль'}),dl=el('button',{textContent:'Удалить'});
+  rs.onclick=async()=>{if(!confirm('Выдать «'+t.name+'» новый пароль? Старый перестанет работать.'))return;
+   const r=await api('/api/admin/op',{method:'POST',body:JSON.stringify({t:'teacher-reset',id:t.id})});const j=r.ok?await r.json():{};
+   if(j.password)prompt('Новый пароль для '+t.name+' (логин '+t.login+'). Скопируйте и отправьте ему:',j.password);else alert(j.error||'Не получилось')};
+  dl.onclick=async()=>{if(!confirm('Удалить аккаунт «'+t.name+'» вместе со всеми его учениками и досками ('+t.students+')? Это нельзя отменить.'))return;
+   await api('/api/admin/op',{method:'POST',body:JSON.stringify({t:'teacher-del',id:t.id})});teachers(d)};
+  d.b.append(el('div',{className:'row'},el('div',{className:'grow'},el('div',{textContent:t.name}),el('div',{className:'mut',textContent:'логин '+t.login+' · учеников: '+t.students+' · с '+fmtD(t.created)})),rs,dl))});
+ d.b.append(el('div',{className:'row',style:'border:0'},el('button',{textContent:'Закрыть',onclick:d.close})));
+}
+$('tch').onclick=()=>teachers();
+
+(async()=>{
+ const old=localStorage.getItem('adm'); // раньше в браузере хранился пароль владельца: переходим на вход по логину
+ if(old&&!tok){localStorage.removeItem('adm');const r=await post('/api/login',{login:'admin',password:old});if(r.ok)setTok(await r.json())}
+ if(invite&&!tok){setReg(true);
+  const r=await fetch('/api/invite?code='+encodeURIComponent(invite)),j=r.ok?await r.json():{};
+  if(!j.ok){setReg(false);history.replaceState(null,'','/t');return showLogin('Приглашение недействительно или уже использовано. Попросите у владельца новую ссылку.',true)}
+  return showLogin('')}
+ if(tok)load();else showLogin('');
+})();
 })();
 </script>
 
@@ -340,10 +432,12 @@ window.addEventListener('keydown',e=>{
 },true);
 
 // Копия всех досок хранится в браузере преподавателя: если сервер потеряет данные (обновление файлов на GitHub), их можно вернуть
-const api=(p,o)=>fetch(p,Object.assign({headers:{'X-Admin':localStorage.getItem('adm')||'','Content-Type':'application/json'}},o));
+const api=(p,o)=>window.boardApi(p,o);
+const bkey=k=>k+':'+(localStorage.getItem('tlogin')||'admin');
 const bdb=()=>new Promise((res,rej)=>{try{const q=indexedDB.open('board-backups',1);q.onupgradeneeded=()=>q.result.createObjectStore('b');q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)}catch(e){rej(e)}});
-async function bget(k){const db=await bdb();return new Promise((res,rej)=>{const q=db.transaction('b').objectStore('b').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
-async function bput(k,v){const db=await bdb();return new Promise((res,rej)=>{const t=db.transaction('b','readwrite');t.objectStore('b').put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})}
+async function bget(k){const db=await bdb();const v=await bget0(db,bkey(k));if(v||localStorage.getItem('tlogin')!=='admin')return v;return bget0(db,k)} // старые копии владельца лежат без логина
+async function bget0(db,k){return new Promise((res,rej)=>{const q=db.transaction('b').objectStore('b').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
+async function bput(k,v){const db=await bdb();return new Promise((res,rej)=>{const t=db.transaction('b','readwrite');t.objectStore('b').put(v,bkey(k));t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})}
 const fmt=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
 async function serverCount(){const r=await api('/api/admin/students');return r.ok?(await r.json()).length:-1}
 async function makeBackup(){
