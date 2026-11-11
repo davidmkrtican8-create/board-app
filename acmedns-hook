@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+# Хук для lego --dns exec: кладёт TXT-запись проверки в acme-dns (auth.acme-dns.io).
+# lego вызывает: acmedns-hook present|cleanup <fqdn> <value>
+import json, sys, urllib.request
+
+ACCOUNTS = "/etc/board-cert/acme-dns-accounts.json"
+API = "https://auth.acme-dns.io/update"
+
+def main():
+    if len(sys.argv) < 4:
+        sys.exit("usage: acmedns-hook present|cleanup FQDN VALUE")
+    action, fqdn, value = sys.argv[1], sys.argv[2], sys.argv[3]
+    if action != "present":
+        return  # acme-dns хранит только последние значения, удалять нечего
+    domain = fqdn.rstrip(".")
+    if domain.startswith("_acme-challenge."):
+        domain = domain[len("_acme-challenge."):]
+    accounts = json.load(open(ACCOUNTS))
+    # lego может передать имя домена или уже конечный адрес из CNAME (<uuid>.auth.acme-dns.io)
+    acc = accounts.get(domain) or next(a for a in accounts.values() if a["fulldomain"].rstrip(".") == domain)
+    body = json.dumps({"subdomain": acc["subdomain"], "txt": value}).encode()
+    req = urllib.request.Request(API, data=body, method="POST", headers={
+        "X-Api-User": acc["username"], "X-Api-Key": acc["password"], "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        print(f"acme-dns: {domain} -> {r.status}")
+
+main()

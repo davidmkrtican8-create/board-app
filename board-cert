@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Сертификат HTTPS для доски через DNS-01 и acme-dns (auth.acme-dns.io): заграничным проверкам не нужно заходить на сервер.
+# В DNS домена: _acme-challenge.<домен> и _acme-challenge.www.<домен> — CNAME на адреса из /etc/board-cert/acme-dns-accounts.json
+#   board-cert setup   — получить сертификат и подключить к сайту
+#   board-cert renew   — продлить, если до конца срока меньше 30 дней (запускается cron'ом)
+set -euo pipefail
+export EXEC_PATH=/usr/local/bin/acmedns-hook EXEC_PROPAGATION_TIMEOUT=300 EXEC_POLLING_INTERVAL=10
+DOMAIN="${BOARD_DOMAIN:-uchidoska.ru}"
+DIR=/etc/board-cert
+LEGO=(lego --accept-tos --email "admin@$DOMAIN" --path "$DIR/lego" --dns exec
+      --dns.resolvers 8.8.8.8:53 -d "$DOMAIN" -d "www.$DOMAIN")
+
+install_cert(){ # положить сертификат туда, где его читает Caddy, и включить сайт по домену
+  install -d -m 0750 -o root -g caddy "$DIR"
+  install -m 0640 -o root -g caddy "$DIR/lego/certificates/$DOMAIN.crt" "$DIR/cert.pem"
+  install -m 0640 -o root -g caddy "$DIR/lego/certificates/$DOMAIN.key" "$DIR/key.pem"
+  cat > /etc/caddy/Caddyfile <<EOF
+$DOMAIN, www.$DOMAIN {
+	tls $DIR/cert.pem $DIR/key.pem
+	reverse_proxy 127.0.0.1:3000 {
+		flush_interval -1
+	}
+}
+http:// {
+	header Content-Type "text/plain; charset=utf-8"
+	respond "ok — сервер доски работает" 200
+}
+EOF
+  systemctl reload caddy || systemctl restart caddy
+  systemctl is-enabled coturn >/dev/null 2>&1 && systemctl restart coturn || true # ретранслятор звонков тоже берёт этот сертификат
+}
+
+case "${1:-}" in
+  setup)
+    mkdir -p "$DIR/lego"
+    echo "Получаю сертификат (1–3 минуты)…"
+    "${LEGO[@]}" run
+    install_cert
+    echo "15 3 * * * root /usr/local/bin/board-cert renew >/var/log/board-cert.log 2>&1" > /etc/cron.d/board-cert
+    echo "Готово: https://$DOMAIN"
+    ;;
+  renew)
+    before=$(sha256sum "$DIR/lego/certificates/$DOMAIN.crt" | cut -c1-64)
+    "${LEGO[@]}" renew --days 30
+    after=$(sha256sum "$DIR/lego/certificates/$DOMAIN.crt" | cut -c1-64)
+    [ "$before" = "$after" ] || install_cert
+    ;;
+  *) echo "использование: board-cert setup | renew"; exit 1 ;;
+esac

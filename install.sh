@@ -31,7 +31,7 @@ export DEBIAN_FRONTEND=noninteractive
 # у части провайдеров IPv6 не работает, и apt висит на «Waiting for headers»: качаем по IPv4 и не ждём бесконечно
 printf 'Acquire::ForceIPv4 "true";\nAcquire::http::Timeout "25";\nAcquire::https::Timeout "25";\nAcquire::Retries "3";\n' > /etc/apt/apt.conf.d/99board-net
 apt-get update -y
-apt-get install -y curl git ca-certificates
+apt-get install -y curl git ca-certificates openssl coturn
 node_ok(){ command -v node >/dev/null && [ "$(node -p 'process.versions.node.split(".")[0]')" -ge 18 ]; }
 if ! node_ok; then
   apt-get install -y nodejs || true
@@ -80,7 +80,9 @@ mkdir -p "$DATA" /var/backups/board
 chown -R board:board "$DATA"
 
 say "Шаг 4 из 6. Настраиваю запуск"
-( umask 077; printf 'ADMIN_KEY=%s\nPORT=3000\nHOST=127.0.0.1\nDATA_DIR=%s\n' "$PASS" "$DATA" > /etc/board.env )
+TURN_SECRET="$(sed -n 's/^TURN_SECRET=//p' /etc/board.env 2>/dev/null || true)" # секрет ретранслятора звонков сохраняем при переустановке
+[ -n "$TURN_SECRET" ] || TURN_SECRET="$(openssl rand -hex 32)"
+( umask 077; printf 'ADMIN_KEY=%s\nPORT=3000\nHOST=127.0.0.1\nDATA_DIR=%s\nTURN_SECRET=%s\nTURN_HOST=%s\n' "$PASS" "$DATA" "$TURN_SECRET" "$DOMAIN" > /etc/board.env )
 cat > /etc/systemd/system/board.service <<EOF
 [Unit]
 Description=Доска репетитора
@@ -106,7 +108,47 @@ $DOMAIN {
 EOF
 if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then
   ufw allow OpenSSH >/dev/null; ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null
+  ufw allow 3478 >/dev/null; ufw allow 5349/tcp >/dev/null; ufw allow 49160:49260/udp >/dev/null
 fi
+# ретранслятор звонков (coturn): если напрямую соединиться нельзя, звук и видео идут через этот сервер
+TIP="$(ip -4 route get 1.1.1.1 | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}')"
+TLS=""
+if [ -f /etc/board-cert/cert.pem ]; then # сертификат, выпущенный board-cert (DNS-проверка), подходит и для turns:
+  usermod -aG caddy turnserver
+  TLS="tls-listening-port=5349
+cert=/etc/board-cert/cert.pem
+pkey=/etc/board-cert/key.pem
+no-tlsv1
+no-tlsv1_1"
+fi
+cat > /etc/turnserver.conf <<EOF
+listening-port=3478
+listening-ip=$TIP
+relay-ip=$TIP
+min-port=49160
+max-port=49260
+fingerprint
+use-auth-secret
+static-auth-secret=$TURN_SECRET
+realm=$DOMAIN
+$TLS
+no-cli
+no-multicast-peers
+denied-peer-ip=0.0.0.0-0.255.255.255
+denied-peer-ip=10.0.0.0-10.255.255.255
+denied-peer-ip=100.64.0.0-100.127.255.255
+denied-peer-ip=127.0.0.0-127.255.255.255
+denied-peer-ip=169.254.0.0-169.254.255.255
+denied-peer-ip=172.16.0.0-172.31.255.255
+denied-peer-ip=192.0.0.0-192.0.0.255
+denied-peer-ip=192.168.0.0-192.168.255.255
+denied-peer-ip=198.18.0.0-198.19.255.255
+total-quota=60
+stale-nonce=600
+syslog
+EOF
+chown root:turnserver /etc/turnserver.conf; chmod 640 /etc/turnserver.conf
+[ -f /etc/default/coturn ] && sed -i 's/^#\?TURNSERVER_ENABLED=.*/TURNSERVER_ENABLED=1/' /etc/default/coturn
 
 say "Шаг 5 из 6. Автообновление и копии"
 cat > /etc/cron.d/board <<EOF
@@ -118,6 +160,8 @@ systemctl enable --now board
 systemctl restart board
 systemctl enable caddy
 systemctl restart caddy
+systemctl enable coturn >/dev/null 2>&1
+systemctl restart coturn || echo "ВНИМАНИЕ: ретранслятор звонков (coturn) не запустился: journalctl -u coturn -n 20"
 
 say "Шаг 6 из 6. Проверка"
 sleep 4
