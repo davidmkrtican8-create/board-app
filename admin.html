@@ -94,7 +94,7 @@ body.nosidebar #side{display:none}
   <div class="foot"><button id="tch" hidden title="Пригласить репетиторов и управлять их аккаунтами">Репетиторы</button><button id="cpw" title="Сменить свой пароль">Пароль</button><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden><button id="lo" title="Выйти из кабинета на этом устройстве">Выйти</button><button id="rb" title="Вернуть учеников и доски из копии, которую кабинет сам сохраняет в вашем браузере">Восстановить из автокопии</button><div id="bkst" style="font-size:12px;color:var(--mut);width:100%"></div></div>
  </div>
  <div id="main">
-  <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk" class="keep">Задачи</button><button id="fs" class="keep" title="Фокус: убрать панели">⛶</button><button id="th" class="keep" title="Тема: как в системе / светлая / тёмная">◐</button><button id="lnk">Ссылка ученика</button><button id="ren">Переименовать</button><button id="del">Удалить</button></div>
+  <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk" class="keep">Задачи</button><button id="fs" class="keep" title="Фокус: убрать панели">⛶</button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button><button id="th" class="keep" title="Тема: как в системе / светлая / тёмная">◐</button><button id="lnk">Ссылка ученика</button><button id="ren">Переименовать</button><button id="del">Удалить</button></div>
   <div id="work">
    <iframe id="fr" allow="microphone; camera; autoplay; clipboard-write"></iframe>
    <div id="tasks" hidden>
@@ -417,6 +417,15 @@ $('hs').onclick=()=>setSB(!document.body.classList.contains('nosidebar'));
 if(localStorage.getItem('nosidebar')==='1')setSB(true);
 // «фокус»: убирает боковые панели (встроенный полный экран Safari ломает клавиатуру, поэтому без него)
 $('fs').onclick=()=>document.body.classList.toggle('admfocus');
+// настоящий полный экран (кнопка ⤢): вместе с ним включается «фокус»; выход — Esc или ещё раз ⤢
+const fsEl=()=>document.fullscreenElement||document.webkitFullscreenElement,de=document.documentElement;
+$('fsb').onclick=()=>{
+ if(fsEl()){(document.exitFullscreen||document.webkitExitFullscreen).call(document);return}
+ if(de.requestFullscreen)de.requestFullscreen().catch(()=>{});else de.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
+};
+const onFs=()=>{document.body.classList.toggle('admfocus',!!fsEl());$('fsb').textContent=fsEl()?'⤡':'⤢'};
+document.addEventListener('fullscreenchange',onFs);document.addEventListener('webkitfullscreenchange',onFs);
+if(!(de.requestFullscreen||de.webkitRequestFullscreen))$('fsb').hidden=true;
 // тема кабинета и доски
 let th=localStorage.getItem('admtheme')||'auto';
 function applyTh(){document.documentElement.dataset.theme=th==='auto'?'':th;try{$('fr').contentWindow.postMessage({t:'theme',v:th},location.origin)}catch(e){}}

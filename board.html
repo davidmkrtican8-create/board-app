@@ -40,6 +40,7 @@ body.noside #side,body.focus #side{display:none}
 body.focus #bar>*:not(.keep){display:none}
 body.focus #main{padding:4px;gap:4px}
 #edone,#newt,#vbadge,#zfit{position:absolute;z-index:3;background:var(--ac);color:#fff;border-color:var(--ac);box-shadow:0 2px 10px rgba(0,0,0,.3)}
+#edel{position:absolute;z-index:3;background:#d32f2f;color:#fff;border-color:#d32f2f;box-shadow:0 2px 10px rgba(0,0,0,.3)}
 #newt{left:50%;bottom:14px;transform:translateX(-50%)}
 #vbadge{left:12px;bottom:12px}
 #zfit{right:12px;bottom:12px}
@@ -117,7 +118,7 @@ body.focus #main{padding:4px;gap:4px}
   <button id="zo" title="Уменьшить">−</button><button id="zi" title="Увеличить">+</button><button id="fit">По ширине</button>
   <select id="fm"><option value="">Файл…</option><option value="img">Вставить картинку…</option><option value="pdf1">Скачать PDF: эта доска</option><option value="pdfa">Скачать PDF: все доски</option><option value="clr">Очистить доску…</option><option value="delp">Удалить эту доску…</option></select>
   <button id="gear" title="Настройки">⚙</button>
-  <button id="fs2" class="keep" title="Фокус: убрать панели">⛶</button>
+  <button id="fs2" class="keep" title="Фокус: убрать панели">⛶</button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button>
   <span id="st">Подключение…</span>
   <input type="file" id="fi" accept="image/*" hidden>
  </div>
@@ -136,12 +137,12 @@ body.focus #main{padding:4px;gap:4px}
   <label class="c"><input type="checkbox" id="showme"> Показывать другим мой курсор</label>
   <button id="fp" hidden>Палец: рисует</button>
   <details><summary>Как открыть на весь экран</summary>
-   <p><b>Компьютер:</b> кнопка ⛶ убирает панели. Полный экран браузера: Ctrl+⌘+F (Mac) или F11 (Windows).</p>
+   <p><b>Компьютер:</b> кнопка ⤢ — во весь экран (выйти: Esc). Кнопка ⛶ только убирает панели.</p>
    <p><b>iPhone / iPad:</b> «Поделиться» → «На экран «Домой»»: доска откроется как приложение без панелей Safari.</p>
    <p><b>Android:</b> меню браузера ⋮ → «Установить приложение» или «Добавить на главный экран».</p>
   </details>
  </div>
- <div id="wrap"><div id="plots"></div><div id="solidbar" hidden><span>Тяните внутри фигуры — вращать</span><button id="sletters" title="Подписать вершины буквами">A B C</button><button id="sreset" title="Вернуть исходный вид">↺ Вид</button></div><button id="followb" hidden></button><div id="callbox" hidden><div id="callhd"><span id="callst">Звонок</span><button id="callmin" title="Свернуть/развернуть">–</button></div><div id="tiles"></div></div><canvas id="cv"></canvas><canvas id="ovl"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button><button id="zfit" hidden>↺ Вернуть масштаб</button><div id="zhint" hidden>Страница приближена в браузере. Вернуть: Ctrl+0 (на Mac ⌘0)</div></div>
+ <div id="wrap"><div id="plots"></div><div id="solidbar" hidden><span>Тяните внутри фигуры — вращать</span><button id="sletters" title="Подписать вершины буквами">A B C</button><button id="sreset" title="Вернуть исходный вид">↺ Вид</button></div><button id="followb" hidden></button><div id="callbox" hidden><div id="callhd"><span id="callst">Звонок</span><button id="callmin" title="Свернуть/развернуть">–</button></div><div id="tiles"></div></div><canvas id="cv"></canvas><canvas id="ovl"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edel" hidden title="Удалить выделенное (клавиша Delete)">🗑 Удалить</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button><button id="zfit" hidden>↺ Вернуть масштаб</button><div id="zhint" hidden>Страница приближена в браузере. Вернуть: Ctrl+0 (на Mac ⌘0)</div></div>
 </div>
 <script>window.addEventListener('error',function(e){if(/ResizeObserver/.test(e.message||''))return;var s=document.getElementById('st');if(s)s.textContent='Ошибка в скрипте: '+(e.message||'')})</script>
 <script>
@@ -374,11 +375,13 @@ function placeDone(){ // кнопка «Готово» рядом с редак�
  const b=$('edone'),g=editImg&&(images[page]||{})[editImg];let rc=null;
  if(g)rc=[g.x,g.y,g.x+g.w,g.y+g.h];
  else{const sk=editStroke&&(strokes[page]||{})[editStroke];if(sk)rc=strokeBox(sk)}
- if(!rc){b.hidden=true;return}
- b.hidden=false;const s=view.s;
+ const dl=$('edel');
+ if(!rc){b.hidden=true;dl.hidden=true;return}
+ b.hidden=false;dl.hidden=viewOnly;const s=view.s;
  let x=(rc[2]-view.x)*s-b.offsetWidth,y=(rc[3]-view.y)*s+8;
  x=Math.max(6,Math.min(cw-b.offsetWidth-6,x));y=Math.max(6,Math.min(ch-b.offsetHeight-6,y));
  b.style.left=x+'px';b.style.top=y+'px';
+ if(!dl.hidden){dl.style.left=Math.max(6,x-dl.offsetWidth-8)+'px';dl.style.top=y+'px'}
 }
 function rotHandle(sk){ // где ручка поворота: над рамкой (или под ней, если сверху нет места)
  if(!canRot(sk)||viewOnly)return null;
@@ -885,9 +888,9 @@ cv.addEventListener('pointerdown',e=>{
   const hh=handleAt(p[0],p[1]);
   if(hh){const g2=images[page][hh.id];cur={mv:hh.id,size:hh.type==='size',dx:p[0]-g2.x,dy:p[1]-g2.y,r:g2.h/g2.w};return}
   const sid=strokeAt(p[0],p[1],true);
-  if(sid){const sk=strokes[page][sid];editStroke=sid;cur={mvs:sid,sx:p[0],sy:p[1],orig:sk.pts.slice()};redraw();return}
+  if(sid){const sk=strokes[page][sid];editImg=null;editStroke=sid;cur={mvs:sid,sx:p[0],sy:p[1],orig:sk.pts.slice()};redraw();return}
   const iid=imgAt(p[0],p[1]);
-  if(iid){const g=images[page][iid];cur={mv:iid,size:false,dx:p[0]-g.x,dy:p[1]-g.y,r:g.h/g.w};return}
+  if(iid){const g=images[page][iid];editStroke=null;editImg=iid;cur={mv:iid,size:false,dx:p[0]-g.x,dy:p[1]-g.y,r:g.h/g.w};redraw();return}
   pan={id:e.pointerId,x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};return;
  }
  const w=penW(); // толщина чернил привязана к листу, а не к масштабу
@@ -980,8 +983,7 @@ document.addEventListener('keydown',e=>{
  if(plain&&e.code==='KeyE'){setTool(isEr(tool())?'pen':ersTool());return} // E — ластик (ещё раз — обратно перо)
  if(plain&&(e.code==='KeyP'||e.code==='KeyB')){setTool('pen');return} // P или B — перо
  if(plain&&e.code==='KeyL'){setTool(tool()==='laser'?'pen':'laser');return} // L — указка
- if(plain&&(e.key==='Delete'||e.key==='Backspace')&&editStroke&&(strokes[page]||{})[editStroke]){ // удалить выделенную фигуру
-  const id=editStroke;delete strokes[page][id];editStroke=null;send({t:'erase',page:page,id:id});redraw();e.preventDefault();return}
+ if(plain&&(e.key==='Delete'||e.key==='Backspace')&&(editStroke||editImg)){if(delSel())e.preventDefault();return} // удалить выделенное
  const z=e.code==='KeyZ',y=e.code==='KeyY';
  if(!(e.metaKey||e.ctrlKey)||!(z||y))return;
  e.preventDefault();if(viewOnly)return;(y||e.shiftKey)?redoAct():undo();
@@ -1034,14 +1036,27 @@ document.addEventListener('paste',e=>{
 $('fi').onchange=()=>{if($('fi').files[0])addImage($('fi').files[0]);$('fi').value=''};
 
 // ---------- отмена / возврат ----------
+function delSel(){ // удалить выделенную картинку или фигуру (Ctrl+Z вернёт)
+ if(viewOnly)return false;let d=null;
+ if(editImg&&(images[page]||{})[editImg]){d={img:images[page][editImg]};d.id=editImg;delete images[page][editImg]}
+ else if(editStroke&&(strokes[page]||{})[editStroke]){d={stroke:strokes[page][editStroke]};d.id=editStroke;delete strokes[page][editStroke]}
+ editImg=null;editStroke=null;if(!d){redraw();return false}
+ mine.push({page:page,id:d.id,del:d});redo=[];send({t:'erase',page:page,id:d.id});redraw();return true;
+}
+function restoreObj(pg,d){
+ if(d.stroke){(strokes[pg]=strokes[pg]||{})[d.id]=d.stroke;send({t:'stroke',page:pg,stroke:clean(Object.assign({},d.stroke,{id:d.id}))})}
+ else{(images[pg]=images[pg]||{})[d.id]=d.img;send({t:'image',page:pg,img:Object.assign({},d.img,{id:d.id})})}
+}
 function undo(){
- const m=mine.pop();if(!m)return;const o=(strokes[m.page]||{})[m.id],g=(images[m.page]||{})[m.id];
+ const m=mine.pop();if(!m)return;
+ if(m.del){restoreObj(m.page,m.del);redo.push({page:m.page,id:m.id,redel:m.del});redraw();return} // вернуть удалённоеconst o=(strokes[m.page]||{})[m.id],g=(images[m.page]||{})[m.id];
  if(o){redo.push({page:m.page,id:m.id,stroke:o});delete strokes[m.page][m.id]}
  else if(g){redo.push({page:m.page,id:m.id,img:g});delete images[m.page][m.id]}else return;
  send({t:'erase',page:m.page,id:m.id});redraw();
 }
 function redoAct(){
  const r=redo.pop();if(!r)return;
+ if(r.redel){if(strokes[r.page])delete strokes[r.page][r.id];if(images[r.page])delete images[r.page][r.id];send({t:'erase',page:r.page,id:r.id});mine.push({page:r.page,id:r.id,del:r.redel});redraw();return}
  if(r.stroke){(strokes[r.page]=strokes[r.page]||{})[r.id]=r.stroke;send({t:'stroke',page:r.page,stroke:clean(Object.assign({id:r.id},r.stroke))})}
  else{(images[r.page]=images[r.page]||{})[r.id]=r.img;send({t:'image',page:r.page,img:Object.assign({id:r.id},r.img)})}
  mine.push({page:r.page,id:r.id});redraw();
@@ -1545,6 +1560,7 @@ $('cp').onclick=()=>{const t=location.href;(navigator.clipboard?navigator.clipbo
  b.onclick=()=>{color=c;if(['er','ers','mv','hand'].includes(tool()))setTool('pen');setCursor();document.querySelectorAll('.sw').forEach(x=>x.classList.remove('on'));b.classList.add('on')};
  $('cols').appendChild(b)});
 $('edone').onclick=()=>{editImg=null;editStroke=null;redraw()};
+$('edel').onclick=()=>{delSel()};
 $('zfit').onclick=()=>{fit()};
 if(window.visualViewport)window.visualViewport.addEventListener('resize',chkZoom);
 $('newt').onclick=()=>{if(!jump)return;view.y=jump.y-40;$('newt').hidden=true;jump=null;redraw()};
@@ -1572,6 +1588,15 @@ $('hp').onclick=()=>setSide(!document.body.classList.contains('noside'));
 if(localStorage.getItem('noside')==='1')setSide(true);
 $('fs2').onclick=()=>{document.body.classList.toggle('focus');setTimeout(resize,30)};
 if(isTeacher)$('fs2').hidden=true; // в кабинете преподавателя эта кнопка есть сверху
+// настоящий полный экран: панели браузера исчезают, вместе с ним включается «фокус»; выход — Esc или ещё раз ⤢
+const fsEl=()=>document.fullscreenElement||document.webkitFullscreenElement,de=document.documentElement;
+$('fsb').onclick=()=>{
+ if(fsEl()){(document.exitFullscreen||document.webkitExitFullscreen).call(document);return}
+ if(de.requestFullscreen)de.requestFullscreen().catch(()=>{});else de.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
+};
+const onFs=()=>{document.body.classList.toggle('focus',!!fsEl());$('fsb').textContent=fsEl()?'⤡':'⤢';setTimeout(resize,60)};
+document.addEventListener('fullscreenchange',onFs);document.addEventListener('webkitfullscreenchange',onFs);
+if(isTeacher||!(de.requestFullscreen||de.webkitRequestFullscreen))$('fsb').hidden=true; // iPhone не умеет — там «На экран Домой»
 // приложение «на главный экран» (полноэкранный режим на телефоне)
 const mf=document.createElement('link');mf.rel='manifest';mf.href='/b/'+room+'/manifest.webmanifest';document.head.appendChild(mf);
 new ResizeObserver(resize).observe(wrap);
