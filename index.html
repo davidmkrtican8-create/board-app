@@ -3,289 +3,294 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>УчиДоска — онлайн-доска для репетитора</title>
-<meta name="description" content="Общая онлайн-доска для занятий с учениками: рисуйте вместе в реальном времени, отправляйте задачи из сборников в один клик и созванивайтесь прямо на доске. Работает в России без VPN.">
-<meta property="og:title" content="УчиДоска — онлайн-доска для репетитора">
-<meta property="og:description" content="Рисуйте вместе с учеником, задачи из сборников в один клик, звонок прямо на доске. Без установки и без VPN.">
+<title>УчиДоска — онлайн-доска для занятий с учениками</title>
+<meta name="description" content="Общая онлайн-доска для репетиторов: пишете вместе с учеником, отправляете задачи из сборников в один клик и созваниваетесь прямо на доске. Работает в России без VPN.">
+<meta property="og:title" content="УчиДоска — онлайн-доска для занятий с учениками">
+<meta property="og:description" content="Пишете вместе с учеником, задачи из сборников в один клик, звонок прямо на доске. Без установки и без VPN.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="/icon.png">
-<meta name="theme-color" content="#6a3fc4">
+<meta name="theme-color" content="#f7f4ec">
 <link rel="icon" href="/icon.png">
 <link rel="apple-touch-icon" href="/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
+/* Тетрадь: синяя ручка — ученик, красная — учитель. Тёмная тема — школьная доска. */
 :root{
- --bg:#f6f4fb;--bg2:#ffffff;--panel:#ffffff;--tx:#1d1a27;--mut:#625d74;--line:#e4dff0;
- --ac:#6a3fc4;--ac2:#8b5cf6;--acsoft:#efe9fd;--teal:#0e9f8e;--red:#d93a3a;--blue:#2563c9;--ink:#1d1a27;
- --paper:#ffffff;--grid:#e3e9f4;--shadow:0 1px 2px rgba(29,26,39,.06),0 12px 32px -12px rgba(54,32,120,.22);
+ --paper:#f7f4ec;--sheet:#fffdf8;--ink:#1b2233;--soft:#566074;--rule:#e4dfd2;--cell:#e6ebf1;
+ --blue:#2547b0;--red:#d33a2c;--green:#2f7d4f;--margin:#e8796f;--onbtn:#fff;
+ --hand:"Caveat","Segoe Print","Bradley Hand",cursive;
+ --sans:"Onest",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
- --bg:#121019;--bg2:#17141f;--panel:#1d1a28;--tx:#ece8f6;--mut:#a39cba;--line:#2e2940;
- --ac:#a98bf0;--ac2:#c4b0ff;--acsoft:#2a2340;--teal:#3cc7b4;--red:#ff7a7a;--blue:#7fb0ff;--ink:#ece8f6;
- --paper:#1e1a2b;--grid:#2b2640;--shadow:0 1px 2px rgba(0,0,0,.4),0 16px 40px -16px rgba(0,0,0,.7);}}
-:root[data-theme="dark"]{--bg:#121019;--bg2:#17141f;--panel:#1d1a28;--tx:#ece8f6;--mut:#a39cba;--line:#2e2940;--ac:#a98bf0;--ac2:#c4b0ff;--acsoft:#2a2340;--teal:#3cc7b4;--red:#ff7a7a;--blue:#7fb0ff;--ink:#ece8f6;--paper:#1e1a2b;--grid:#2b2640;--shadow:0 1px 2px rgba(0,0,0,.4),0 16px 40px -16px rgba(0,0,0,.7)}
+ --paper:#18211d;--sheet:#1f2a25;--ink:#eef1e8;--soft:#a8b4ab;--rule:#304039;--cell:#2a3832;
+ --blue:#9db8ff;--red:#ff8f7f;--green:#8fd6a8;--margin:#b4655c;--onbtn:#10182b}}
+:root[data-theme="dark"]{--paper:#18211d;--sheet:#1f2a25;--ink:#eef1e8;--soft:#a8b4ab;--rule:#304039;--cell:#2a3832;--blue:#9db8ff;--red:#ff8f7f;--green:#8fd6a8;--margin:#b4655c;--onbtn:#10182b}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0;background:var(--bg);color:var(--tx);font:17px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 18px/1.6 var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 a{color:inherit}
-.wrap{max-width:1160px;margin:0 auto;padding:0 20px}
+.w{max-width:1120px;margin:0 auto;padding:0 24px}
+.hand{font-family:var(--hand);font-weight:700;color:var(--red);line-height:1}
+
 /* шапка */
-header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:saturate(1.4) blur(12px);-webkit-backdrop-filter:saturate(1.4) blur(12px);border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
-.hd{display:flex;align-items:center;gap:24px;height:64px}
-.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px;letter-spacing:-.02em;text-decoration:none}
-.logo svg{flex:none}
-.logo b{color:var(--ac)}
-nav{display:flex;gap:22px;margin-left:auto;font-size:15px}
-nav a{text-decoration:none;color:var(--mut)}nav a:hover{color:var(--tx)}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 20px;border-radius:12px;font-weight:650;font-size:16px;text-decoration:none;border:1.5px solid transparent;transition:transform .15s,box-shadow .15s,background .15s;white-space:nowrap}
-.btn:active{transform:translateY(1px)}
-.btn.pri{background:var(--ac);color:#fff;box-shadow:0 8px 20px -8px color-mix(in srgb,var(--ac) 70%,transparent)}
-.btn.pri:hover{box-shadow:0 12px 26px -10px color-mix(in srgb,var(--ac) 80%,transparent);transform:translateY(-1px)}
-.btn.ghost{border-color:var(--line);background:var(--panel)}
-.btn.ghost:hover{border-color:var(--ac)}
-.btn.sm{padding:8px 14px;font-size:15px;border-radius:10px}
+header{border-bottom:1px solid var(--rule)}
+.hd{display:flex;align-items:center;gap:28px;height:68px}
+.brand{display:flex;align-items:baseline;font-weight:800;font-size:21px;letter-spacing:-.02em;text-decoration:none}
+.brand i{width:9px;height:9px;background:var(--red);border-radius:2px;display:inline-block;margin-left:3px}
+.hd nav{display:flex;gap:26px;margin-left:auto;font-size:15.5px}
+.hd nav a{text-decoration:none;color:var(--soft)}.hd nav a:hover{color:var(--ink)}
+.hd .in{font-size:15.5px;font-weight:600;text-decoration:none;padding:7px 14px;border:1.5px solid var(--ink);border-radius:8px}
+.hd .in:hover{background:var(--ink);color:var(--paper)}
+
+/* кнопки */
+.btn{display:inline-flex;align-items:center;gap:10px;padding:14px 22px;border-radius:9px;font:600 17px var(--sans);text-decoration:none;background:var(--blue);color:var(--onbtn);border:0;transition:transform .12s,box-shadow .12s}
+.btn:hover{transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--ink)}
+.btn:active{transform:none;box-shadow:none}
+.link{font-weight:600;color:var(--ink);text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:4px}
+
 /* первый экран */
-.hero{position:relative;overflow:hidden;padding:64px 0 40px}
-.hero:before{content:"";position:absolute;inset:0;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:28px 28px;mask-image:radial-gradient(ellipse 70% 60% at 50% 30%,#000 30%,transparent 75%);-webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 30%,#000 30%,transparent 75%);opacity:.7;pointer-events:none}
-.hero .wrap{position:relative;display:grid;grid-template-columns:1.02fr 1fr;gap:48px;align-items:center}
-.pill{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;background:var(--acsoft);color:var(--ac);font-size:14px;font-weight:600}
-.pill i{width:8px;height:8px;border-radius:50%;background:var(--teal);box-shadow:0 0 0 4px color-mix(in srgb,var(--teal) 25%,transparent)}
-h1{font-size:clamp(36px,5.4vw,60px);line-height:1.04;letter-spacing:-.035em;margin:18px 0 18px;font-weight:850}
-h1 .hl{background:linear-gradient(100deg,var(--ac),var(--ac2));-webkit-background-clip:text;background-clip:text;color:transparent}
-.lead{font-size:clamp(17px,1.6vw,20px);color:var(--mut);margin:0 0 28px;max-width:34em}
-.cta{display:flex;gap:12px;flex-wrap:wrap}
-.trust{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:26px;color:var(--mut);font-size:14px}
-.trust span{display:inline-flex;align-items:center;gap:7px}
-.trust svg{color:var(--teal)}
-/* макет доски */
-.mock{position:relative;border-radius:18px;background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);padding:10px;transform:rotate(-1deg)}
-.mock .bar{display:flex;gap:6px;align-items:center;padding:4px 4px 10px;flex-wrap:nowrap;overflow:hidden}
-.mock .bar span{flex:none;height:26px;border-radius:8px;border:1px solid var(--line);padding:0 10px;font-size:12px;display:inline-flex;align-items:center;color:var(--mut);background:var(--bg2)}
-.mock .bar span.on{background:var(--ac);color:#fff;border-color:var(--ac)}
-.mock .bar .dot{width:16px;height:16px;border-radius:50%;padding:0;border:2px solid var(--panel);box-shadow:0 0 0 1px var(--line)}
-.mock svg.board{display:block;width:100%;height:auto;border-radius:10px;background:var(--paper)}
-.callcard{position:absolute;right:-14px;top:58px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:8px;display:flex;gap:6px;transform:rotate(2deg)}
-.callcard .t{width:74px;height:56px;border-radius:9px;position:relative;overflow:hidden;display:flex;align-items:flex-end;padding:4px;font-size:10px;color:#fff}
-.callcard .t1{background:linear-gradient(135deg,#7c5ce6,#4b2fa8)}
-.callcard .t2{background:linear-gradient(135deg,#19b6a2,#0b7d70)}
-.callcard .t b{background:rgba(0,0,0,.35);padding:1px 5px;border-radius:5px;font-weight:600}
-.callcard .live{position:absolute;left:10px;top:-11px;background:var(--red);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
-.cur{position:absolute;display:flex;align-items:flex-start;gap:2px;font-size:11px;font-weight:600;color:#fff;pointer-events:none}
-.cur em{font-style:normal;padding:2px 7px;border-radius:6px;margin-top:12px}
-/* секции */
-section{padding:84px 0}
-.sec-h{max-width:720px;margin:0 auto 44px;text-align:center}
-.eyebrow{color:var(--ac);font-weight:700;font-size:14px;letter-spacing:.06em;text-transform:uppercase}
-h2{font-size:clamp(28px,3.6vw,42px);line-height:1.12;letter-spacing:-.03em;margin:10px 0 12px;font-weight:820}
-.sec-h p{color:var(--mut);margin:0;font-size:18px}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 1px 2px rgba(29,26,39,.04);transition:transform .2s,box-shadow .2s,border-color .2s}
-.card:hover{transform:translateY(-3px);box-shadow:var(--shadow);border-color:color-mix(in srgb,var(--ac) 35%,var(--line))}
-.ic{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;background:var(--acsoft);color:var(--ac);margin-bottom:16px}
-.card h3{margin:0 0 8px;font-size:19px;letter-spacing:-.01em}
-.card p{margin:0;color:var(--mut);font-size:16px}
-.card .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
-.card .tags span{font-size:12.5px;padding:3px 9px;border-radius:999px;background:var(--bg);border:1px solid var(--line);color:var(--mut)}
-/* шаги */
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;counter-reset:s}
-.step{position:relative;padding:26px 24px 24px;border-radius:18px;background:var(--panel);border:1px solid var(--line)}
-.step:before{counter-increment:s;content:counter(s);position:absolute;top:-16px;left:22px;width:36px;height:36px;border-radius:11px;background:var(--ac);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 18px -8px var(--ac)}
-.step h3{margin:8px 0 6px;font-size:18px}.step p{margin:0;color:var(--mut);font-size:16px}
+.hero{padding:72px 0 88px}
+.hero .w{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.08fr);gap:56px;align-items:center}
+.kicker{font-size:15px;color:var(--soft);margin:0 0 18px;display:flex;align-items:center;gap:10px}
+.kicker:before{content:"";width:28px;height:2px;background:var(--red)}
+h1{font-size:clamp(40px,5.2vw,64px);line-height:1.02;letter-spacing:-.035em;font-weight:800;margin:0 0 22px}
+h1 u{text-decoration:none;position:relative;white-space:nowrap}
+h1 u svg{position:absolute;left:-2%;bottom:-.16em;width:104%;height:.32em;overflow:visible}
+.lead{font-size:clamp(18px,1.6vw,20px);color:var(--soft);margin:0 0 32px;max-width:30em}
+.act{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.facts{margin:34px 0 0;padding:16px 0 0;border-top:1px dashed var(--rule);display:flex;flex-wrap:wrap;gap:6px 18px;font-size:15px;color:var(--soft)}
+.facts b{color:var(--ink);font-weight:600}
+
+/* тетрадный лист с уроком */
+.sheet{position:relative;background:var(--sheet);border:1px solid var(--rule);border-radius:4px;box-shadow:0 1px 0 var(--rule),0 22px 40px -28px rgba(27,34,51,.45)}
+.sheet svg.pg{display:block;width:100%;height:auto}
+.note{position:absolute;font-size:24px;white-space:nowrap}
+.note svg{position:absolute;overflow:visible}
+.who{position:absolute;display:flex;align-items:flex-start;font:600 11px var(--sans);color:#fff;pointer-events:none}
+.who span{margin-top:13px;padding:2px 7px;border-radius:4px}
+.call{position:absolute;right:16px;top:16px;display:flex;align-items:center;gap:10px;background:var(--sheet);border:1px solid var(--rule);border-radius:10px;padding:8px 12px 8px 8px;font-size:13px;box-shadow:0 6px 16px -10px rgba(0,0,0,.4)}
+.call .av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:12px;color:#fff}
+.call .av+.av{margin-left:-16px;border:2px solid var(--sheet)}
+.call small{display:block;color:var(--soft);font-size:11.5px;line-height:1.2}
+.call b{font-weight:600}
+.call .dot{width:8px;height:8px;border-radius:50%;background:var(--green);margin-left:4px}
+
+/* разделы */
+section{padding:96px 0}
+.sh{display:grid;grid-template-columns:200px 1fr;gap:40px;margin-bottom:48px}
+.sh .tag{font-size:15px;color:var(--soft);padding-top:12px;border-top:2px solid var(--ink)}
+h2{font-size:clamp(30px,3.6vw,46px);line-height:1.08;letter-spacing:-.03em;font-weight:800;margin:0;max-width:16em}
+
+/* возможности: разворот с номерами */
+.rows{border-top:1px solid var(--rule)}
+.row{display:grid;grid-template-columns:200px minmax(0,1fr) 260px;gap:40px;padding:36px 0;border-bottom:1px solid var(--rule);align-items:start}
+.num{font-family:var(--hand);font-size:44px;font-weight:700;color:var(--red);line-height:.9}
+.row h3{margin:0 0 10px;font-size:23px;letter-spacing:-.015em;font-weight:700}
+.row p{margin:0;color:var(--soft);max-width:34em}
+.row .pic{justify-self:end;width:100%;max-width:260px}
+.row .pic svg{display:block;width:100%;height:auto}
+
+/* от автора */
+.author{background:var(--sheet);border:1px solid var(--rule);border-radius:4px;position:relative;padding:44px 48px 40px 88px;max-width:820px;margin:0 auto;background-image:linear-gradient(var(--cell) 1px,transparent 1px);background-size:100% 34px;background-position:0 30px}
+.author:before{content:"";position:absolute;left:62px;top:0;bottom:0;width:2px;background:var(--margin);opacity:.8}
+.author p{margin:0 0 16px;font-size:19px;line-height:34px}
+.author .sig{font-family:var(--hand);font-size:34px;color:var(--blue);margin-top:6px}
+.author .draft{position:absolute;right:20px;top:-14px;background:var(--red);color:#fff;font:600 12px var(--sans);padding:3px 9px;border-radius:4px}
+
+/* как начать */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);border-top:2px solid var(--ink)}
+.steps div{padding:26px 28px 6px 0}
+.steps div+div{padding-left:28px;border-left:1px solid var(--rule)}
+.steps b{display:block;font-size:20px;margin:6px 0 8px;letter-spacing:-.01em}
+.steps p{margin:0;color:var(--soft);font-size:17px}
+.steps .n{font:700 15px var(--sans);color:var(--red)}
+
 /* ученикам */
-.alt{background:var(--bg2);border-block:1px solid var(--line)}
-.stud{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center}
-.stud ul{list-style:none;padding:0;margin:20px 0 0;display:grid;gap:12px}
-.stud li{display:flex;gap:12px;align-items:flex-start;color:var(--mut)}
-.stud li svg{flex:none;margin-top:3px;color:var(--teal)}
-.phone{justify-self:center;width:260px;border-radius:34px;border:10px solid #1b1726;background:var(--paper);box-shadow:var(--shadow);overflow:hidden;aspect-ratio:9/18;position:relative}
-.phone .url{margin:10px;border-radius:10px;background:var(--bg);font-size:11px;color:var(--mut);padding:6px 10px;text-align:center}
+.kids{display:grid;grid-template-columns:200px 1fr;gap:40px;padding:40px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.kids .tag{font-size:15px;color:var(--soft);padding-top:12px;border-top:2px solid var(--ink);align-self:start}
+.kids p{margin:0;font-size:20px;max-width:34em}
+.kids p span{color:var(--soft)}
+
 /* финал */
-.final{padding:72px 0 96px}
-.final .box{position:relative;overflow:hidden;border-radius:26px;padding:56px 32px;text-align:center;color:#fff;background:radial-gradient(120% 140% at 0% 0%,#8b5cf6 0%,#6a3fc4 45%,#3d2290 100%)}
-.final .box:before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.08) 1px,transparent 1px);background-size:28px 28px}
-.final h2{position:relative;color:#fff}.final p{position:relative;opacity:.88;margin:0 auto 26px;max-width:36em;font-size:18px}
-.final .btn{position:relative}
-.final .btn.pri{background:#fff;color:#4b2fa8}
-.final .btn.ghost{background:transparent;border-color:rgba(255,255,255,.45);color:#fff}
-footer{border-top:1px solid var(--line);padding:28px 0 40px;color:var(--mut);font-size:14px}
-footer .wrap{display:flex;gap:16px;justify-content:space-between;flex-wrap:wrap}
-footer a{text-decoration:none}footer a:hover{color:var(--tx)}
-/* появление при прокрутке */
-.rv{opacity:0;transform:translateY(16px);transition:opacity .6s ease,transform .6s ease}.rv.in{opacity:1;transform:none}
-@media (prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none}html{scroll-behavior:auto}}
+.end{padding:100px 0 110px}
+.end .w{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:40px;align-items:end}
+.end h2{max-width:13em}
+.end .cta{position:relative;justify-self:start}
+.end .cta .hand{position:absolute;left:8px;top:-56px;font-size:28px;transform:rotate(-4deg)}
+.end .cta .hand svg{position:absolute;left:150px;top:10px;overflow:visible}
+footer{border-top:1px solid var(--rule);padding:28px 0 44px;color:var(--soft);font-size:14.5px}
+footer .w{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+footer a{text-decoration:none}footer a:hover{color:var(--ink)}
+
 /* адаптив */
-@media (max-width:960px){.hero .wrap{grid-template-columns:1fr;gap:40px}.mock{transform:none;max-width:620px;margin:0 auto}.grid{grid-template-columns:1fr 1fr}.stud{grid-template-columns:1fr}}
-@media (max-width:720px){nav{display:none}.hd .btn.ghost{margin-left:auto}.grid,.steps{grid-template-columns:1fr}.steps{gap:30px}section{padding:64px 0}.hero{padding:40px 0 24px}.callcard{right:4px;top:auto;bottom:-22px;transform:none}.callcard .t{width:62px;height:46px}.mock .bar span:nth-child(n+6){display:none}.final .box{padding:44px 20px}}
+@media (max-width:1180px){.note{display:none}}
+@media (max-width:980px){
+ .hero .w{grid-template-columns:1fr;gap:56px}.hero{padding:48px 0 64px}
+ .sh,.kids{grid-template-columns:1fr;gap:16px}.sh .tag,.kids .tag{max-width:200px}
+ .row{grid-template-columns:72px minmax(0,1fr);gap:8px 20px}.row .pic{grid-column:2;justify-self:start;max-width:240px;margin-top:14px}
+ .end .w{grid-template-columns:1fr}.end .cta{margin-top:64px}
+}
+@media (max-width:640px){
+ body{font-size:17px}.w{padding:0 18px}.hd nav{display:none}.hd .in{margin-left:auto}
+ section{padding:72px 0}
+ .steps{grid-template-columns:1fr}.steps div,.steps div+div{padding:22px 0;border-left:0;border-bottom:1px solid var(--rule)}
+ .author{padding:34px 22px 30px 44px}.author:before{left:28px}.author .draft{right:12px}
+ .call{right:8px;top:auto;bottom:8px;padding:6px 10px 6px 6px}.call small{display:none}
+ .row{grid-template-columns:48px minmax(0,1fr)}.num{font-size:36px}
+}
 </style>
 </head>
 <body>
 <header>
- <div class="wrap hd">
-  <a class="logo" href="/" aria-label="УчиДоска — на главную">
-   <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="3" width="32" height="24" rx="6" fill="var(--ac)"/><path d="M7 20c3-6 5-8 7-6s3 4 6 0 4-6 7-5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M12 27l-3 5M22 27l3 5" stroke="var(--ac)" stroke-width="2.4" stroke-linecap="round"/></svg>
-   <span>Учи<b>Доска</b></span>
-  </a>
-  <nav><a href="#features">Возможности</a><a href="#start">Как начать</a><a href="#students">Ученикам</a></nav>
-  <a class="btn ghost sm" href="/t">Войти</a>
+ <div class="w hd">
+  <a class="brand" href="/" aria-label="УчиДоска — на главную">учидоска<i></i></a>
+  <nav><a href="#how">Возможности</a><a href="#start">Как начать</a><a href="#kids">Ученикам</a></nav>
+  <a class="in" href="/t">Войти</a>
  </div>
 </header>
 
 <main>
  <div class="hero">
-  <div class="wrap">
+  <div class="w">
    <div>
-    <span class="pill"><i></i>Работает в России без VPN</span>
-    <h1>Удобная онлайн‑доска для <span class="hl">занятий с&nbsp;учениками</span></h1>
-    <p class="lead">Рисуйте вместе с учеником в реальном времени, отправляйте задачи из сборников в один клик и созванивайтесь прямо на доске. Ничего не нужно устанавливать: компьютер, планшет со стилусом или телефон.</p>
-    <div class="cta">
-     <a class="btn pri" data-tg href="#">
-      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M21.9 4.3 18.7 19.4c-.2 1.1-.9 1.3-1.8.8l-4.9-3.6-2.4 2.3c-.3.3-.5.5-1 .5l.4-5 9.1-8.2c.4-.4-.1-.6-.6-.2L6.2 13 1.4 11.5c-1-.3-1-1 .2-1.5L20.6 2.8c.9-.3 1.6.2 1.3 1.5z"/></svg>
-      Получить доступ
-     </a>
-     <a class="btn ghost" href="/t">Войти в кабинет</a>
+    <p class="kicker">Для репетиторов и их учеников</p>
+    <h1>Удобная онлайн&#8209;доска для занятий с&nbsp;<u>учениками<svg viewBox="0 0 200 20" preserveAspectRatio="none" aria-hidden="true"><path d="M3 13C40 6 92 4 197 9M14 17c50-5 110-6 168-3" fill="none" stroke="var(--red)" stroke-width="3.2" stroke-linecap="round"/></svg></u></h1>
+    <p class="lead">Пишете вместе с учеником, как в одной тетради. Отправляете задачи из своего сборника в один клик и созваниваетесь прямо на доске — без Zoom и без установки программ.</p>
+    <div class="act">
+     <a class="btn" data-tg href="#"><svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M21.9 4.3 18.7 19.4c-.2 1.1-.9 1.3-1.8.8l-4.9-3.6-2.4 2.3c-.3.3-.5.5-1 .5l.4-5 9.1-8.2c.4-.4-.1-.6-.6-.2L6.2 13 1.4 11.5c-1-.3-1-1 .2-1.5L20.6 2.8c.9-.3 1.6.2 1.3 1.5z"/></svg>Получить доступ</a>
+     <a class="link" href="/t">У меня есть аккаунт</a>
     </div>
-    <div class="trust">
-     <span><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="m5 12 5 5 9-10"/></svg>Серверы в Москве</span>
-     <span><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="m5 12 5 5 9-10"/></svg>Без установки</span>
-     <span><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="m5 12 5 5 9-10"/></svg>Ученику не нужна регистрация</span>
-    </div>
+    <p class="facts"><span><b>Без VPN</b> — серверы в Москве</span><span><b>Без установки</b> — в любом браузере</span><span><b>Ученику</b> регистрация не нужна</span></p>
    </div>
 
-   <div class="mock" aria-label="Как выглядит доска во время занятия">
-    <div class="bar"><span class="on">✏️ Перо</span><span>T Текст</span><span>△ Фигуры</span><span class="dot" style="background:#1a1a1a"></span><span class="dot" style="background:#d32f2f"></span><span class="dot" style="background:#1565c0"></span><span>📞 Звонок</span><span>↶</span></div>
-    <svg class="board" viewBox="0 0 560 380" role="img" aria-label="Решение задачи на доске: формула, единичная окружность и график">
-     <defs><pattern id="g" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="var(--grid)" stroke-width="1"/></pattern></defs>
-     <rect width="560" height="380" fill="url(#g)"/>
-     <!-- карточка задачи из сборника -->
-     <g transform="translate(24 20)">
-      <rect width="300" height="64" rx="8" fill="var(--panel)" stroke="var(--line)"/>
-      <rect width="300" height="20" rx="8" fill="#8db48e"/><rect y="12" width="300" height="8" fill="#8db48e"/>
-      <text x="10" y="14" font-size="11" font-weight="700" fill="#fff">Задача 14.8</text>
-      <text x="12" y="40" font-size="13" fill="var(--ink)">Решите уравнение 1 − cos 2x = √2 sin x</text>
-      <text x="12" y="56" font-size="11" fill="var(--mut)">б) Найдите корни на отрезке [−3π; −3π/2]</text>
+   <div class="sheet" aria-label="Пример урока на доске">
+    <svg class="pg" viewBox="0 0 600 430" role="img" aria-label="Тетрадный лист: задача, решение учеником синей ручкой и пометки учителя красной">
+     <defs><pattern id="c" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="var(--cell)" stroke-width="1"/></pattern></defs>
+     <rect width="600" height="430" fill="url(#c)"/>
+     <path d="M520 0V430" stroke="var(--margin)" stroke-width="1.6" opacity=".75"/>
+     <g transform="translate(28 26)">
+      <rect width="330" height="70" fill="var(--sheet)" stroke="var(--rule)"/>
+      <text x="12" y="22" font-family="Onest,Arial,sans-serif" font-size="11" font-weight="700" fill="var(--soft)" letter-spacing=".04em">ЗАДАЧА 14.8</text>
+      <text x="12" y="44" font-family="Onest,Arial,sans-serif" font-size="14" fill="var(--ink)">Решите уравнение 1 − cos 2x = √2 sin x</text>
+      <text x="12" y="61" font-family="Onest,Arial,sans-serif" font-size="12" fill="var(--soft)">б) Укажите корни на отрезке [−3π; −3π/2]</text>
      </g>
-     <!-- рукописное решение -->
-     <g font-family="'Bradley Hand','Segoe Print','Noteworthy','Chalkboard SE','Comic Sans MS',cursive" font-size="25">
-      <text x="30" y="132" fill="var(--ink)">2 sin²x = √2 sin x</text>
-      <text x="270" y="132" fill="var(--red)">→  sin x = 0</text>
-      <text x="270" y="162" fill="var(--red)" font-size="21">или sin x = √2⁄2</text>
+     <g font-family="Caveat,'Segoe Print','Bradley Hand',cursive" font-weight="500" fill="var(--blue)">
+      <text x="30" y="140" font-size="28">2 sin²x = √2 sin x</text>
+      <text x="30" y="178" font-size="28">sin x (2 sin x − √2) = 0</text>
+      <text x="30" y="216" font-size="28">sin x = 0  или  sin x = √2⁄2</text>
      </g>
-     <!-- единичная окружность -->
+     <g fill="none" stroke="var(--red)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M318 166l7 8 14-18"/>
+      <ellipse cx="178" cy="208" rx="150" ry="22" transform="rotate(-1.5 178 208)"/>
+     </g>
+     <text x="560" y="150" font-family="Caveat,'Segoe Print',cursive" font-weight="700" font-size="34" fill="var(--red)" text-anchor="middle">5</text>
      <g fill="none" stroke-linecap="round">
-      <path d="M40 260h170M125 175v170" stroke="var(--mut)" stroke-width="1.6"/>
-      <circle cx="125" cy="260" r="66" stroke="var(--ink)" stroke-width="2.6"/>
-      <path d="M125 260l47-47" stroke="var(--blue)" stroke-width="2.4"/>
-      <path d="M125 260l-47 47" stroke="var(--blue)" stroke-width="2.4" stroke-dasharray="6 6"/>
-      <circle cx="172" cy="213" r="4" fill="var(--blue)" stroke="none"/>
-      <circle cx="78" cy="307" r="4" fill="var(--blue)" stroke="none"/>
-      <path d="M145 260a20 20 0 0 0-6-14" stroke="var(--red)" stroke-width="2"/>
+      <path d="M36 330h160M116 254v156" stroke="var(--soft)" stroke-width="1.4"/>
+      <circle cx="116" cy="330" r="62" stroke="var(--blue)" stroke-width="2.3"/>
+      <path d="M116 330l44-44M116 330l-44-44" stroke="var(--blue)" stroke-width="2"/>
+      <circle cx="160" cy="286" r="3.6" fill="var(--red)" stroke="none"/><circle cx="72" cy="286" r="3.6" fill="var(--red)" stroke="none"/>
      </g>
-     <text x="178" y="206" font-size="14" font-style="italic" fill="var(--blue)">π/4</text>
-     <text x="40" y="324" font-size="14" font-style="italic" fill="var(--blue)">−3π/4</text>
-     <!-- график -->
-     <g transform="translate(260 180)">
-      <path d="M0 90h270M120 0v170" stroke="var(--mut)" stroke-width="1.6" fill="none"/>
-      <path d="M270 90l-8-4v8zM120 0l-4 8h8z" fill="var(--mut)"/>
-      <path d="M8 150C40 40 70 40 100 90s60 120 90 60 50-110 72-118" fill="none" stroke="var(--teal)" stroke-width="2.8" stroke-linecap="round"/>
-      <text x="200" y="22" font-size="14" font-style="italic" fill="var(--teal)">y = sin x</text>
-      <rect x="150" y="104" width="64" height="40" rx="4" fill="none" stroke="var(--ac)" stroke-width="2" stroke-dasharray="6 5"/>
+     <g font-family="Caveat,'Segoe Print',cursive" font-size="21" fill="var(--blue)"><text x="164" y="280">π/4</text><text x="30" y="280">3π/4</text></g>
+     <path d="M262 400l46-78 46 78z" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round" opacity=".85"/>
+     <g transform="translate(372 250)" fill="none" stroke-linecap="round">
+      <path d="M0 80h132M66 0v160" stroke="var(--soft)" stroke-width="1.4"/>
+      <path d="M4 140C26 30 44 30 66 80s40 90 62 -10" stroke="var(--green)" stroke-width="2.4"/>
      </g>
-     <!-- ровный ромб и треугольник -->
-     <path d="M244 300l36-24 36 24-36 24z" fill="none" stroke="var(--ac)" stroke-width="2.6" stroke-linejoin="round"/>
-     <path d="M226 186l26 46h-52z" fill="none" stroke="#ef6c00" stroke-width="2.6" stroke-linejoin="round"/>
     </svg>
-    <div class="cur" style="left:58%;top:62%"><svg width="16" height="18" viewBox="0 0 16 18"><path d="M1 1l4 15 3-6 6-1z" fill="#6a3fc4" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg><em style="background:#6a3fc4">Преподаватель</em></div>
-    <div class="cur" style="left:30%;top:79%"><svg width="16" height="18" viewBox="0 0 16 18"><path d="M1 1l4 15 3-6 6-1z" fill="#0e9f8e" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg><em style="background:#0e9f8e">Ученик</em></div>
-    <div class="callcard" aria-hidden="true"><span class="live">● на связи</span><div class="t t1"><b>Вы</b></div><div class="t t2"><b>Ученик</b></div></div>
+    <div class="who" style="left:58%;top:47%"><svg width="15" height="17" viewBox="0 0 15 17" aria-hidden="true"><path d="M1 1l4 14 3-6 6-1z" fill="#d33a2c" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"/></svg><span style="background:#d33a2c">Преподаватель</span></div>
+    <div class="who" style="left:30%;top:66%"><svg width="15" height="17" viewBox="0 0 15 17" aria-hidden="true"><path d="M1 1l4 14 3-6 6-1z" fill="#2547b0" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"/></svg><span style="background:#2547b0">Ученик</span></div>
+    <div class="call" aria-hidden="true"><span class="av" style="background:#d33a2c">П</span><span class="av" style="background:#2547b0">У</span><span><b>Звонок идёт</b><small>прямо на доске</small></span><span class="dot"></span></div>
+    <div class="note hand" style="left:-128px;top:30%;transform:rotate(-6deg)" aria-hidden="true">ученик пишет<br>синей ручкой<svg width="60" height="40" style="left:104px;top:40px"><path d="M2 6c22 2 38 12 48 28M50 34l-11-3M50 34l1-11" fill="none" stroke="var(--red)" stroke-width="2.2" stroke-linecap="round"/></svg></div>
    </div>
   </div>
  </div>
 
- <section id="features">
-  <div class="wrap">
-   <div class="sec-h rv"><div class="eyebrow">Возможности</div><h2>Всё для урока — на одной доске</h2><p>Удобная тетрадь в клетку, которую вы с учеником видите одновременно. Плюс инструменты, которые экономят время репетитора.</p></div>
-   <div class="grid">
-    <div class="card rv"><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></div><h3>Рисуйте вместе</h3><p>Всё, что пишет преподаватель или ученик, второй видит мгновенно. Видно даже курсор собеседника.</p><div class="tags"><span>нажим пера</span><span>ластик</span><span>текст</span><span>10 толщин</span></div></div>
-    <div class="card rv"><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l8 9-8 9-8-9z"/></svg></div><h3>Ровные фигуры сами</h3><p>Нарисовали от руки и задержали перо: получился точный ромб, трапеция или равносторонний треугольник. Любую фигуру можно повернуть.</p><div class="tags"><span>плоские</span><span>объёмные</span><span>координаты</span></div></div>
-    <div class="card rv"><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M12 7v6M9 10h6"/></svg></div><h3>Задачи из сборников</h3><p>Откройте свой PDF-сборник прямо в кабинете и отправьте задачу на доску ученика одной кнопкой: с местом под решение.</p><div class="tags"><span>поиск по номеру</span><span>оглавление</span><span>любой фрагмент</span></div></div>
-    <div class="card rv"><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg></div><h3>Звонок прямо на доске</h3><p>Голос и видео без Zoom и мессенджеров. Ученик нажимает одну кнопку — и вы уже разговариваете.</p><div class="tags"><span>голос</span><span>видео</span><span>на телефоне</span></div></div>
-    <div class="card rv"><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg></div><h3>Доска для каждого ученика</h3><p>У каждого ученика своя постоянная ссылка и тетрадь с несколькими досками. Конспект урока скачивается в PDF.</p><div class="tags"><span>история занятий</span><span>PDF</span><span>копии</span></div></div>
-    <div class="card rv"><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div><h3>Надёжно и без VPN</h3><p>Серверы в Москве: доска открывается у учеников по всей России. Доски сохраняются автоматически, каждую ночь делается резервная копия.</p><div class="tags"><span>автосохранение</span><span>ночные копии</span><span>HTTPS</span></div></div>
+ <section id="how" style="padding-top:40px">
+  <div class="w">
+   <div class="sh"><div class="tag">Возможности</div><h2>Всё, что нужно на уроке, — на одном листе</h2></div>
+   <div class="rows">
+    <div class="row">
+     <div class="num">01</div>
+     <div><h3>Пишете вместе, как в одной тетради</h3><p>Всё, что пишете вы или ученик, второй видит в ту же секунду — вместе с курсором собеседника. Перо чувствует нажим стилуса на планшете. Нарисовали ромб от руки и задержали перо — он станет ровным, его можно повернуть.</p></div>
+     <div class="pic" aria-hidden="true"><svg viewBox="0 0 260 120"><path d="M86 22c-20 14-34 24-48 36 14 10 30 22 50 36 18-14 32-24 48-36-14-12-32-26-50-36z" fill="none" stroke="var(--blue)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity=".5"/><path d="M146 58h14M154 52l6 6-6 6" fill="none" stroke="var(--red)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M212 22l48 36-48 36-48-36z" fill="none" stroke="var(--blue)" stroke-width="2.4" stroke-linejoin="round" transform="translate(-8 0)"/><text x="160" y="116" font-family="Caveat,cursive" font-size="20" fill="var(--red)">стало ровно</text></svg></div>
+    </div>
+    <div class="row">
+     <div class="num">02</div>
+     <div><h3>Задачи из вашего сборника — в один клик</h3><p>Загрузите PDF сборника в кабинет: файл остаётся у вас на компьютере. Найдите задачу по номеру или в оглавлении и нажмите «+» — она появится на доске ученика вместе с местом под решение.</p></div>
+     <div class="pic" aria-hidden="true"><svg viewBox="0 0 260 120"><rect x="8" y="10" width="110" height="100" fill="var(--sheet)" stroke="var(--rule)"/><path d="M20 30h80M20 44h64M20 70h80M20 84h56" stroke="var(--soft)" stroke-width="3" stroke-linecap="round" opacity=".5"/><rect x="14" y="58" width="98" height="36" fill="none" stroke="var(--red)" stroke-width="2"/><path d="M128 76h46M164 66l10 10-10 10" fill="none" stroke="var(--red)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="186" y="54" width="66" height="44" fill="var(--sheet)" stroke="var(--blue)" stroke-width="2"/><path d="M194 68h44M194 80h30" stroke="var(--blue)" stroke-width="2.6" stroke-linecap="round" opacity=".6"/></svg></div>
+    </div>
+    <div class="row">
+     <div class="num">03</div>
+     <div><h3>Звонок прямо на доске</h3><p>Не нужно держать открытыми Zoom и доску одновременно. Нажали «Звонок» — у ученика загорается кнопка «Присоединиться». Голос, а если нужно, то и видео. Работает и на мобильном интернете.</p></div>
+     <div class="pic" aria-hidden="true"><svg viewBox="0 0 260 120"><circle cx="106" cy="58" r="30" fill="#d33a2c" opacity=".92"/><circle cx="154" cy="58" r="30" fill="#2547b0" opacity=".92"/><text x="106" y="66" text-anchor="middle" font-family="Onest,sans-serif" font-weight="700" font-size="22" fill="#fff">П</text><text x="154" y="66" text-anchor="middle" font-family="Onest,sans-serif" font-weight="700" font-size="22" fill="#fff">У</text><path d="M58 40c-8 11-8 26 0 37M46 31c-14 17-14 38 0 55M202 40c8 11 8 26 0 37M214 31c14 17 14 38 0 55" fill="none" stroke="var(--soft)" stroke-width="2.2" stroke-linecap="round" opacity=".6"/></svg></div>
+    </div>
+    <div class="row">
+     <div class="num">04</div>
+     <div><h3>У каждого ученика — своя тетрадь</h3><p>Постоянная личная ссылка, несколько досок на разные темы, конспект урока в PDF одной кнопкой. Ученик возвращается к прошлым занятиям когда угодно, а вы видите, что он решал.</p></div>
+     <div class="pic" aria-hidden="true"><svg viewBox="0 0 260 120"><rect x="60" y="22" width="90" height="86" fill="var(--sheet)" stroke="var(--rule)" transform="rotate(-6 105 65)"/><rect x="84" y="16" width="90" height="86" fill="var(--sheet)" stroke="var(--rule)" transform="rotate(3 129 59)"/><rect x="108" y="12" width="90" height="86" fill="var(--sheet)" stroke="var(--ink)" stroke-width="1.4"/><path d="M118 12v86" stroke="var(--margin)" stroke-width="1.4"/><path d="M128 34h56M128 48h44M128 62h52" stroke="var(--blue)" stroke-width="2.6" stroke-linecap="round" opacity=".6"/></svg></div>
+    </div>
+    <div class="row">
+     <div class="num">05</div>
+     <div><h3>Работает в России, ничего не теряется</h3><p>Серверы в Москве: доска открывается у учеников без VPN, с компьютера, планшета и телефона. Всё сохраняется автоматически, а каждую ночь делается резервная копия.</p></div>
+     <div class="pic" aria-hidden="true"><svg viewBox="0 0 260 120"><path d="M70 82c-16 0-26-10-26-24s12-24 26-22c6-14 20-22 36-20 18 2 30 16 30 30 14 0 24 10 24 22s-10 14-22 14z" fill="none" stroke="var(--blue)" stroke-width="2.4" stroke-linejoin="round"/><path d="M84 62l14 14 30-32" fill="none" stroke="var(--red)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><text x="176" y="66" font-family="Caveat,cursive" font-size="24" fill="var(--red)">Москва</text></svg></div>
+    </div>
+   </div>
+  </div>
+ </section>
+
+ <section style="padding-top:20px">
+  <div class="w">
+   <div class="author">
+    <span class="draft">черновик — поправьте под себя</span>
+    <p>Я сам репетитор по математике. Мне не хватало доски, на которой удобно разбирать задачи из сборников, рисовать графики и чертежи и при этом не держать открытыми ещё три программы.</p>
+    <p>Поэтому я сделал свою — и пользуюсь ей на уроках. Если вы тоже репетитор, напишите мне: дам доступ и помогу провести первое занятие.</p>
+    <div class="sig">Давид</div>
    </div>
   </div>
  </section>
 
  <section id="start" style="padding-top:20px">
-  <div class="wrap">
-   <div class="sec-h rv"><div class="eyebrow">Как начать</div><h2>Первый урок — через пять минут</h2><p>Никаких сложных настроек: только ссылка и браузер.</p></div>
+  <div class="w">
+   <div class="sh"><div class="tag">Как начать</div><h2>Первый урок — через пять минут</h2></div>
    <div class="steps">
-    <div class="step rv"><h3>Получите приглашение</h3><p>Напишите нам — пришлём ссылку. По ней вы сами придумаете логин и пароль для своего кабинета.</p></div>
-    <div class="step rv"><h3>Добавьте ученика</h3><p>Нажмите «+ Ученик» и отправьте ему личную ссылку на доску в любом мессенджере.</p></div>
-    <div class="step rv"><h3>Занимайтесь</h3><p>Открывайте доску ученика, отправляйте задачи из сборников и созванивайтесь — всё в одном окне.</p></div>
+    <div><span class="n">Шаг 1</span><b>Получите приглашение</b><p>Напишите мне в Telegram — пришлю ссылку. По ней вы сами придумаете логин и пароль.</p></div>
+    <div><span class="n">Шаг 2</span><b>Добавьте ученика</b><p>Нажмите «+ Ученик» и отправьте ему личную ссылку на доску в любом мессенджере.</p></div>
+    <div><span class="n">Шаг 3</span><b>Занимайтесь</b><p>Открывайте доску ученика, отправляйте задачи и созванивайтесь — всё в одном окне.</p></div>
    </div>
   </div>
  </section>
 
- <section id="students" class="alt">
-  <div class="wrap stud">
-   <div class="rv">
-    <div class="eyebrow">Ученикам</div>
-    <h2>Ничего не нужно устанавливать</h2>
-    <p style="color:var(--mut);margin:0">Откройте ссылку, которую прислал преподаватель, — это и есть ваша доска. Без регистрации и паролей.</p>
-    <ul>
-     <li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>Работает на компьютере, планшете и телефоне</li>
-     <li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>Можно добавить на главный экран — откроется как приложение</li>
-     <li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>Все прошлые занятия остаются на доске — удобно повторять</li>
-    </ul>
-    <p style="color:var(--mut);font-size:15px;margin-top:20px">Нет ссылки? Попросите её у своего преподавателя.</p>
-   </div>
-   <div class="phone rv" aria-hidden="true">
-    <div class="url">🔒 uchidoska.ru/b/…</div>
-    <svg viewBox="0 0 240 420" width="100%" style="display:block">
-     <defs><pattern id="g2" width="16" height="16" patternUnits="userSpaceOnUse"><path d="M16 0H0V16" fill="none" stroke="var(--grid)"/></pattern></defs>
-     <rect width="240" height="420" fill="url(#g2)"/>
-     <text x="22" y="70" font-family="'Bradley Hand','Segoe Print','Noteworthy','Chalkboard SE','Comic Sans MS',cursive" font-size="24" fill="var(--ink)">y = x³ − 3x</text>
-     <path d="M30 150h180M120 100v120" stroke="var(--mut)" stroke-width="1.4"/>
-     <path d="M40 210c30-90 50-90 80-60s50 50 80-40" fill="none" stroke="var(--teal)" stroke-width="2.6" stroke-linecap="round"/>
-     <rect x="18" y="300" width="204" height="54" rx="12" fill="var(--panel)" stroke="var(--line)"/>
-     <circle cx="44" cy="327" r="14" fill="#2e7d32"/><path d="M38 327h12M44 321v12" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
-     <text x="66" y="323" font-size="12" font-weight="700" fill="var(--tx)">Преподаватель на звонке</text>
-     <text x="66" y="340" font-size="11" fill="var(--mut)">Нажмите, чтобы войти</text>
-    </svg>
-   </div>
+ <div class="w" id="kids">
+  <div class="kids">
+   <div class="tag">Ученикам</div>
+   <p>Откройте ссылку, которую прислал преподаватель, — это и есть ваша доска. <span>Регистрация и пароли не нужны. На телефоне её можно добавить на главный экран, и она откроется как приложение. Нет ссылки — попросите у своего преподавателя.</span></p>
   </div>
- </section>
+ </div>
 
- <div class="final">
-  <div class="wrap">
-   <div class="box rv">
-    <h2>Попробуйте на ближайшем уроке</h2>
-    <p>Напишите нам в Telegram — пришлём приглашение и поможем провести первое занятие.</p>
-    <div class="cta" style="justify-content:center">
-     <a class="btn pri" data-tg href="#">Получить доступ</a>
-     <a class="btn ghost" href="/t">У меня уже есть аккаунт</a>
-    </div>
+ <div class="end">
+  <div class="w">
+   <h2>Попробуйте на ближайшем уроке</h2>
+   <div class="cta">
+    <span class="hand" aria-hidden="true">пишите, отвечу<svg width="60" height="46"><path d="M4 4c26 0 42 14 46 36M50 40l-10-5M50 40l4-11" fill="none" stroke="var(--red)" stroke-width="2.2" stroke-linecap="round"/></svg></span>
+    <a class="btn" data-tg href="#"><svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M21.9 4.3 18.7 19.4c-.2 1.1-.9 1.3-1.8.8l-4.9-3.6-2.4 2.3c-.3.3-.5.5-1 .5l.4-5 9.1-8.2c.4-.4-.1-.6-.6-.2L6.2 13 1.4 11.5c-1-.3-1-1 .2-1.5L20.6 2.8c.9-.3 1.6.2 1.3 1.5z"/></svg>Написать в Telegram</a>
    </div>
   </div>
  </div>
 </main>
 
 <footer>
- <div class="wrap">
-  <span>© <span id="yr">2026</span> УчиДоска — онлайн-доска для репетиторов</span>
-  <span><a href="/t">Вход для преподавателей</a> · <a data-tg href="#">Связаться</a></span>
+ <div class="w">
+  <span>© <span id="yr">2026</span> УчиДоска</span>
+  <span><a href="/t">Вход для преподавателей</a> &nbsp;·&nbsp; <a data-tg href="#">Telegram</a></span>
  </div>
 </footer>
 
 <script>
-// куда ведёт «Получить доступ»
 var TG='https://t.me/davvwe';
 document.querySelectorAll('[data-tg]').forEach(function(a){a.href=TG;a.target='_blank';a.rel='noopener'});
 document.getElementById('yr').textContent=new Date().getFullYear();
-// плавное появление блоков при прокрутке
-(function(){var els=document.querySelectorAll('.rv');
- if(!('IntersectionObserver' in window)){els.forEach(function(e){e.classList.add('in')});return}
- var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{rootMargin:'0px 0px -8% 0px'});
- els.forEach(function(e){io.observe(e)})})();
 </script>
 </body>
 </html>
