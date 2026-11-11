@@ -440,6 +440,28 @@ window.addEventListener('keydown',e=>{
  e.preventDefault();f.contentWindow.postMessage({t:'key',a:(e.code==='KeyY'||e.shiftKey)?'redo':'undo'},location.origin);
 },true);
 
+// ⌘V, когда фокус в кабинете (например, после клика по ученику): картинку передаём в доску
+const isInp=x=>!!x&&(x.tagName==='TEXTAREA'||(x.tagName==='INPUT'&&/^(text|number|search|password|email|url|tel)$/i.test(x.type||'text')));
+const boardOpen=()=>($('fr').getAttribute('src')||'').startsWith('/b/');
+document.addEventListener('paste',e=>{
+ const dt=e.clipboardData,a=document.activeElement;if(!dt||!boardOpen())return;
+ if(isInp(a)&&dt.getData('text/plain'))return;
+ let f=null;const it=dt.items||[];
+ for(let i=0;i<it.length&&!f;i++)if(it[i].kind==='file'&&/^image\//.test(it[i].type))f=it[i].getAsFile();
+ if(!f)for(const x of (dt.files||[]))if(/^image\/|\.(heic|heif)$/i.test(x.type||x.name)){f=x;break}
+ if(!f)return;e.preventDefault();if(a&&a!==document.body)a.blur();
+ const r=new FileReader();r.onload=()=>{$('fr').contentWindow.postMessage({t:'pasteimg',src:r.result,heic:/heic|heif/i.test(f.type+' '+(f.name||''))},location.origin);$('fr').focus()};r.readAsDataURL(f);
+},true);
+// Safari присылает «вставку», только если фокус в поле ввода: на ⌘V подставляем невидимое поле
+const pcatch=document.createElement('div');pcatch.contentEditable='true';pcatch.setAttribute('aria-hidden','true');
+pcatch.style.cssText='position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;overflow:hidden';document.body.appendChild(pcatch);
+pcatch.addEventListener('input',()=>{pcatch.textContent=''});
+window.addEventListener('keydown',e=>{
+ if(!(e.metaKey||e.ctrlKey)||e.code!=='KeyV'||!boardOpen())return;const a=document.activeElement;
+ if(isInp(a)||a===pcatch||(a&&a.isContentEditable))return;
+ pcatch.focus({preventScroll:true});setTimeout(()=>{pcatch.textContent='';if(document.activeElement===pcatch)pcatch.blur()},300);
+},true);
+
 // Копия всех досок хранится в браузере преподавателя: если сервер потеряет данные (обновление файлов на GitHub), их можно вернуть
 const api=(p,o)=>window.boardApi(p,o);
 const bkey=k=>k+':'+(localStorage.getItem('tlogin')||'admin');

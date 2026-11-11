@@ -977,6 +977,7 @@ const isTextTarget=t=>!!t&&(t.tagName==='TEXTAREA'||(t.tagName==='INPUT'&&/^(tex
 document.addEventListener('keydown',e=>{
  const a=document.activeElement,tg=a&&a.tagName;
  if(isTextTarget(a))return;
+ if((e.metaKey||e.ctrlKey)&&e.code==='KeyV'&&!viewOnly&&a!==pcatch){pcatch.focus({preventScroll:true});setTimeout(()=>{pcatch.textContent='';if(document.activeElement===pcatch)pcatch.blur()},300);return}
  if(e.code==='Space'&&!(tg==='SELECT'||tg==='BUTTON')){space=true;setCursor();e.preventDefault();return}
  if((editImg||editStroke)&&(e.key==='Enter'||e.key==='Escape')&&tg!=='SELECT'){editImg=null;editStroke=null;redraw();e.preventDefault();return}
  if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&e.key==='0'){fit();return}
@@ -1017,23 +1018,46 @@ function placeImage(im,task,gap){
  send({t:'image',page:page,img:{id:iid,src:src,x:r2(x),y:r2(y),w:r2(dw),h:r2(dh)}});
  editImg=iid;redraw(); // сразу режим правки: можно подвинуть и изменить размер
 }
+const MAXIMG=40; // столько картинок на одной доске принимает сервер
+function imgFull(){if(Object.keys(images[page]||{}).length<MAXIMG)return false;
+ modal('На этой доске уже '+MAXIMG+' картинок — больше не помещается. Создайте новую доску: «+ Доска».',{ok:'Понятно'});return true}
+function addImageSrc(src,heic){ // картинка из data:-ссылки (файл, вставка, кабинет)
+ if(viewOnly||imgFull())return;
+ const im=new Image();im.onload=()=>placeImage(im,false);
+ im.onerror=()=>modal(heic?'Это фото в формате HEIC — браузер его не открывает. Сохраните его как JPG или PNG (или сделайте скриншот) и вставьте снова.':'Не получилось открыть эту картинку. Попробуйте сохранить её как PNG или JPG.',{ok:'Понятно'});
+ im.src=src;
+}
 function addImage(file){
+ if(viewOnly||imgFull())return;
  const fr=new FileReader();
- fr.onload=()=>{const im=new Image();im.onload=()=>placeImage(im,false);im.src=fr.result};
+ fr.onload=()=>addImageSrc(fr.result,/heic|heif/i.test(file.type+' '+(file.name||'')));
  fr.readAsDataURL(file);
 }
 window.addEventListener('message',e=>{
  if(e.origin!==location.origin)return;const d=e.data;if(!d)return;
  if(d.t==='key'){if(!viewOnly)(d.a==='redo'?redoAct:undo)();return}
  if(d.t==='theme'&&['auto','light','dark'].includes(d.v)){S.theme=d.v;$('theme').value=d.v;saveS();applyTheme();return}
+ if(d.t==='pasteimg'&&typeof d.src==='string'&&/^data:image\//.test(d.src)){addImageSrc(d.src,!!d.heic);return} // ⌘V, нажатый в кабинете
  if(d.t!=='task'||typeof d.src!=='string'||!/^data:image\/(png|jpeg);base64,/.test(d.src))return;
+ if(imgFull())return;
  const im=new Image();im.onload=()=>placeImage(im,true,Math.max(0,Math.min(1500,+d.gap||350)));im.src=d.src;
 });
+function clipImage(dt){ // картинка из буфера обмена (скриншот, из браузера, файл из Finder)
+ if(!dt)return null;const it=dt.items||[];
+ for(let i=0;i<it.length;i++)if(it[i].kind==='file'&&/^image\//.test(it[i].type)){const f=it[i].getAsFile();if(f)return f}
+ for(const f of (dt.files||[]))if(/^image\/|\.(heic|heif)$/i.test(f.type||f.name))return f;
+ return null;
+}
 document.addEventListener('paste',e=>{
- if(viewOnly||isTextTarget(document.activeElement))return;
- const it=(e.clipboardData&&e.clipboardData.items)||[];
- for(let i=0;i<it.length;i++)if(it[i].type.indexOf('image')===0){addImage(it[i].getAsFile());e.preventDefault();return}
-});
+ if(viewOnly)return;const a=document.activeElement,dt=e.clipboardData;
+ if(isTextTarget(a)&&dt&&dt.getData('text/plain'))return; // в поле ввода вставляем текст как обычно
+ const f=clipImage(dt);if(!f)return;
+ e.preventDefault();if(a&&a!==document.body)a.blur();addImage(f);
+},true);
+// Safari присылает «вставку», только если фокус в поле ввода: на ⌘V подставляем невидимое поле
+const pcatch=document.createElement('div');pcatch.contentEditable='true';pcatch.setAttribute('aria-hidden','true');
+pcatch.style.cssText='position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;overflow:hidden';document.body.appendChild(pcatch);
+pcatch.addEventListener('input',()=>{pcatch.textContent=''});
 $('fi').onchange=()=>{if($('fi').files[0])addImage($('fi').files[0]);$('fi').value=''};
 
 // ---------- отмена / возврат ----------
