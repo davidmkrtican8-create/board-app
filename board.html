@@ -97,11 +97,12 @@ body.focus #main{padding:4px;gap:4px}
 @keyframes ring{50%{box-shadow:0 0 0 6px rgba(46,125,50,.25)}}
 #micb.off,#camb.off{background:color-mix(in srgb,#d32f2f 14%,var(--panel));border-color:#d32f2f;text-decoration:line-through}
 #callbox[hidden]{display:none}
-#callbox{position:absolute;right:12px;top:12px;z-index:6;background:var(--panel);border:1px solid var(--bd);border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.25);padding:6px;max-width:min(360px,calc(100% - 24px));touch-action:none}
+#callbox{position:absolute;right:12px;top:12px;z-index:6;background:var(--panel);border:1px solid var(--bd);border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.25);padding:6px;max-width:calc(100% - 24px);touch-action:none;--tw:160px}
+#callrs{position:absolute;right:0;bottom:0;width:20px;height:20px;cursor:nwse-resize;touch-action:none;background:linear-gradient(135deg,transparent 55%,var(--mut) 55%,var(--mut) 62%,transparent 62%,transparent 72%,var(--mut) 72%,var(--mut) 79%,transparent 79%);border-bottom-right-radius:12px}#callbox.min #callrs{display:none}
 #callhd{display:flex;align-items:center;gap:6px;cursor:move;font-size:12px;color:var(--mut);padding:0 2px 4px}#callhd span{flex:1}#callhd button{padding:0 8px;line-height:20px}
-#tiles{display:flex;flex-wrap:wrap;gap:6px}#callbox.min #tiles{display:none}
-.tile{position:relative;width:160px;height:120px;border-radius:8px;overflow:hidden;background:#2b2638;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;text-align:center}
-.tile.me{width:96px;height:72px}.tile video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.tile.me video{transform:scaleX(-1)}
+#tiles{display:flex;flex-wrap:wrap;gap:6px;position:relative}#callbox.min #tiles{display:none}
+.tile{position:relative;width:var(--tw);height:calc(var(--tw)*.75);border-radius:8px;overflow:hidden;background:#2b2638;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;text-align:center}
+.tile.me{position:absolute;right:6px;bottom:6px;z-index:2;width:max(64px,calc(var(--tw)*.3));height:max(48px,calc(var(--tw)*.225));border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.4)}.tile.me:only-child{position:relative;right:auto;bottom:auto;border:0;box-shadow:none;width:var(--tw);height:calc(var(--tw)*.75)}.tile video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.tile.me video{transform:scaleX(-1)}
 .tile .nm{position:absolute;left:4px;bottom:4px;background:rgba(0,0,0,.55);padding:1px 6px;border-radius:6px;font-size:11px;z-index:1}
 .tile.talk{outline:3px solid #2e7d32}
 #leadb.on{background:#2e7d32;color:#fff;border-color:#2e7d32}
@@ -171,7 +172,7 @@ body.focus #main{padding:4px;gap:4px}
    <p><b>Android:</b> меню браузера ⋮ → «Установить приложение» или «Добавить на главный экран».</p>
   </details>
  </div>
- <div id="wrap"><div id="plots"></div><div id="solidbar" hidden><span id="shint">Тяните внутри фигуры — вращать</span><button id="sletters" title="Подписать вершины буквами">A B C</button><button id="ssec" title="Сечение плоскостью через три точки на рёбрах">✂ Сечение</button><button id="sreset" title="Вернуть исходный вид">↺ Вид</button></div><button id="followb" hidden></button><div id="callbox" hidden><div id="callhd"><span id="callst">Звонок</span><button id="callmin" title="Свернуть/развернуть">–</button></div><div id="tiles"></div></div><canvas id="cv"></canvas><canvas id="ovl"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edel" hidden title="Удалить выделенное (клавиша Delete)">🗑 Удалить</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button><button id="zfit" hidden>↺ Вернуть масштаб</button><div id="zhint" hidden>Страница приближена в браузере. Вернуть: Ctrl+0 (на Mac ⌘0)</div></div>
+ <div id="wrap"><div id="plots"></div><div id="solidbar" hidden><span id="shint">Тяните внутри фигуры — вращать</span><button id="sletters" title="Подписать вершины буквами">A B C</button><button id="ssec" title="Сечение плоскостью через три точки на рёбрах">✂ Сечение</button><button id="sreset" title="Вернуть исходный вид">↺ Вид</button></div><button id="followb" hidden></button><div id="callbox" hidden><div id="callhd"><span id="callst">Звонок</span><button id="callbig" title="Крупное видео / обычное (или двойной щелчок по видео)">⤢</button><button id="callmin" title="Свернуть/развернуть">–</button></div><div id="tiles"></div><div id="callrs" title="Потяните, чтобы увеличить или уменьшить видео"></div></div><canvas id="cv"></canvas><canvas id="ovl"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edel" hidden title="Удалить выделенное (клавиша Delete)">🗑 Удалить</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button><button id="zfit" hidden>↺ Вернуть масштаб</button><div id="zhint" hidden>Страница приближена в браузере. Вернуть: Ctrl+0 (на Mac ⌘0)</div></div>
 </div>
 <script>var errN=0;window.addEventListener('error',function(e){if(/ResizeObserver/.test(e.message||''))return;var s=document.getElementById('st');if(s)s.textContent='Ошибка в скрипте: '+(e.message||'');
  if(errN++<5)try{fetch('/api/log',{method:'POST',body:JSON.stringify({m:String(e.message||'').slice(0,300),l:e.lineno,c:e.colno,s:String(e.error&&e.error.stack||'').slice(0,800),u:navigator.userAgent.slice(0,200),p:location.pathname.slice(0,40)})}).catch(function(){})}catch(_){}})</script>
@@ -1450,6 +1451,20 @@ $('callmin').onclick=()=>{$('callbox').classList.toggle('min');$('callmin').text
  $('callhd').addEventListener('pointerdown',e=>{if(e.target.tagName==='BUTTON')return;const r=box.getBoundingClientRect(),w=wrap.getBoundingClientRect();d={x:e.clientX-r.left,y:e.clientY-r.top,w:w};$('callhd').setPointerCapture(e.pointerId)});
  $('callhd').addEventListener('pointermove',e=>{if(!d)return;const w=d.w;box.style.left=Math.max(0,Math.min(w.width-box.offsetWidth,e.clientX-w.left-d.x))+'px';box.style.top=Math.max(0,Math.min(w.height-box.offsetHeight,e.clientY-w.top-d.y))+'px';box.style.right='auto'});
  $('callhd').addEventListener('pointerup',()=>{d=null});
+ // размер видео: тянуть за уголок, кнопка ⤢ или двойной щелчок по видео; размер запоминается
+ const fit=()=>{const w=wrap.getBoundingClientRect(),r=box.getBoundingClientRect();
+  if(r.right>w.right-4||r.bottom>w.bottom-4){box.style.left=Math.max(0,Math.min(r.left-w.left,w.width-box.offsetWidth-4))+'px';box.style.top=Math.max(0,Math.min(r.top-w.top,w.height-box.offsetHeight-4))+'px';box.style.right='auto'}};
+ const setTw=(v,save)=>{const w=wrap.getBoundingClientRect();v=Math.round(Math.max(100,Math.min(v,w.width-40,(w.height-60)/.75)));box.style.setProperty('--tw',v+'px');if(save)try{localStorage.setItem('callTw',v)}catch(e){};return v};
+ let tw0=160;try{tw0=+localStorage.getItem('callTw')||160}catch(e){}
+ box.style.setProperty('--tw',Math.max(100,Math.min(640,tw0))+'px'); // до показа окна размеры доски могут быть ещё нулевые — не ограничиваем по ним
+ let rz=null;const h=$('callrs');
+ h.addEventListener('pointerdown',e=>{e.stopPropagation();const r=box.getBoundingClientRect(),w=wrap.getBoundingClientRect();box.style.left=(r.left-w.left)+'px';box.style.top=(r.top-w.top)+'px';box.style.right='auto';rz={x:e.clientX,y:e.clientY,tw:parseFloat(getComputedStyle(box).getPropertyValue('--tw'))||160};h.setPointerCapture(e.pointerId)});
+ h.addEventListener('pointermove',e=>{if(!rz)return;const d=Math.max(e.clientX-rz.x,(e.clientY-rz.y)/.75);setTw(rz.tw+d,true)});
+ h.addEventListener('pointerup',()=>{if(rz){rz=null;fit()}});
+ const big=()=>{const cur=parseFloat(getComputedStyle(box).getPropertyValue('--tw'))||160,w=wrap.getBoundingClientRect();
+  if(cur<380){setTw(Math.min(640,w.width*.6),true);box.style.left=Math.max(0,w.width-box.offsetWidth-12)+'px';box.style.top='12px';box.style.right='auto'}else setTw(160,true);
+  box.classList.remove('min');$('callmin').textContent='–';fit()};
+ $('callbig').onclick=big;$('tiles').addEventListener('dblclick',big);
 })();
 window.addEventListener('pagehide',()=>{if(call.on)navigator.sendBeacon&&navigator.sendBeacon('/api/'+room+'/op',JSON.stringify({t:'rtc',kind:'bye',from:me}))});
 setInterval(()=>{if(call.on)callUI()},2000);
