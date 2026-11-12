@@ -268,6 +268,32 @@ function hwImg(sid, src, lim) { // сохранить картинку, верн
 const hwRm = (sid, n) => { if (HNAME.test(String(n))) fs.unlink(path.join(HWD, sid, n), () => {}); };
 const norm = a => String(a == null ? '' : a).toLowerCase().replace(/\s+/g, '').replace(/,/g, '.').replace(/[−–—]/g, '-');
 const right = (ans, a) => !!norm(a) && String(ans).split(/[;|]/).some(x => norm(x) && norm(x) === norm(a)); // в ответе можно указать варианты через ;
+// «Работа над ошибками»: неверно решённые задачи копятся в H.mis и через неделю сами предлагаются в новую домашку
+const REP_DAYS = 7, REP_MAX = 3, REPF = path.join(HWD, '_rep.json');
+let REPOFF = {}; try { REPOFF = JSON.parse(fs.readFileSync(REPF, 'utf8')); } catch (e) {}
+const repOn = tid => !REPOFF[tid];
+function hwCopy(sid, n) { // копия картинки под новым именем (у каждой домашки и у копилки ошибок — свои файлы)
+  if (!HNAME.test(String(n))) return null;
+  const m = crypto.randomBytes(8).toString('hex') + n.slice(n.lastIndexOf('.'));
+  try { fs.copyFileSync(path.join(HWD, sid, n), path.join(HWD, sid, m)); return m; } catch (e) { return null; }
+}
+const repDue = H => (H.mis || []).filter(x => !x.out && Date.now() - x.at >= REP_DAYS * 864e5).sort((a, b) => a.at - b.at).slice(0, REP_MAX);
+function repCheck(sid, H, h) { // после проверки: ошибки — в копилку, исправленные — из копилки
+  H.mis = H.mis || []; H.fixed = H.fixed || 0;
+  for (const t of h.tasks) {
+    const m = h.marks[t.id] !== undefined ? h.marks[t.id] : h.auto[t.id];
+    if (t.rep) {
+      const x = H.mis.find(y => y.id === t.rep);
+      if (!x || t.repDone) continue;
+      if (m === 1) { hwRm(sid, x.img); H.mis = H.mis.filter(y => y !== x); H.fixed++; t.repDone = 1; }
+      else { x.out = null; if (m === 0) { x.at = Date.now(); x.n = (x.n || 1) + 1; t.repDone = 1; } }
+    } else {
+      const src = h.id + ':' + t.id, x = H.mis.find(y => y.src === src);
+      if (m === 0 && !x && H.mis.length < 200) H.mis.push({ id: crypto.randomBytes(4).toString('hex'), src, img: t.img ? hwCopy(sid, t.img) : null, w: t.w, h: t.h, text: t.text, num: t.num, ans: t.ans, at: Date.now(), n: 1, out: null });
+      else if (m === 1 && x && !x.out) { hwRm(sid, x.img); H.mis = H.mis.filter(y => y !== x); } // оценку исправили на «верно»
+    }
+  }
+}
 const hwPending = sid => hwOf(sid).list.filter(h => h.st === 'sent').length;
 function hwPublic(h) { // что видит ученик: правильные ответы — только после проверки
   const done = h.st === 'checked';
@@ -275,7 +301,7 @@ function hwPublic(h) { // что видит ученик: правильные �
     id: h.id, title: h.title, due: h.due, created: h.created, st: h.st, sentAt: h.sentAt, checkedAt: h.checkedAt,
     comment: done ? h.comment : '', photos: h.photos, board: h.board, answers: h.answers,
     auto: h.st === 'new' ? {} : h.auto, marks: done ? h.marks : {},
-    tasks: h.tasks.map(t => ({ id: t.id, img: t.img, w: t.w, h: t.h, text: t.text, num: t.num, short: !!t.ans, ans: done ? t.ans : undefined }))
+    tasks: h.tasks.map(t => ({ id: t.id, img: t.img, w: t.w, h: t.h, text: t.text, num: t.num, rep: t.rep ? 1 : 0, short: !!t.ans, ans: done ? t.ans : undefined }))
   };
 }
 function hwBoard(sid, h) { // «Решать на доске»: отдельная доска с задачами и местом под решение
@@ -286,7 +312,7 @@ function hwBoard(sid, h) { // «Решать на доске»: отдельна
   let y = 40;
   const fit = hh => { const k = Math.floor(y / PS); if (y + hh > k * PS + PH - 20) y = (k + 1) * PS + 40; };
   h.tasks.forEach((t, i) => {
-    const label = 'Задача ' + (i + 1) + (t.num ? ' (№' + t.num + ')' : '');
+    const label = 'Задача ' + (i + 1) + (t.num ? ' (№' + t.num + ')' : '') + (t.rep ? ' — работа над ошибками' : '');
     const words = String(t.text || '').split(/\s+/).filter(Boolean), lines = [label];
     let ln = '';
     for (const w of words) { if ((ln + ' ' + w).trim().length > 58) { lines.push(ln); ln = w; } else ln = (ln + ' ' + w).trim(); }
@@ -504,6 +530,16 @@ function hwTeacher(req, res, u, me) { // /api/admin/hw…
     const o = {}; index.students.filter(s => s.owner === me.id).forEach(s => { const n = hwPending(s.id); if (n) o[s.id] = n; });
     return json(res, o);
   }
+  if (req.method === 'GET' && u.pathname === '/api/admin/hw-rep') {
+    const sid = String(u.searchParams.get('s') || '');
+    if (!own(sid)) { res.writeHead(404); return res.end(); }
+    const H = hwOf(sid);
+    return json(res, { on: repOn(me.id), due: repDue(H).map(x => ({ id: x.id, img: x.img, text: x.text, num: x.num, ans: x.ans, n: x.n || 1, at: x.at })), left: (H.mis || []).length, fixed: H.fixed || 0 });
+  }
+  if (req.method === 'POST' && u.pathname === '/api/admin/hw-rep') return body(req, res, 1e4, j => {
+    if (j.on) delete REPOFF[me.id]; else REPOFF[me.id] = 1;
+    fs.writeFileSync(REPF, JSON.stringify(REPOFF)); json(res, { on: repOn(me.id) });
+  });
   if (req.method === 'GET' && u.pathname === '/api/admin/hw') {
     const sid = String(u.searchParams.get('s') || '');
     if (!own(sid)) { res.writeHead(404); return res.end(); }
@@ -522,8 +558,13 @@ function hwTeacher(req, res, u, me) { // /api/admin/hw…
         tasks.push({ id: crypto.randomBytes(4).toString('hex'), img, w: num(t.w, 1, 1e5, 1000), h: num(t.h, 1, 1e5, 600), text, num: Math.round(num(t.num, 0, 19, 0)), ans: String(t.ans || '').trim().slice(0, 80) });
       }
       if (!tasks.length) return json(res, { error: 'В задачах нет ни картинки, ни текста' });
+      const nid = crypto.randomBytes(5).toString('hex'), want = Array.isArray(j.rep) && repOn(me.id) ? j.rep.map(String) : [];
+      for (const x of repDue(H)) if (want.includes(x.id)) { // задачи на повторение — в конец домашки
+        tasks.push({ id: crypto.randomBytes(4).toString('hex'), img: x.img ? hwCopy(sid, x.img) : null, w: x.w, h: x.h, text: x.text, num: x.num, ans: x.ans, rep: x.id });
+        x.out = nid;
+      }
       const due = Number.isFinite(+j.due) && +j.due > 0 ? +j.due : null;
-      const nh = { id: crypto.randomBytes(5).toString('hex'), title: String(j.title || '').trim().slice(0, 80) || 'Домашка', due, created: Date.now(), tasks, st: 'new', answers: {}, auto: {}, marks: {}, photos: [], board: null, comment: '' };
+      const nh = { id: nid, title: String(j.title || '').trim().slice(0, 80) || 'Домашка', due, created: Date.now(), tasks, st: 'new', answers: {}, auto: {}, marks: {}, photos: [], board: null, comment: '' };
       H.list.unshift(nh);
       const sn = own(sid).name, dd = due ? ', сдать до ' + dmy(due) : '';
       tgStudent(sid, w => w === 's' ? '📚 Новая домашка от ' + me.name + ': «' + nh.title + '» (' + tasks.length + ' зад.' + dd + ').\nОткрыть: ' + TG.site + '/s/' + sid + '?hw=' + nh.id
@@ -532,6 +573,7 @@ function hwTeacher(req, res, u, me) { // /api/admin/hw…
     else if (j.t === 'check') {
       h.marks = {}; for (const t of h.tasks) { const v = (j.marks || {})[t.id]; if (v === 0 || v === 1) h.marks[t.id] = v; }
       h.comment = String(j.comment || '').slice(0, 2000); h.st = 'checked'; h.checkedAt = Date.now();
+      repCheck(sid, H, h);
       const ms = h.tasks.map(t => h.marks[t.id] !== undefined ? h.marks[t.id] : h.auto[t.id]).filter(v => v !== undefined), ok = ms.filter(Boolean).length;
       const sc = ms.length ? ': верно ' + ok + ' из ' + ms.length : '', sn = own(sid).name;
       tgStudent(sid, w => w === 's' ? '✔️ Домашка «' + h.title + '» проверена' + sc + '.' + (h.comment ? '\n💬 ' + h.comment : '') + '\n' + TG.site + '/s/' + sid + '?hw=' + h.id
@@ -539,6 +581,7 @@ function hwTeacher(req, res, u, me) { // /api/admin/hw…
     } else if (j.t === 'return') { h.st = 'new'; h.comment = String(j.comment || h.comment || '').slice(0, 2000); }
     else if (j.t === 'del') {
       h.tasks.forEach(t => hwRm(sid, t.img)); h.photos.forEach(p => hwRm(sid, p));
+      (H.mis || []).forEach(x => { if (x.out === h.id) x.out = null; }); // задача на повторение вернётся в следующую домашку
       H.list = H.list.filter(x => x !== h);
     } else { res.writeHead(400); return res.end(); }
     hwSave(sid); json(res, H.list);
@@ -551,7 +594,7 @@ function hwStudent(req, res, sid) { // /api/<id>/hw — открывается �
   const H = hwOf(sid);
   const out = () => {
     const r = room(sid), t = byId(s.owner);
-    json(res, { name: s.name, teacher: t ? t.name : '', list: H.list.map(hwPublic), pages: r ? r.s.pages.map(p => ({ id: p.id, title: p.title })) : [], tg: TG.token ? { s: tgLink('s' + sid), p: tgLink('p' + sid), on: (TG.subs[sid] || []).some(x => x.who === 's') } : null });
+    json(res, { name: s.name, teacher: t ? t.name : '', rep: { fixed: H.fixed || 0, left: (H.mis || []).length }, list: H.list.map(hwPublic), pages: r ? r.s.pages.map(p => ({ id: p.id, title: p.title })) : [], tg: TG.token ? { s: tgLink('s' + sid), p: tgLink('p' + sid), on: (TG.subs[sid] || []).some(x => x.who === 's') } : null });
   };
   if (req.method === 'GET') return out();
   if (req.method !== 'POST') { res.writeHead(405); return res.end(); }
@@ -599,7 +642,7 @@ function admin(req, res, u) {
   const isOwner = me.id === 'owner';
   if (req.method === 'GET' && u.pathname === '/api/admin/me') return json(res, who(me));
   if (req.method === 'GET' && u.pathname === '/api/admin/students') return json(res, mine());
-  if (u.pathname === '/api/admin/hw' || u.pathname === '/api/admin/hw-pending') return hwTeacher(req, res, u, me);
+  if (u.pathname === '/api/admin/hw' || u.pathname === '/api/admin/hw-pending' || u.pathname === '/api/admin/hw-rep') return hwTeacher(req, res, u, me);
   if (u.pathname === '/api/admin/tg' || u.pathname === '/api/admin/tg-student') return tgAdmin(req, res, u, me);
   if (req.method === 'GET' && u.pathname === '/api/admin/backup') {
     const all = {}; mine().forEach(s => { const r = room(s.id); if (r) all[s.id] = r.s; });

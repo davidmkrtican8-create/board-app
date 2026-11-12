@@ -633,6 +633,29 @@ function startDraft(){
  if(draft&&draft.tasks.length&&draft.sid!==sid&&!confirm('Сейчас собирается домашка для «'+sName(draft.sid)+'». Начать заново для «'+sName(sid)+'»?'))return;
  if(!draft||draft.sid!==sid)draft={sid,tasks:[],title:new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'}),due:''}; // название по умолчанию — сегодняшняя дата
  window.hwDraft=true;tray();if(window.hwTasksRedraw)window.hwTasksRedraw();
+ loadRep(sid);
+}
+// «Работа над ошибками»: какие старые ошибки ученика пора повторить
+async function loadRep(sid){
+ try{const r=await api('/api/admin/hw-rep?s='+sid);if(!r.ok)return;const j=await r.json();
+  if(!draft||draft.sid!==sid)return;draft.repInfo=j;draft.rep=j.due.map(x=>x.id);tray()}catch(e){}
+}
+function repRow(){
+ const R=draft.repInfo;if(!R)return null;
+ const cb=el('input',{type:'checkbox',checked:R.on});
+ cb.onchange=async()=>{const r=await api('/api/admin/hw-rep',{method:'POST',body:JSON.stringify({on:cb.checked})});if(r.ok){R.on=(await r.json()).on;tray()}};
+ const row=el('div',{className:'r'},el('label',{title:'Неверно решённые задачи через неделю сами добавляются в новую домашку, пока ученик не решит их верно. Можно выключить на время — для всех учеников.',style:'display:flex;gap:4px;align-items:center;cursor:pointer'},cb,el('span',{textContent:'🔁 Работа над ошибками'})));
+ if(!R.on){row.append(el('span',{className:'hint',textContent:'выключено — задачи на повторение не добавляются'}));return row}
+ const keep=R.due.filter(x=>draft.rep.includes(x.id));
+ if(!R.due.length)row.append(el('span',{className:'hint',textContent:R.left?'ошибок к повторению сейчас нет (вернутся через неделю после ошибки)':'у ученика пока нет ошибок для повторения'}));
+ else{row.append(el('span',{className:'hint',textContent:keep.length?'+ '+keep.length+' '+(keep.length===1?'задача':'задачи')+' на повторение добавятся в конец:':'задачи на повторение убраны'}));
+  R.due.forEach(x=>{const on=draft.rep.includes(x.id);
+   const b=el('span',{className:'chip',title:x.text||'',style:'display:inline-flex;gap:4px;align-items:center;padding:2px 4px 2px 6px;border:1px solid var(--bd);border-radius:8px;font-size:12px;opacity:'+(on?1:.45)});
+   if(x.img){const im=el('img',{src:'/hwimg/'+draft.sid+'/'+x.img,style:'height:28px;max-width:90px;object-fit:contain;background:#fff;border-radius:4px;cursor:zoom-in'});im.onclick=()=>window.open(im.src);b.append(im)}
+   b.append(el('span',{textContent:(x.num?'№'+x.num:'задача')+(x.n>1?' (ошибка ×'+x.n+')':'')}));
+   b.append(el('button',{textContent:on?'✕':'↺',title:on?'Не добавлять в эту домашку':'Вернуть',style:'padding:0 6px;line-height:18px',onclick:()=>{draft.rep=on?draft.rep.filter(y=>y!==x.id):draft.rep.concat(x.id);tray()}}));
+   row.append(b)})}
+ return row;
 }
 function stopDraft(){draft=null;window.hwDraft=false;$('hwtray').hidden=true;if(window.hwTasksRedraw)window.hwTasksRedraw()}
 function tray(scrollEnd){
@@ -651,7 +674,8 @@ function tray(scrollEnd){
    el('button',{textContent:'🖼 Файл',onclick:()=>fileIn.click()}),fileIn,
    el('button',{textContent:'📄 PDF с ответами',title:'Домашка из PDF-файла: задачи нарежутся сами, ответы из конца файла подставятся для автопроверки',onclick:()=>pdfIn.click()}),pdfIn,
    el('button',{textContent:'✎ Текстом',onclick:()=>{draft.tasks.push({src:null,text:'',num:0,ans:''});tray(true);const a=$('hwcards').lastChild;if(a)a.querySelector('textarea').focus()}}),
-   el('span',{className:'hint',textContent:'Скриншот задачи с сайта: сделайте снимок экрана и нажмите ⌘V (Ctrl+V) здесь. Если у задачи короткий ответ — впишите его, он проверится сам.'})));
+   el('span',{className:'hint',textContent:'Скриншот задачи с сайта: сделайте снимок экрана и нажмите ⌘V (Ctrl+V) здесь. Если у задачи короткий ответ — впишите его, он проверится сам.'})),
+  repRow()||'');
  const cs=el('div',{id:'hwcards'});
  if(!draft.tasks.length)cs.append(el('div',{className:'hint',textContent:'Пока нет задач.'}));
  draft.tasks.forEach((k,i)=>{
@@ -696,7 +720,8 @@ async function importPdf(file){
   // страницы с ответами: с той, где заголовок «Ответы», до конца (только во второй половине файла)
   let ansFrom=0;for(let p=n;p>Math.max(1,n/2);p--)if(items[p].some(i=>/^\s*Ответы\s*:?\s*$/i.test(i.str)||/^\s*Ответы\s*:/i.test(i.str)))ansFrom=p;
   const ans={};
-  if(ansFrom){let txt='';for(let p=ansFrom;p<=n;p++){const pg=await doc.getPage(p),h=pg.getViewport({scale:1}).height;txt+=' '+items[p].filter(i=>i.transform[5]>45&&i.transform[5]<h-45).map(i=>i.str).join(' ')} // без колонтитулов (номер страницы)txt=txt.replace(/^[\s\S]*?Ответы\s*:?/i,' ');
+  if(ansFrom){let txt='';for(let p=ansFrom;p<=n;p++){const pg=await doc.getPage(p),h=pg.getViewport({scale:1}).height;txt+=' '+items[p].filter(i=>i.transform[5]>45&&i.transform[5]<h-45).map(i=>i.str).join(' ')} // без колонтитулов (номер страницы)
+   txt=txt.replace(/^[\s\S]*?Ответы\s*:?/i,' ');
    let m,re=/№\s*(\d+)\s*[.)]\s*([\s\S]+?)(?=\s№\s*\d+\s*[.)]|$)/g;while((m=re.exec(txt)))ans[+m[1]]=cleanAns(m[2]);
    if(!Object.keys(ans).length){re=/(?:^|\s)(\d+)\s*[.)]\s*(-?\s*[\d\s]+(?:[.,]\s*\d+)?)/g;while((m=re.exec(txt)))ans[+m[1]]=cleanAns(m[2])}}
   const last=ansFrom?ansFrom-1:n;
@@ -721,7 +746,7 @@ async function sendDraft(){
  const d=draft;if(!d||!d.tasks.length)return;
  if(d.tasks.some(k=>!k.src&&!k.text.trim())){alert('Есть пустая задача без условия — заполните или уберите её');return}
  const due=d.due?new Date(d.due+'T23:59').getTime():0;
- const r=await api('/api/admin/hw',{method:'POST',body:JSON.stringify({t:'add',s:d.sid,title:d.title.trim()||new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'}),due,tasks:d.tasks.map(k=>({img:k.src,w:k.w,h:k.h,text:k.text,num:k.num,ans:k.ans}))})});
+ const r=await api('/api/admin/hw',{method:'POST',body:JSON.stringify({t:'add',s:d.sid,title:d.title.trim()||new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'}),due,tasks:d.tasks.map(k=>({img:k.src,w:k.w,h:k.h,text:k.text,num:k.num,ans:k.ans})),rep:d.repInfo&&d.repInfo.on?d.rep:[]})});
  const j=r.ok?await r.json():{error:'Не получилось отправить (слишком большие картинки?)'};
  if(j.error){alert(j.error);return}
  stopDraft();alert('Домашка отправлена! Ученик увидит её в своём кабинете: кнопка «📚 Домашка» на его доске.');
@@ -760,7 +785,7 @@ async function openOne(d,sid,id){
  if(h.st==='new')d.b.append(el('p',{className:'mut',textContent:'Ученик ещё не сдал. Ниже — что он успел сделать.'}));
  h.tasks.forEach((t,i)=>{
   const c=el('div',{className:'ct'});
-  c.append(el('div',{className:'r'},el('b',{textContent:'Задача '+(i+1)}),t.num?el('span',{className:'chip',textContent:'№'+t.num}):null));
+  c.append(el('div',{className:'r'},el('b',{textContent:'Задача '+(i+1)}),t.num?el('span',{className:'chip',textContent:'№'+t.num}):null,t.rep?el('span',{className:'chip',textContent:'🔁 работа над ошибками'}):null));
   if(t.text)c.append(el('div',{textContent:t.text,style:'white-space:pre-wrap'}));
   if(t.img){const im=el('img',{src:imgU(sid,t.img),loading:'lazy'});im.onclick=()=>window.open(im.src);c.append(im)}
   const r=el('div',{className:'r'});

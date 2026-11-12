@@ -104,6 +104,7 @@ function stats(){
  ks.forEach(k=>{const b=by[k],v=Math.round(b.ok/b.all*100),c=v>=75?'var(--ok)':v>=45?'var(--warn)':'var(--bad)';
   const i=el('i');i.style.width=v+'%';i.style.background=c;
   p.append(el('div',{className:'bar'},el('span',{className:'n',textContent:'№'+k}),el('div',{className:'tr'},i),el('span',{className:'v',textContent:v+'% · '+b.ok+'/'+b.all})))});
+ const R=D.rep||{};if(R.fixed||R.left)p.append(el('div',{className:'empty',style:'text-align:left;margin-top:8px',textContent:'🔁 Работа над ошибками: исправлено '+R.fixed+' из '+(R.fixed+R.left)+(R.left?' · ещё '+R.left+(R.left===1?' вернётся':' вернутся')+' в следующие домашки':' — все ошибки исправлены! 🎉')}));
 }
 function chip(h){
  if(h.st==='checked'){const ms=h.tasks.map(t=>mark(h,t)).filter(m=>m!==undefined);return el('span',{className:'chip checked',textContent:'Проверено'+(ms.length?' · '+ms.filter(Boolean).length+' из '+ms.length:'')})}
@@ -144,7 +145,7 @@ function show(id){
  if(edit)w.append(el('p',{className:'mut',textContent:'Короткие ответы впишите в поля. Решение обязательно: на доске или фото тетради. Когда всё готово, нажмите «Сдать на проверку».'}));
  h.tasks.forEach((t,i)=>{
   const c=el('div',{className:'task'});
-  c.append(el('div',{className:'hd'},el('b',{textContent:'Задача '+(i+1)}),t.num?el('span',{className:'chip',textContent:'№'+t.num}):null));
+  c.append(el('div',{className:'hd'},el('b',{textContent:'Задача '+(i+1)}),t.num?el('span',{className:'chip',textContent:'№'+t.num}):null,t.rep?el('span',{className:'chip',title:'Эту задачу вы раньше решили неверно — попробуйте ещё раз',textContent:'🔁 работа над ошибками'}):null));
   if(t.text)c.append(el('div',{className:'txt',textContent:t.text}));
   if(t.img){const im=el('img',{src:img(t.img),alt:'Условие задачи',loading:'lazy'});im.onclick=()=>zoom(im.src);c.append(im)}
   const m=mark(h,t);
