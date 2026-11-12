@@ -912,10 +912,12 @@ cv.addEventListener('pointerdown',e=>{
   if(pan&&pan.touch){pan=null;ptrs.clear();gest=null}} // ладонь начала двигать доску, а потом коснулось перо — доску больше не двигаем
  if(e.pointerType==='touch'){
   if(cur&&curPen)return; // пока пишет стилус, касания ладони и пальцев не считаем
-  if(S.palm&&Math.max(e.width||0,e.height||0)>60)return; // широкое касание — это ладонь
+  const fingerScroll=fingerPan||penSeen||tool()==='hand'||viewOnly||space; // палец здесь только листает
+  if(S.palm&&!fingerScroll&&Math.max(e.width||0,e.height||0)>60)return; // широкое касание, когда палец рисует, — это ладонь (когда палец листает, не отбрасываем: у некоторых iPad пальцы «широкие»)
   // простой стилус (без Bluetooth) iPad видит как палец. Ладонь лежит НИЖЕ кончика стилуса — из нескольких касаний рисует верхнее
   const tDraw=S.palm&&!fingerPan&&!penSeen&&tool()!=='hand'&&!viewOnly&&!space,now=performance.now();
-  if(tDraw&&cur&&curPid!==null&&curPid!==e.pointerId&&!(now-curT0<120&&curTr<15&&ptrs.size===1)){ // уже рисует одно касание, пришло второе (жест двумя пальцами — только если оба почти одновременно и первое ещё не рисовало)
+  const twoF=cur&&ptrs.size===1&&Math.abs(e.clientY-curY)<55&&Math.abs(e.clientX-curX)<260&&now-curT0<450&&curTr<90; // второй палец лёг рядом на той же высоте вскоре после первого — это прокрутка двумя пальцами (ладонь лежит ниже)
+  if(tDraw&&!twoF&&cur&&curPid!==null&&curPid!==e.pointerId&&!(now-curT0<120&&curTr<15&&ptrs.size===1)){ // уже рисует одно касание, пришло второе (жест двумя пальцами — только если оба почти одновременно и первое ещё не рисовало)
    if(e.clientY<curY-25&&(now-curT0<600||curTr<40)){ptrs.clear();if(cur.pts)clearLive();cur=null;curPid=null;redraw()} // новое выше, а «рисовала» неподвижная ладонь — убираем её след, рисует новое
    else return; // новое ниже — это ладонь, не считаем
   }
@@ -1751,7 +1753,9 @@ $('zfit').onclick=()=>{fit()};
 if(window.visualViewport)window.visualViewport.addEventListener('resize',chkZoom);
 $('newt').onclick=()=>{if(!jump)return;view.y=jump.y-40;$('newt').hidden=true;jump=null;redraw()};
 if(!isTeacher)['clr','delp'].forEach(v=>{const o=$('fm').querySelector('[value='+v+']');if(o)o.remove()}); // ученик не видит «Очистить» и «Удалить»
-if(navigator.maxTouchPoints>0){$('fp').hidden=false;$('fp').onclick=()=>{fingerPan=!fingerPan;$('fp').textContent='Палец: '+(fingerPan?'листает':'рисует')}}
+if(navigator.maxTouchPoints>0){$('fp').hidden=false;const fpT=()=>{$('fp').textContent='Палец: '+(fingerPan?'листает':'рисует')};
+ try{fingerPan=localStorage.getItem('fingerPan')==='1'}catch(_){}fpT(); // выбор запоминается на этом устройстве
+ $('fp').onclick=()=>{fingerPan=!fingerPan;try{localStorage.setItem('fingerPan',fingerPan?'1':'0')}catch(_){}fpT()}}
 // настройки
 $('gear').onclick=()=>{$('set').hidden=!$('set').hidden};
 document.addEventListener('pointerdown',e=>{
