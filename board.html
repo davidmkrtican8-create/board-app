@@ -163,7 +163,6 @@ body.focus #main{padding:4px;gap:4px}
   <h3>Настройки</h3>
   <label>Тема <select id="theme"><option value="auto">Как в системе</option><option value="light">Светлая</option><option value="dark">Тёмная</option></select></label>
   <label>Фон листа <select id="bgs"><option value="grid">Клетка</option><option value="line">Линейка</option><option value="none">Чистый</option></select></label>
-  <label class="c"><input type="checkbox" id="vonly"> Только просмотр (случайно не нарисую)</label>
   <label>Шумоподавление в звонке <select id="nrs"><option value="strong">Сильное — убирает скрип пера</option><option value="normal">Обычное</option><option value="off">Выключено</option></select></label>
   <label class="c"><input type="checkbox" id="snap"> Ровные фигуры (задержать перо)</label>
   <label class="c"><input type="checkbox" id="prs"> Нажим пера: толщина зависит от силы нажатия (обычно лучше выключить)</label>
@@ -1925,8 +1924,7 @@ document.addEventListener('pointerdown',e=>{
 $('theme').value=S.theme;$('theme').onchange=()=>{S.theme=$('theme').value;saveS();applyTheme()};
 $('nrs').value=S.nr;$('nrs').onchange=()=>{S.nr=$('nrs').value;saveS();micMode()};
 $('bgs').value=S.bg;$('bgs').onchange=()=>{bg=$('bgs').value;S.bg=bg;saveS();redraw()};
-function setView(v){viewOnly=v;$('vonly').checked=v;$('vbadge').hidden=!v;closeText();editImg=null;editStroke=null;setCursor();redraw()}
-$('vonly').onchange=()=>setView($('vonly').checked);
+function setView(v){viewOnly=v;$('vbadge').hidden=!v;closeText();editImg=null;editStroke=null;setCursor();redraw()}
 $('vbadge').onclick=()=>setView(false);
 // защита от случайных выделений и меню на телефоне
 document.addEventListener('selectstart',e=>{const t=e.target&&e.target.nodeType===1?e.target:(e.target&&e.target.parentElement);if(!t||!/^(INPUT|TEXTAREA)$/.test(t.tagName))e.preventDefault()});
