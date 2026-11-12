@@ -405,10 +405,58 @@ setInterval(() => { // напоминание о сроке: накануне, �
     if (ch) hwSave(sid);
   }
 }, 30 * 60e3);
+// ---------- вечерний конспект: PDF досок, которые меняли на уроке ----------
+// снимок присылает браузер преподавателя (POST /api/<id>/snap), вечером бот рассылает их ученику и родителям
+const SND = path.join(DIR, 'snap'), SNM = path.join(SND, '_meta.json');
+try { fs.mkdirSync(SND, { recursive: true }); } catch (e) {}
+let SN = {}; try { SN = JSON.parse(fs.readFileSync(SNM, 'utf8')); } catch (e) {}
+const saveSN = () => fs.writeFileSync(SNM, JSON.stringify(SN));
+const mskDay = t => new Date((t || Date.now()) + 3 * 3600e3).toISOString().slice(0, 10);
+function snapPost(req, res, sid) {
+  const me = auth(req), s = index.students.find(x => x.id === sid);
+  if (!me || !s || s.owner !== me.id) { res.writeHead(403); return res.end(); }
+  body(req, res, 25e6, j => {
+    const pg = String(j.page || '');
+    if (!ID.test(pg) || typeof j.pdf !== 'string' || j.pdf.length > 24e6) { res.writeHead(400); return res.end(); }
+    const buf = Buffer.from(j.pdf, 'base64');
+    if (buf.slice(0, 5).toString() !== '%PDF-') { res.writeHead(400); return res.end(); }
+    fs.mkdirSync(path.join(SND, sid), { recursive: true });
+    fs.writeFileSync(path.join(SND, sid, pg + '.pdf'), buf);
+    const m = (SN[sid] = SN[sid] || {}), old = m[pg] || {};
+    m[pg] = { t: Date.now(), day: mskDay(), title: String(j.title || 'Доска').slice(0, 80), sent: old.day === mskDay() ? old.sent || 0 : 0 };
+    saveSN(); res.writeHead(204); res.end();
+  });
+}
+let snapRunning = false;
+async function snapSend() { // с 21:00 по Москве: доски, которые не меняли уже 30 минут, отправляем один раз
+  const hr = (new Date().getUTCHours() + 3) % 24;
+  if (snapRunning || hr < 21) return; snapRunning = true;
+  try {
+    const today = mskDay();
+    for (const sid of Object.keys(SN)) {
+      const s = index.students.find(x => x.id === sid), m = SN[sid];
+      for (const pg of Object.keys(m)) {
+        const e = m[pg], f = path.join(SND, sid, pg + '.pdf');
+        if (!s || e.day !== today) { delete m[pg]; fs.unlink(f, () => {}); continue; } // вчерашнее и удалённое — убираем
+        if (e.sent >= e.t || Date.now() - e.t < 30 * 60e3) continue;
+        const L = TG.token && !(TG.noAuto || {})[s.owner] ? (TG.subs[sid] || []) : [];
+        let buf = null; try { buf = fs.readFileSync(f); } catch (er) {}
+        if (buf) for (const x of L) {
+          const cap = (x.who === 'p' ? '📝 ' + s.name + ' — конспект урока ' : '📝 Конспект урока ') + dmy(e.t) + ': «' + e.title + '»';
+          try { await tgDoc(x.chat, buf, (s.name + ' — ' + e.title + '.pdf').replace(/[\\/:*?"<>|]/g, '_'), cap); } catch (er) {}
+        }
+        e.sent = Date.now();
+      }
+      if (!Object.keys(m).length) { delete SN[sid]; fs.rm(path.join(SND, sid), { recursive: true, force: true }, () => {}); }
+    }
+    saveSN();
+  } finally { snapRunning = false; }
+}
+setInterval(() => { snapSend().catch(() => {}); }, 10 * 60e3);
 function tgAdmin(req, res, u, me) { // /api/admin/tg…
   const isOwner = me.id === 'owner', own = id => index.students.find(x => x.id === id && x.owner === me.id);
   if (req.headers.host) { const s = siteOf(req); if (TG.site !== s && TG.token) { TG.site = s; saveTG(); } }
-  if (req.method === 'GET' && u.pathname === '/api/admin/tg') return json(res, { on: !!TG.token, bot: TG.bot, owner: isOwner, me: (TG.tsubs[me.id] || []).length, link: tgLink(tCode(me.id)) });
+  if (req.method === 'GET' && u.pathname === '/api/admin/tg') return json(res, { on: !!TG.token, bot: TG.bot, owner: isOwner, me: (TG.tsubs[me.id] || []).length, link: tgLink(tCode(me.id)), auto: !(TG.noAuto || {})[me.id] });
   if (req.method === 'GET' && u.pathname === '/api/admin/tg-student') {
     const sid = String(u.searchParams.get('s') || ''); if (!own(sid)) { res.writeHead(404); return res.end(); }
     return json(res, { on: !!TG.token, s: tgLink('s' + sid), p: tgLink('p' + sid), subs: (TG.subs[sid] || []).map(x => ({ who: x.who, name: x.name })) });
@@ -427,6 +475,7 @@ async function tgPost(req, res, j, me, isOwner, own) {
       TG.token = tok; TG.bot = r.result.username; TG.offset = 0; TG.site = siteOf(req); saveTG();
       return json(res, { ok: true, bot: TG.bot });
     }
+    if (j.t === 'auto') { TG.noAuto = TG.noAuto || {}; if (j.on) delete TG.noAuto[me.id]; else TG.noAuto[me.id] = true; saveTG(); return json(res, { ok: true }); }
     if (j.t === 'send') { // конспект урока
       const s = own(String(j.s || '')); if (!s) { res.writeHead(404); return res.end(); }
       if (!TG.token) return json(res, { error: 'Telegram-бот не подключён' });
@@ -530,7 +579,8 @@ function dropRoom(id) { // удалить доску ученика целико
   const r = rooms[id]; if (r) { r.clients.forEach(c => c.end()); delete rooms[id]; }
   if (RID.test(String(id))) {
     fs.unlink(path.join(DIR, id + '.json'), () => {});
-    delete hwc[id]; fs.unlink(path.join(HWD, id + '.json'), () => {}); fs.rm(path.join(HWD, id), { recursive: true, force: true }, () => {});
+    delete hwc[id]; fs.unlink(path.join(HWD, id + '.json'), () => {});
+    if (SN[id]) { delete SN[id]; saveSN(); } fs.rm(path.join(SND, id), { recursive: true, force: true }, () => {}); fs.rm(path.join(HWD, id), { recursive: true, force: true }, () => {});
   }
 }
 function admin(req, res, u) {
@@ -633,6 +683,8 @@ http.createServer((req, res) => {
     if (++logN > 60) { res.writeHead(204); return res.end(); }
     return body(req, res, 4000, j => { console.log('client-error', JSON.stringify(j).slice(0, 1500)); res.writeHead(204); res.end(); });
   }
+  const snp = u.pathname.match(/^\/api\/([a-z0-9]{4,32})\/snap$/);
+  if (snp && req.method === 'POST') return snapPost(req, res, snp[1]);
   const hm = u.pathname.match(/^\/api\/([a-z0-9]{4,32})\/hw$/);
   if (hm) return hwStudent(req, res, hm[1]);
   const hi = u.pathname.match(/^\/hwimg\/([a-z0-9]{4,32})\/([a-f0-9]{16}\.(jpg|png|webp))$/);

@@ -567,6 +567,7 @@ function openPage(id){page=id;live={};$('newt').hidden=true;jump=null;editImg=nu
 
 // ---------- сообщения от сервера ----------
 function onOp(o){
+ if(o.page&&SNAP_OPS.includes(o.t))snapDirty[o.page]=Date.now(); // доска изменилась — позже сохраним её PDF для вечернего конспекта
  if(o.from===me&&(o.t==='strokeset'||o.t==='imgset'||o.t==='stroke'))return; // своё эхо со старым положением заставляло объект дёргаться
  if(o.t==='rtc'){onRtc(o);return}
  if(o.t==='init'){callInit(o.call);myName=o.name||null;$('who').textContent=o.name?'Кабинет: '+o.name:'Доска';document.title=o.name||'Доска';pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};for(const pg in strokes)for(const id in strokes[pg])strokes[pg][id].id=id; // у загруженных объектов нет поля id — проставляем
@@ -1124,6 +1125,7 @@ window.addEventListener('message',e=>{
  if(e.origin!==location.origin)return;const d=e.data;if(!d)return;
  if(d.t==='key'){if(!viewOnly)(d.a==='redo'?redoAct:undo)();return}
  if(d.t==='theme'&&['auto','light','dark'].includes(d.v)){S.theme=d.v;$('theme').value=d.v;saveS();applyTheme();return}
+ if(d.t==='snapnow'){snapAll(true).finally(()=>e.source.postMessage({t:'snapdone'},location.origin));return}
  if(d.t==='pdfreq'){buildPDF(false).then(async r=>{const b=new Uint8Array(await r.blob.arrayBuffer());let s='';for(let i=0;i<b.length;i+=32768)s+=String.fromCharCode.apply(null,b.subarray(i,i+32768));
   e.source.postMessage({t:'pdfres',b64:btoa(s),fname:r.fname,title:r.title},location.origin)}).catch(()=>e.source.postMessage({t:'pdfres',err:1},location.origin));return} // конспект в Telegram из кабинета
  if(d.t==='pasteimg'&&typeof d.src==='string'&&/^data:image\//.test(d.src)){addImageSrc(d.src,!!d.heic);return} // ⌘V, нажатый в кабинете
@@ -1240,9 +1242,27 @@ async function exportPDF(all){
  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);
  $('st').textContent='PDF сохранён';redraw();
 }
-async function buildPDF(all){
- const ids=all?pages.map(p=>p.id):[page];
- $('st').textContent='Готовлю PDF…';
+// ---------- снимки досок для вечернего конспекта в Telegram ----------
+// сервер рисовать не умеет, поэтому PDF делает браузер преподавателя: через 40 с после последней правки на уроке
+const SNAP_OPS=['stroke','strokeset','image','imgset','erase','clear'],snapDirty={};let snapBusy=false;
+const tTok=()=>{try{return localStorage.getItem('tok')||''}catch(e){return ''}};
+async function snapPage(pid){
+ const sk=strokes[pid]||{},im=images[pid]||{};
+ if(!pages.some(p=>p.id===pid)||!(Object.keys(sk).length||Object.keys(im).length)){delete snapDirty[pid];return}
+ const t0=snapDirty[pid],r=await buildPDF(false,pid),b=new Uint8Array(await r.blob.arrayBuffer());let bin='';
+ for(let i=0;i<b.length;i+=32768)bin+=String.fromCharCode.apply(null,b.subarray(i,i+32768));
+ const res=await fetch('/api/'+room+'/snap',{method:'POST',headers:{'Content-Type':'application/json','X-Token':tTok()},body:JSON.stringify({page:pid,title:r.title,pdf:btoa(bin)})});
+ if(res.ok&&snapDirty[pid]===t0)delete snapDirty[pid];
+}
+async function snapAll(force){
+ if(!isTeacher||!tTok())return;
+ for(let i=0;snapBusy&&i<50;i++)await new Promise(r=>setTimeout(r,200));if(snapBusy)return;snapBusy=true;
+ try{for(const pid of Object.keys(snapDirty))if(force||Date.now()-snapDirty[pid]>40000){try{await snapPage(pid)}catch(e){}}}finally{snapBusy=false}
+}
+setInterval(()=>snapAll(false),15000);
+async function buildPDF(all,only){ // only — одна доска по id, без надписей в строке состояния (тихий снимок для конспекта)
+ const ids=only?[only]:all?pages.map(p=>p.id):[page];
+ if(!only)$('st').textContent='Готовлю PDF…';
  const keepCtx=ctx,keepDark=dark,jpegs=[];
  try{
   dark=false;
@@ -1266,9 +1286,9 @@ async function buildPDF(all){
   }
  }finally{ctx=keepCtx;dark=keepDark}
  const blob=makePDF(jpegs);
- const title=(pages.find(p=>p.id===page)||{}).title||'доска';
+ const title=(pages.find(p=>p.id===(only||page))||{}).title||'доска';
  const fname=((myName?myName+' — ':'')+(all?'все доски':title)).replace(/[\\/:*?"<>|]/g,'_')+'.pdf';
- $('st').textContent='';redraw();
+ if(!only)$('st').textContent='';redraw();
  return{blob,fname,title};
 }
 

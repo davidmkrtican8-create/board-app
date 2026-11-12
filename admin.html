@@ -166,10 +166,16 @@ function render(){const l=$('list');l.innerHTML='';
   const t=document.createElement('span');t.textContent=s.name;d.append(dot,t);
   const pn=(window.hwPend||{})[s.id];if(pn){const b=document.createElement('span');b.className='badge';b.textContent=pn;b.title='Домашек ждут проверки: '+pn;d.append(b)}
   d.onclick=()=>pick(s.id);l.appendChild(d)});if(window.hwOnPick)window.hwOnPick()}
-function pick(id){cur=id;if(me)localStorage.setItem('last:'+me.login,id);const s=students.filter(x=>x.id===id)[0];
+function pick(id,hash){cur=id;if(me)localStorage.setItem('last:'+me.login,id);const s=students.filter(x=>x.id===id)[0];
  if(!s){cur=null;$('nm').textContent='Выберите ученика';$('fr').src='about:blank';render();return}
- $('nm').textContent=s.name;$('fr').src='/b/'+id;render()}
-window.hwCtx={cur:()=>cur,students:()=>students,render:()=>render(),open:(id,hash)=>{pick(id);if(hash)$('fr').src='/b/'+id+hash}};
+ $('nm').textContent=s.name;render();
+ const f=$('fr'),prev=f.getAttribute('src')||'';
+ if(!prev.startsWith('/b/')||prev.split(/[/#]/)[2]===id){f.src='/b/'+id+(hash||'');return}
+ // перед сменой ученика доска сохраняет снимок для вечернего конспекта (не дольше 4 с)
+ let done=false;const go=()=>{if(done)return;done=true;removeEventListener('message',h);if(cur===id)f.src='/b/'+id+(hash||'')};
+ const h=e=>{if(e.origin===location.origin&&e.data&&e.data.t==='snapdone')go()};addEventListener('message',h);setTimeout(go,4000);
+ try{f.contentWindow.postMessage({t:'snapnow'},location.origin)}catch(e){go()}}
+window.hwCtx={cur:()=>cur,students:()=>students,render:()=>render(),open:(id,hash)=>pick(id,hash)};
 async function op(o){const r=await api('/api/admin/op',{method:'POST',body:JSON.stringify(o)});
  const j=r.ok?await r.json():null;if(!j||j.error){alert(j&&j.error||'Не получилось');return false}
  if(Array.isArray(j))students=j;render();return j}
@@ -706,6 +712,8 @@ $('tgb').onclick=async()=>{
   d.b.append(el('p',{textContent:'✅ Бот @'+g.bot+' работает. Ученики и родители подключаются по ссылкам из окна «Домашка» или из кабинета ученика.'}));
   d.b.append(el('div',{className:'row'},el('span',{className:'grow',textContent:g.me?'🔔 Вы получаете уведомления, когда ученики сдают домашку.':'Получать себе уведомления, когда ученики сдают домашку:'}),
    el('a',{href:g.link,target:'_blank',rel:'noopener'},el('button',{className:'pri',textContent:g.me?'Подключить ещё устройство':'Подключить'}))));
+  const au=el('input',{type:'checkbox',checked:g.auto});au.onchange=async()=>{const j=await post({t:'auto',on:au.checked});if(j.error){alert(j.error);au.checked=!au.checked}};
+  d.b.append(el('label',{className:'row',style:'cursor:pointer'},au,el('span',{className:'grow',textContent:'Вечером (после 21:00) автоматически отправлять ученику и родителям PDF досок, на которых сегодня был урок'})));
  }else if(!g.owner)d.b.append(el('p',{textContent:'Бот ещё не подключён. Его подключает владелец сайта.'}));
  if(g.owner){
   const steps=el('ol',{style:'margin:0;padding-left:20px;line-height:1.6'});
