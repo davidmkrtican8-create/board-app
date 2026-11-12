@@ -495,14 +495,17 @@ function setSB(h){document.body.classList.toggle('nosidebar',h);localStorage.set
 $('hs').onclick=()=>setSB(!document.body.classList.contains('nosidebar'));
 if(localStorage.getItem('nosidebar')==='1')setSB(true);
 // «фокус»: убирает боковые панели (встроенный полный экран Safari ломает клавиатуру, поэтому без него)
-$('fs').onclick=()=>document.body.classList.toggle('admfocus');
+// ⛶ и ⤢ прячут оба списка слева: учеников (здесь) и досок (внутри доски)
+const sideMsg=()=>{try{$('fr').contentWindow.postMessage({t:'side',hide:document.body.classList.contains('admfocus')},location.origin)}catch(e){}};
+$('fr').addEventListener('load',sideMsg); // при переходе к другому ученику доска загружается заново
+$('fs').onclick=()=>{document.body.classList.toggle('admfocus');sideMsg()};
 // настоящий полный экран (кнопка ⤢): вместе с ним включается «фокус»; выход — Esc или ещё раз ⤢
 const fsEl=()=>document.fullscreenElement||document.webkitFullscreenElement,de=document.documentElement;
 $('fsb').onclick=()=>{
  if(fsEl()){(document.exitFullscreen||document.webkitExitFullscreen).call(document);return}
  if(de.requestFullscreen)de.requestFullscreen().catch(()=>{});else de.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
 };
-const onFs=()=>{document.body.classList.toggle('admfocus',!!fsEl());$('fsb').textContent=fsEl()?'⤡':'⤢'};
+const onFs=()=>{document.body.classList.toggle('admfocus',!!fsEl());$('fsb').textContent=fsEl()?'⤡':'⤢';sideMsg()};
 document.addEventListener('fullscreenchange',onFs);document.addEventListener('webkitfullscreenchange',onFs);
 if(!(de.requestFullscreen||de.webkitRequestFullscreen))$('fsb').hidden=true;
 // iPad: в полноэкранном режиме не даём Safari прокрутить страницу (иначе он выходит из полного экрана); прокручиваемые списки работают
