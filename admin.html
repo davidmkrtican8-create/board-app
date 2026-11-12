@@ -119,10 +119,10 @@ body.nosidebar #side{display:none}
   <div class="top"><b>Ученики</b><button id="addS">+ Ученик</button></div>
   <div id="list"></div>
   <div id="whoami" style="font-size:12px;color:var(--mut)"></div>
-  <div class="foot"><button id="tch" hidden title="Пригласить репетиторов и управлять их аккаунтами">Репетиторы</button><button id="cpw" title="Сменить свой пароль">Пароль</button><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden><button id="lo" title="Выйти из кабинета на этом устройстве">Выйти</button><button id="rb" title="Вернуть учеников и доски из копии, которую кабинет сам сохраняет в вашем браузере">Восстановить из автокопии</button><div id="bkst" style="font-size:12px;color:var(--mut);width:100%"></div></div>
+  <div class="foot"><button id="tch" hidden title="Пригласить репетиторов и управлять их аккаунтами">Репетиторы</button><button id="tgb" title="Telegram-бот: уведомления и конспекты">Telegram</button><button id="cpw" title="Сменить свой пароль">Пароль</button><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden><button id="lo" title="Выйти из кабинета на этом устройстве">Выйти</button><button id="rb" title="Вернуть учеников и доски из копии, которую кабинет сам сохраняет в вашем браузере">Восстановить из автокопии</button><div id="bkst" style="font-size:12px;color:var(--mut);width:100%"></div></div>
  </div>
  <div id="main">
-  <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk" class="keep">Задачи</button><button id="hwk" title="Домашние задания ученика">Домашка<span id="hwkn"></span></button><button id="fs" class="keep" title="Фокус: убрать панели">⛶</button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button><button id="th" class="keep" title="Тема: как в системе / светлая / тёмная">◐</button><button id="lnk">Ссылка ученика</button><button id="ren">Переименовать</button><button id="del">Удалить</button></div>
+  <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk" class="keep">Задачи</button><button id="hwk" title="Домашние задания ученика">Домашка<span id="hwkn"></span></button><button id="tgs" title="Отправить конспект урока ученику и родителям в Telegram">📨 Конспект</button><button id="fs" class="keep" title="Фокус: убрать панели">⛶</button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button><button id="th" class="keep" title="Тема: как в системе / светлая / тёмная">◐</button><button id="lnk">Ссылка ученика</button><button id="ren">Переименовать</button><button id="del">Удалить</button></div>
   <div id="work">
    <iframe id="fr" allow="microphone; camera; autoplay; clipboard-write"></iframe>
    <div id="tasks" hidden>
@@ -644,6 +644,7 @@ async function openList(d,sid){
   el('div',{className:'row'},el('button',{className:'pri',textContent:'+ Задать домашку',onclick:()=>{d.close();startDraft()}}),
    el('span',{className:'mut grow',textContent:'Кабинет ученика: '+link}),el('button',{textContent:'Копировать',onclick:e=>{const b=e.target;(navigator.clipboard?navigator.clipboard.writeText(link):Promise.reject()).then(()=>{b.textContent='Скопировано'},()=>prompt('Ссылка:',link))}}),
    el('button',{textContent:'Закрыть',onclick:d.close})));
+ {const tr=el('div',{className:'row'});d.b.append(tr);if(window.hwTgRow)window.hwTgRow(tr,sid)}
  if(!L.length)d.b.append(el('p',{className:'mut',textContent:'Домашек пока нет. Нажмите «+ Задать домашку».'}));
  L.forEach(h=>{
   const ms=h.tasks.map(t=>h.marks[t.id]!==undefined?h.marks[t.id]:h.auto[t.id]).filter(v=>v!==undefined);
@@ -688,6 +689,66 @@ async function openOne(d,sid,id){
   el('button',{textContent:'Закрыть',onclick:d.close})));
 }
 $('hwk').onclick=()=>{const sid=C().cur();if(!sid){alert('Сначала выберите ученика слева');return}const d=dlg();d.b.append(el('p',{className:'mut',textContent:'Загружаю…'}));openList(d,sid)};
+})();
+</script>
+<script>
+// Telegram: настройка бота (владелец), уведомления себе, ссылки ученику и родителям, конспект урока
+(function(){
+const $=i=>document.getElementById(i),C=()=>window.hwCtx,api=(p,o)=>window.boardApi(p,o);
+const el=(tag,props,...kids)=>{const e=Object.assign(document.createElement(tag),props||{});kids.forEach(k=>k!=null&&e.append(k));return e};
+function dlg(title){const o=el('div',{className:'dlg'}),b=el('div');b.append(el('h2',{textContent:title}));o.append(b);o.addEventListener('pointerdown',e=>{if(e.target===o)o.remove()});document.body.append(o);return{o,b,close:()=>o.remove()}}
+const copyBtn=(label,text)=>el('button',{textContent:label,onclick:e=>{const b=e.target,o=b.textContent;(navigator.clipboard?navigator.clipboard.writeText(text):Promise.reject()).then(()=>{b.textContent='Скопировано';setTimeout(()=>{b.textContent=o},1500)},()=>prompt('Ссылка:',text))}});
+const post=async o=>{const r=await api('/api/admin/tg',{method:'POST',body:JSON.stringify(o)});return r.ok?r.json():{error:'Не получилось (код '+r.status+')'}};
+// --- окно «Telegram» ---
+$('tgb').onclick=async()=>{
+ const d=dlg('Telegram-бот');const r=await api('/api/admin/tg');if(!r.ok){d.close();alert('Не получилось');return}const g=await r.json();
+ if(g.on){
+  d.b.append(el('p',{textContent:'✅ Бот @'+g.bot+' работает. Ученики и родители подключаются по ссылкам из окна «Домашка» или из кабинета ученика.'}));
+  d.b.append(el('div',{className:'row'},el('span',{className:'grow',textContent:g.me?'🔔 Вы получаете уведомления, когда ученики сдают домашку.':'Получать себе уведомления, когда ученики сдают домашку:'}),
+   el('a',{href:g.link,target:'_blank',rel:'noopener'},el('button',{className:'pri',textContent:g.me?'Подключить ещё устройство':'Подключить'}))));
+ }else if(!g.owner)d.b.append(el('p',{textContent:'Бот ещё не подключён. Его подключает владелец сайта.'}));
+ if(g.owner){
+  const steps=el('ol',{style:'margin:0;padding-left:20px;line-height:1.6'});
+  ['Откройте в Telegram бота @BotFather (с синей галочкой) и нажмите «Запустить».','Отправьте ему /newbot.','Придумайте имя, например «УчиДоска», затем адрес бота — латиницей, на конце bot, например uchidoska_help_bot.','BotFather пришлёт токен — длинную строку вида 123456789:AA…. Скопируйте её и вставьте в поле ниже. Никому её не пересылайте.'].forEach(t=>steps.append(el('li',{textContent:t})));
+  const inp=el('input',{type:'password',placeholder:'Токен от @BotFather',autocomplete:'off'}),err=el('div',{className:'err'});
+  const save=el('button',{className:'pri',textContent:g.on?'Заменить бота':'Подключить бота',onclick:async()=>{err.textContent='';save.disabled=true;const j=await post({t:'token',token:inp.value});save.disabled=false;if(j.error){err.textContent=j.error;return}d.close();alert('Готово! Бот @'+j.bot+' подключён.');$('tgb').click()}});
+  d.b.append(el('b',{textContent:g.on?'Заменить бота (только владелец)':'Как подключить (один раз, 3 минуты)'}));
+  if(!g.on)d.b.append(steps);
+  d.b.append(inp,err,el('div',{className:'row'},save,g.on?el('button',{textContent:'Отключить бота',onclick:async()=>{if(confirm('Отключить бота? Уведомления перестанут приходить всем.')){await post({t:'token',token:''});d.close()}}}):null,el('button',{textContent:'Закрыть',onclick:d.close})));
+ }else d.b.append(el('div',{className:'row'},el('button',{textContent:'Закрыть',onclick:d.close})));
+};
+// --- строка Telegram в окне «Домашка» ---
+window.hwTgRow=async(box,sid)=>{
+ const r=await api('/api/admin/tg-student?s='+sid);if(!r.ok)return;const g=await r.json();if(!g.on){box.append(el('span',{className:'mut',textContent:'Telegram: бот не подключён (кнопка «Telegram» внизу слева)'}));return}
+ const st=g.subs.filter(x=>x.who==='s').length,pa=g.subs.filter(x=>x.who==='p').length;
+ box.append(el('span',{className:'grow',textContent:'Telegram: ученик '+(st?'✅':'— не подключён')+' · родители: '+(pa||'нет')}),copyBtn('Ссылка ученику',g.s),copyBtn('Ссылка родителям',g.p));
+};
+// --- конспект урока ---
+function askPdf(){return new Promise((ok,bad)=>{const f=$('fr');const h=e=>{if(e.origin!==location.origin||!e.data||e.data.t!=='pdfres')return;removeEventListener('message',h);clearTimeout(t);e.data.err?bad():ok(e.data)};
+ const t=setTimeout(()=>{removeEventListener('message',h);bad()},60000);addEventListener('message',h);f.contentWindow.postMessage({t:'pdfreq'},location.origin)})}
+$('tgs').onclick=async()=>{
+ const sid=C().cur();if(!sid){alert('Сначала выберите ученика слева');return}
+ const s=C().students().find(x=>x.id===sid),d=dlg('Конспект урока: '+s.name);
+ const [gr,hr]=await Promise.all([api('/api/admin/tg-student?s='+sid),api('/api/admin/hw?s='+sid)]);const g=gr.ok?await gr.json():{},H=hr.ok?await hr.json():[];
+ if(!g.on||!g.subs||!g.subs.length){
+  d.b.append(el('p',{textContent:g.on?'Ни ученик, ни родители ещё не подключили Telegram. Отправьте им ссылки — после этого конспекты можно будет присылать одной кнопкой.':'Telegram-бот ещё не подключён: кнопка «Telegram» внизу слева.'}));
+  if(g.on)d.b.append(el('div',{className:'row'},copyBtn('Ссылка ученику',g.s),copyBtn('Ссылка родителям',g.p)));
+  d.b.append(el('div',{className:'row'},el('button',{textContent:'Закрыть',onclick:d.close})));return}
+ const day=new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'}),hw=H.find(h=>h.st==='new');
+ const ta=el('textarea',{style:'min-height:150px',value:'📝 Урок '+day+'\nЧто прошли: \n'+(hw?'Домашка: «'+hw.title+'»'+(hw.due?' — до '+new Date(hw.due).toLocaleDateString('ru-RU',{day:'numeric',month:'long'}):'')+' (в кабинете ученика)':'')});
+ const pdf=el('input',{type:'checkbox',checked:true}),err=el('div',{className:'err'});
+ const who=g.subs.map(x=>(x.who==='s'?'ученик':'родитель')+(x.name?' ('+x.name+')':'')).join(', ');
+ const go=el('button',{className:'pri',textContent:'Отправить',onclick:async()=>{
+  go.disabled=true;err.textContent='';go.textContent='Готовлю…';let p=null;
+  if(pdf.checked){try{p=await askPdf()}catch(e){err.textContent='Не получилось сделать PDF доски';go.disabled=false;go.textContent='Отправить';return}}
+  go.textContent='Отправляю…';
+  const j=await post({t:'send',s:sid,text:ta.value,pdf:p&&p.b64,fname:p&&p.fname});
+  go.disabled=false;go.textContent='Отправить';if(j.error){err.textContent=j.error;return}
+  d.close();alert('Конспект отправлен ('+j.sent+')')}});
+ d.b.append(el('p',{className:'mut',textContent:'Получат: '+who}),ta,el('label',{style:'display:flex;gap:8px;align-items:center'},pdf,el('span',{textContent:'Приложить открытую доску (PDF)'})),err,
+  el('div',{className:'row'},go,el('button',{textContent:'Отмена',onclick:d.close})));
+ ta.focus();ta.setSelectionRange(ta.value.indexOf('Что прошли: ')+12,ta.value.indexOf('Что прошли: ')+12);
+};
 })();
 </script>
 </body>

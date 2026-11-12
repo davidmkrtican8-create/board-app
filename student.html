@@ -29,6 +29,7 @@ h2{font-size:19px;margin:24px 0 10px}
 .chip.late{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}
 .chip.sent{background:var(--soft);color:var(--ac)}
 .chip.checked{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
+.tg{background:var(--panel);border:1px solid var(--bd);border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:15px}.tg .t{flex:1;min-width:200px}.tg a{text-decoration:none}
 .empty{color:var(--mut);background:var(--panel);border:1px dashed var(--bd);border-radius:14px;padding:18px;text-align:center}
 .bar{display:flex;align-items:center;gap:10px;margin:7px 0}.bar .n{width:58px;font-size:14px}
 .bar .tr{flex:1;height:12px;border-radius:6px;background:var(--soft);overflow:hidden}.bar .tr i{display:block;height:100%;border-radius:6px}
@@ -64,6 +65,7 @@ h2{font-size:19px;margin:24px 0 10px}
    <div class="stat"><b id="s2">–</b><span>верных решений</span></div>
    <div class="stat"><b id="s3">–</b><span>досок с уроков</span></div>
   </div>
+  <div id="tgc"></div>
   <h2>Домашка</h2><div id="list"></div>
   <h2>Прогресс по номерам ЕГЭ</h2><div id="prog"></div>
   <h2>Доски с уроков</h2><div class="boards" id="boards"></div>
@@ -122,7 +124,13 @@ function home(){
  });
  const bs=$('boards');bs.innerHTML='';
  D.pages.slice().reverse().forEach(p=>bs.append(el('a',{href:'/b/'+sid+'#p='+p.id,textContent:p.title||'Доска'})));
- stats();
+ stats();tgCard();
+}
+function tgCard(){
+ const c=$('tgc');c.innerHTML='';if(!D.tg)return;
+ const cp=el('button',{textContent:'Ссылка для родителей',title:'Скопировать ссылку: родители будут получать новости об уроках и домашках',onclick:()=>{(navigator.clipboard?navigator.clipboard.writeText(D.tg.p):Promise.reject()).then(()=>toast('Ссылка скопирована — отправьте её родителям'),()=>prompt('Ссылка для родителей:',D.tg.p))}});
+ c.append(el('div',{className:'tg'},el('div',{className:'t',textContent:D.tg.on?'🔔 Telegram подключён: домашки и напоминания приходят туда.':'🔔 Получайте домашку, напоминания о сроках и оценки в Telegram'}),
+  D.tg.on?null:el('a',{href:D.tg.s,target:'_blank',rel:'noopener'},el('button',{className:'pri',textContent:'Подключить'})),cp));
 }
 const plural=(n,a,b,c)=>{n%=100;if(n>10&&n<20)return c;n%=10;return n===1?a:n>1&&n<5?b:c};
 function show(id){

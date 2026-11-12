@@ -311,6 +311,140 @@ function hwBoard(sid, h) { // «Решать на доске»: отдельна
   save(r);
   return pid;
 }
+// ---------- Telegram-бот: домашка, напоминания и конспекты ученику и родителям ----------
+// один бот на весь сайт; токен вводит владелец в кабинете («Telegram»), хранится в _tg.json
+const https = require('https');
+const TGF = path.join(DIR, '_tg.json');
+let TG = { token: '', bot: '', site: '', offset: 0, subs: {}, tsubs: {} };
+try { TG = Object.assign(TG, JSON.parse(fs.readFileSync(TGF, 'utf8'))); } catch (e) {}
+const saveTG = () => fs.writeFileSync(TGF, JSON.stringify(TG));
+const siteOf = req => (String(req.headers['x-forwarded-proto'] || '').split(',')[0] || 'http') + '://' + req.headers.host;
+function tgCall(method, params, timeout, token) {
+  return new Promise((ok, bad) => {
+    const b = Buffer.from(JSON.stringify(params || {}));
+    const rq = https.request({ host: 'api.telegram.org', path: '/bot' + (token || TG.token) + '/' + method, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': b.length }, timeout: timeout || 20000 }, r => {
+      let d = ''; r.on('data', c => d += c); r.on('end', () => { try { ok(JSON.parse(d)); } catch (e) { bad(e); } });
+    });
+    rq.on('timeout', () => rq.destroy(new Error('timeout'))); rq.on('error', bad); rq.end(b);
+  });
+}
+function tgDoc(chat, buf, fname, caption) { // отправить файл (PDF конспекта)
+  return new Promise((ok, bad) => {
+    const bd = '----b' + crypto.randomBytes(8).toString('hex'), parts = [];
+    const field = (n, v) => parts.push(Buffer.from('--' + bd + '\r\nContent-Disposition: form-data; name="' + n + '"\r\n\r\n' + v + '\r\n'));
+    field('chat_id', String(chat)); if (caption) field('caption', caption.slice(0, 1000));
+    parts.push(Buffer.from('--' + bd + '\r\nContent-Disposition: form-data; name="document"; filename="' + encodeURIComponent(fname) + '"\r\nContent-Type: application/pdf\r\n\r\n'), buf, Buffer.from('\r\n--' + bd + '--\r\n'));
+    const body = Buffer.concat(parts);
+    const rq = https.request({ host: 'api.telegram.org', path: '/bot' + TG.token + '/sendDocument', method: 'POST', headers: { 'Content-Type': 'multipart/form-data; boundary=' + bd, 'Content-Length': body.length }, timeout: 60000 }, r => {
+      let d = ''; r.on('data', c => d += c); r.on('end', () => { try { ok(JSON.parse(d)); } catch (e) { bad(e); } });
+    });
+    rq.on('timeout', () => rq.destroy(new Error('timeout'))); rq.on('error', bad); rq.end(body);
+  });
+}
+const tgSay = (chat, text) => TG.token ? tgCall('sendMessage', { chat_id: chat, text, disable_web_page_preview: true }).then(r => { if (r && !r.ok && r.error_code === 403) tgDrop(chat); return r; }).catch(() => null) : Promise.resolve(null);
+function tgDrop(chat) { // человек заблокировал бота — больше не пишем
+  for (const k in TG.subs) TG.subs[k] = TG.subs[k].filter(x => x.chat !== chat);
+  for (const k in TG.tsubs) TG.tsubs[k] = TG.tsubs[k].filter(x => x !== chat);
+  saveTG();
+}
+const tCode = tid => 't' + tid + '_' + sign('tg' + tid).slice(0, 12).replace(/[^A-Za-z0-9]/g, 'x');
+const tgLink = code => TG.bot ? 'https://t.me/' + TG.bot + '?start=' + code : '';
+// написать ученику и его родителям; f(кто) возвращает текст: 's' — ученику, 'p' — родителю
+function tgStudent(sid, f) { (TG.subs[sid] || []).forEach(x => { const t = f(x.who); if (t) tgSay(x.chat, t); }); }
+function tgTeacher(tid, text) { (TG.tsubs[tid] || []).forEach(c => tgSay(c, text)); }
+function tgOnMessage(m) {
+  if (!m || !m.chat || m.chat.type !== 'private') return;
+  const chat = m.chat.id, text = String(m.text || '').trim(), who = [m.from && m.from.first_name, m.from && m.from.last_name].filter(Boolean).join(' ').slice(0, 60);
+  const st = text.match(/^\/start(?:\s+(\S+))?/);
+  if (text === '/stop') { tgDrop(chat); return tgSay(chat, 'Готово, больше не буду писать. Подключиться снова можно по ссылке из кабинета.'); }
+  if (st && st[1]) {
+    const c = st[1], s = index.students.find(x => x.id === c.slice(1));
+    if ((c[0] === 's' || c[0] === 'p') && s) {
+      const L = (TG.subs[s.id] = (TG.subs[s.id] || []).filter(x => x.chat !== chat));
+      if (L.length >= 10) L.shift();
+      L.push({ chat, who: c[0], name: who }); saveTG();
+      return tgSay(chat, c[0] === 's'
+        ? 'Готово, ' + s.name + '! Сюда будут приходить домашки, напоминания о сроках и результаты проверки.\nКабинет: ' + TG.site + '/s/' + s.id + '\nОтключить: /stop'
+        : 'Готово! Сюда будут приходить новости об уроках и домашках ученика: ' + s.name + '.\nОтключить: /stop');
+    }
+    const t = [owner(), ...teachersOnly()].find(x => tCode(x.id) === c);
+    if (t) {
+      const L = (TG.tsubs[t.id] = (TG.tsubs[t.id] || []).filter(x => x !== chat)); L.push(chat); saveTG();
+      return tgSay(chat, 'Готово, ' + t.name + '! Буду сообщать, когда ученики сдают домашку.\nОтключить: /stop');
+    }
+  }
+  tgSay(chat, 'Это бот УчиДоски. Чтобы подключиться, откройте ссылку из кабинета ученика или ту, что прислал преподаватель.');
+}
+let tgPolling = false;
+async function tgPoll() {
+  if (tgPolling) return; tgPolling = true;
+  for (;;) {
+    if (!TG.token) { await new Promise(r => setTimeout(r, 10000)); continue; }
+    try {
+      const tok = TG.token, r = await tgCall('getUpdates', { offset: TG.offset, timeout: 50, allowed_updates: ['message'] }, 65000);
+      if (tok !== TG.token) continue;
+      if (!r.ok) { await new Promise(x => setTimeout(x, 15000)); continue; }
+      for (const u of r.result) { TG.offset = u.update_id + 1; try { tgOnMessage(u.message); } catch (e) {} }
+      if (r.result.length) saveTG();
+    } catch (e) { await new Promise(x => setTimeout(x, 5000)); }
+  }
+}
+tgPoll();
+const dmy = t => new Date(t).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', timeZone: 'Europe/Moscow' });
+setInterval(() => { // напоминание о сроке: накануне, с 15 до 21 по Москве
+  const hr = (new Date().getUTCHours() + 3) % 24;
+  if (!TG.token || hr < 15 || hr >= 21) return;
+  for (const sid in TG.subs) {
+    if (!TG.subs[sid].length || !index.students.some(x => x.id === sid)) continue;
+    const H = hwOf(sid); let ch = false;
+    for (const h of H.list) {
+      if (h.st !== 'new' || !h.due || h.rem || h.due - Date.now() > 30 * 3600e3 || h.due < Date.now()) continue;
+      h.rem = 1; ch = true;
+      tgStudent(sid, w => w === 's' ? '⏰ Напоминание: домашку «' + h.title + '» нужно сдать до ' + dmy(h.due) + '. Если уже решил — не забудь нажать «Сдать на проверку».\n' + TG.site + '/s/' + sid + '?hw=' + h.id : null);
+    }
+    if (ch) hwSave(sid);
+  }
+}, 30 * 60e3);
+function tgAdmin(req, res, u, me) { // /api/admin/tg…
+  const isOwner = me.id === 'owner', own = id => index.students.find(x => x.id === id && x.owner === me.id);
+  if (req.headers.host) { const s = siteOf(req); if (TG.site !== s && TG.token) { TG.site = s; saveTG(); } }
+  if (req.method === 'GET' && u.pathname === '/api/admin/tg') return json(res, { on: !!TG.token, bot: TG.bot, owner: isOwner, me: (TG.tsubs[me.id] || []).length, link: tgLink(tCode(me.id)) });
+  if (req.method === 'GET' && u.pathname === '/api/admin/tg-student') {
+    const sid = String(u.searchParams.get('s') || ''); if (!own(sid)) { res.writeHead(404); return res.end(); }
+    return json(res, { on: !!TG.token, s: tgLink('s' + sid), p: tgLink('p' + sid), subs: (TG.subs[sid] || []).map(x => ({ who: x.who, name: x.name })) });
+  }
+  if (req.method === 'POST' && u.pathname === '/api/admin/tg') return body(req, res, 30e6, j => tgPost(req, res, j, me, isOwner, own).catch(() => { try { res.writeHead(500); res.end(); } catch (e) {} }));
+  res.writeHead(404); res.end();
+}
+async function tgPost(req, res, j, me, isOwner, own) {
+    if (j.t === 'token') {
+      if (!isOwner) { res.writeHead(403); return res.end(); }
+      const tok = String(j.token || '').trim();
+      if (!tok) { TG.token = ''; TG.bot = ''; saveTG(); return json(res, { ok: true }); }
+      if (!/^\d+:[\w-]{30,}$/.test(tok)) return json(res, { error: 'Это не похоже на токен бота. Скопируйте его из сообщения @BotFather целиком.' });
+      let r = null; try { r = await tgCall('getMe', {}, 15000, tok); } catch (e) {}
+      if (!r || !r.ok) return json(res, { error: 'Telegram не принял этот токен. Проверьте, что скопировали его полностью.' });
+      TG.token = tok; TG.bot = r.result.username; TG.offset = 0; TG.site = siteOf(req); saveTG();
+      return json(res, { ok: true, bot: TG.bot });
+    }
+    if (j.t === 'send') { // конспект урока
+      const s = own(String(j.s || '')); if (!s) { res.writeHead(404); return res.end(); }
+      if (!TG.token) return json(res, { error: 'Telegram-бот не подключён' });
+      const L = TG.subs[s.id] || []; if (!L.length) return json(res, { error: 'Ни ученик, ни родители ещё не подключили Telegram' });
+      const text = String(j.text || '').trim().slice(0, 3500);
+      let pdf = null; if (typeof j.pdf === 'string' && j.pdf.length < 28e6) pdf = Buffer.from(j.pdf, 'base64');
+      const fname = String(j.fname || 'Конспект.pdf').replace(/[\\/:*?"<>|\r\n]/g, '_').slice(0, 100);
+      let n = 0;
+      for (const x of L) {
+        try {
+          if (text) await tgSay(x.chat, text);
+          if (pdf) { const r = await tgDoc(x.chat, pdf, fname, ''); if (r && r.ok) n++; } else n++;
+        } catch (e) {}
+      }
+      return json(res, n ? { sent: n } : { error: 'Не получилось отправить. Попробуйте ещё раз.' });
+    }
+    res.writeHead(400); res.end();
+}
 function hwTeacher(req, res, u, me) { // /api/admin/hw…
   const own = id => index.students.find(x => x.id === id && x.owner === me.id);
   if (req.method === 'GET' && u.pathname === '/api/admin/hw-pending') {
@@ -336,11 +470,19 @@ function hwTeacher(req, res, u, me) { // /api/admin/hw…
       }
       if (!tasks.length) return json(res, { error: 'В задачах нет ни картинки, ни текста' });
       const due = Number.isFinite(+j.due) && +j.due > 0 ? +j.due : null;
-      H.list.unshift({ id: crypto.randomBytes(5).toString('hex'), title: String(j.title || '').trim().slice(0, 80) || 'Домашка', due, created: Date.now(), tasks, st: 'new', answers: {}, auto: {}, marks: {}, photos: [], board: null, comment: '' });
+      const nh = { id: crypto.randomBytes(5).toString('hex'), title: String(j.title || '').trim().slice(0, 80) || 'Домашка', due, created: Date.now(), tasks, st: 'new', answers: {}, auto: {}, marks: {}, photos: [], board: null, comment: '' };
+      H.list.unshift(nh);
+      const sn = own(sid).name, dd = due ? ', сдать до ' + dmy(due) : '';
+      tgStudent(sid, w => w === 's' ? '📚 Новая домашка от ' + me.name + ': «' + nh.title + '» (' + tasks.length + ' зад.' + dd + ').\nОткрыть: ' + TG.site + '/s/' + sid + '?hw=' + nh.id
+        : '📚 ' + sn + ': задана домашка «' + nh.title + '»' + dd + '.');
     } else if (!h) return json(res, { error: 'Домашка не найдена' });
     else if (j.t === 'check') {
       h.marks = {}; for (const t of h.tasks) { const v = (j.marks || {})[t.id]; if (v === 0 || v === 1) h.marks[t.id] = v; }
       h.comment = String(j.comment || '').slice(0, 2000); h.st = 'checked'; h.checkedAt = Date.now();
+      const ms = h.tasks.map(t => h.marks[t.id] !== undefined ? h.marks[t.id] : h.auto[t.id]).filter(v => v !== undefined), ok = ms.filter(Boolean).length;
+      const sc = ms.length ? ': верно ' + ok + ' из ' + ms.length : '', sn = own(sid).name;
+      tgStudent(sid, w => w === 's' ? '✔️ Домашка «' + h.title + '» проверена' + sc + '.' + (h.comment ? '\n💬 ' + h.comment : '') + '\n' + TG.site + '/s/' + sid + '?hw=' + h.id
+        : '✔️ ' + sn + ': домашка «' + h.title + '» проверена' + sc + '.' + (h.comment ? '\n💬 ' + h.comment : ''));
     } else if (j.t === 'return') { h.st = 'new'; h.comment = String(j.comment || h.comment || '').slice(0, 2000); }
     else if (j.t === 'del') {
       h.tasks.forEach(t => hwRm(sid, t.img)); h.photos.forEach(p => hwRm(sid, p));
@@ -356,7 +498,7 @@ function hwStudent(req, res, sid) { // /api/<id>/hw — открывается �
   const H = hwOf(sid);
   const out = () => {
     const r = room(sid), t = byId(s.owner);
-    json(res, { name: s.name, teacher: t ? t.name : '', list: H.list.map(hwPublic), pages: r ? r.s.pages.map(p => ({ id: p.id, title: p.title })) : [] });
+    json(res, { name: s.name, teacher: t ? t.name : '', list: H.list.map(hwPublic), pages: r ? r.s.pages.map(p => ({ id: p.id, title: p.title })) : [], tg: TG.token ? { s: tgLink('s' + sid), p: tgLink('p' + sid), on: (TG.subs[sid] || []).some(x => x.who === 's') } : null });
   };
   if (req.method === 'GET') return out();
   if (req.method !== 'POST') { res.writeHead(405); return res.end(); }
@@ -376,6 +518,9 @@ function hwStudent(req, res, sid) { // /api/<id>/hw — открывается �
     } else if (j.t === 'submit') {
       h.auto = {}; for (const t of h.tasks) if (t.ans) h.auto[t.id] = right(t.ans, h.answers[t.id]) ? 1 : 0;
       h.st = 'sent'; h.sentAt = Date.now();
+      const okA = Object.values(h.auto).filter(Boolean).length, nA = Object.keys(h.auto).length;
+      tgTeacher(s.owner, '📥 ' + s.name + ' сдал(а) домашку «' + h.title + '»' + (nA ? ' (автопроверка: ' + okA + ' из ' + nA + ')' : '') + '.\nПроверить: ' + TG.site + '/t');
+      tgStudent(sid, w => w === 'p' ? '📥 ' + s.name + ' сдал(а) домашку «' + h.title + '».' : null);
     } else { res.writeHead(400); return res.end(); }
     hwSave(sid); out();
   });
@@ -396,6 +541,7 @@ function admin(req, res, u) {
   if (req.method === 'GET' && u.pathname === '/api/admin/me') return json(res, who(me));
   if (req.method === 'GET' && u.pathname === '/api/admin/students') return json(res, mine());
   if (u.pathname === '/api/admin/hw' || u.pathname === '/api/admin/hw-pending') return hwTeacher(req, res, u, me);
+  if (u.pathname === '/api/admin/tg' || u.pathname === '/api/admin/tg-student') return tgAdmin(req, res, u, me);
   if (req.method === 'GET' && u.pathname === '/api/admin/backup') {
     const all = {}; mine().forEach(s => { const r = room(s.id); if (r) all[s.id] = r.s; });
     return json(res, { index: { students: mine() }, rooms: all });
