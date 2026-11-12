@@ -64,6 +64,30 @@ button,input{font:inherit;color:var(--tx);background:var(--panel);border:1px sol
 .dlg .pri,#lf .pri{background:var(--ac);color:#fff;border-color:var(--ac)}.dlg .err{color:#d32f2f;min-height:18px}
 .dlg code{font-size:12px;word-break:break-all;background:color-mix(in srgb,var(--ac) 10%,transparent);padding:4px 6px;border-radius:6px}
 body.nosidebar #side{display:none}
+.badge{background:#d32f2f;color:#fff;border-radius:10px;font-size:11px;font-weight:700;padding:1px 6px;margin-left:auto}
+#hwkn:not(:empty){background:#d32f2f;color:#fff;border-radius:10px;font-size:11px;font-weight:700;padding:1px 6px;margin-left:6px}
+.dlg>div.wide{max-width:920px}
+.hwplus{width:auto;padding:0 8px;font-size:12px;border-radius:15px;background:var(--ac);border-color:var(--ac)}
+#hwtray{border-top:2px solid var(--ac);background:var(--panel);padding:8px 10px;display:flex;flex-direction:column;gap:6px;max-height:46%;min-height:0}
+#hwtray[hidden]{display:none}
+#hwtray .r{display:flex;gap:6px;align-items:center;flex-wrap:wrap}#hwtray .r input{font-size:14px}
+#hwtray .hint{font-size:12px;color:var(--mut)}
+#hwcards{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;min-height:0}
+.hc{flex:none;width:190px;border:1px solid var(--bd);border-radius:10px;padding:6px;display:flex;flex-direction:column;gap:5px;font-size:13px;position:relative}
+.hc img{width:100%;height:84px;object-fit:contain;background:#fff;border-radius:6px}
+.hc .tx{height:84px;overflow:auto;white-space:pre-wrap;background:color-mix(in srgb,var(--ac) 6%,transparent);border-radius:6px;padding:4px}
+.hc select,.hc input{font-size:13px;padding:4px 6px;width:100%}
+.hc .x{position:absolute;top:2px;right:2px;padding:0 7px;border-radius:12px;font-size:13px}
+.hwi{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--bd)}.hwi .grow{flex:1;min-width:180px}
+.chip{font-size:12px;padding:2px 9px;border-radius:12px;background:color-mix(in srgb,var(--ac) 12%,transparent);white-space:nowrap}
+.chip.sent{background:#d32f2f;color:#fff}.chip.checked{background:color-mix(in srgb,#2e7d32 18%,transparent)}
+.ct{border:1px solid var(--bd);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.ct img{max-width:100%;max-height:260px;object-fit:contain;align-self:flex-start;background:#fff;border-radius:6px;cursor:zoom-in}
+.ct .r{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.mk2{padding:4px 12px}.mk2.on.y{background:#2e7d32;border-color:#2e7d32;color:#fff}.mk2.on.n{background:#d32f2f;border-color:#d32f2f;color:#fff}
+.ok{color:#2e7d32;font-weight:600}.no{color:#d32f2f;font-weight:600}
+.phs{display:flex;gap:8px;flex-wrap:wrap}.phs img{width:110px;height:140px;object-fit:cover;border-radius:8px;border:1px solid var(--bd);cursor:zoom-in}
+.dlg textarea{width:100%;min-height:70px;font:inherit;color:var(--tx);background:var(--panel);border:1px solid var(--bd);border-radius:8px;padding:8px}
 @media (max-width:700px){#app{flex-direction:column}#side{width:100%;max-height:34%;border-right:0;border-bottom:1px solid var(--bd)}}
 </style>
 </head>
@@ -98,7 +122,7 @@ body.nosidebar #side{display:none}
   <div class="foot"><button id="tch" hidden title="Пригласить репетиторов и управлять их аккаунтами">Репетиторы</button><button id="cpw" title="Сменить свой пароль">Пароль</button><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden><button id="lo" title="Выйти из кабинета на этом устройстве">Выйти</button><button id="rb" title="Вернуть учеников и доски из копии, которую кабинет сам сохраняет в вашем браузере">Восстановить из автокопии</button><div id="bkst" style="font-size:12px;color:var(--mut);width:100%"></div></div>
  </div>
  <div id="main">
-  <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk" class="keep">Задачи</button><button id="fs" class="keep" title="Фокус: убрать панели">⛶</button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button><button id="th" class="keep" title="Тема: как в системе / светлая / тёмная">◐</button><button id="lnk">Ссылка ученика</button><button id="ren">Переименовать</button><button id="del">Удалить</button></div>
+  <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk" class="keep">Задачи</button><button id="hwk" title="Домашние задания ученика">Домашка<span id="hwkn"></span></button><button id="fs" class="keep" title="Фокус: убрать панели">⛶</button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button><button id="th" class="keep" title="Тема: как в системе / светлая / тёмная">◐</button><button id="lnk">Ссылка ученика</button><button id="ren">Переименовать</button><button id="del">Удалить</button></div>
   <div id="work">
    <iframe id="fr" allow="microphone; camera; autoplay; clipboard-write"></iframe>
    <div id="tasks" hidden>
@@ -109,6 +133,7 @@ body.nosidebar #side{display:none}
     <div id="tview"><div id="tbox"><canvas id="tcv"></canvas><div id="tov"></div></div></div>
    </div>
   </div>
+  <div id="hwtray" hidden></div>
  </div>
 </div>
 <script>
@@ -138,10 +163,13 @@ function render(){const l=$('list');l.innerHTML='';
  if(!students.length){const d=document.createElement('div');d.className='st';d.style.color='var(--mut)';d.textContent='Пока нет учеников. Нажмите «+ Ученик».';l.appendChild(d)}
  students.forEach(s=>{const d=document.createElement('div');d.className='st'+(s.id===cur?' on':'');
   const dot=document.createElement('span');dot.className='dot';dot.style.background=s.color;
-  const t=document.createElement('span');t.textContent=s.name;d.append(dot,t);d.onclick=()=>pick(s.id);l.appendChild(d)})}
+  const t=document.createElement('span');t.textContent=s.name;d.append(dot,t);
+  const pn=(window.hwPend||{})[s.id];if(pn){const b=document.createElement('span');b.className='badge';b.textContent=pn;b.title='Домашек ждут проверки: '+pn;d.append(b)}
+  d.onclick=()=>pick(s.id);l.appendChild(d)});if(window.hwOnPick)window.hwOnPick()}
 function pick(id){cur=id;if(me)localStorage.setItem('last:'+me.login,id);const s=students.filter(x=>x.id===id)[0];
  if(!s){cur=null;$('nm').textContent='Выберите ученика';$('fr').src='about:blank';render();return}
  $('nm').textContent=s.name;$('fr').src='/b/'+id;render()}
+window.hwCtx={cur:()=>cur,students:()=>students,render:()=>render(),open:(id,hash)=>{pick(id);if(hash)$('fr').src='/b/'+id+hash}};
 async function op(o){const r=await api('/api/admin/op',{method:'POST',body:JSON.stringify(o)});
  const j=r.ok?await r.json():null;if(!j||j.error){alert(j&&j.error||'Не получилось');return false}
  if(Array.isArray(j))students=j;render();return j}
@@ -302,6 +330,8 @@ async function render(markY){
   b.onmouseenter=()=>c.classList.add('hot');b.onmouseleave=()=>c.classList.remove('hot');
   b.onclick=()=>send(fx0-.005,fy0,fx1+.005,fy1,b);
   ov.append(c,b);
+  if(window.hwDraft){const z=document.createElement('button');z.className='plus hwplus';z.textContent='+ ДЗ';z.title='Добавить эту задачу в домашку';z.style.cssText='top:calc('+fy0*100+'% + 34px);left:1%';
+   z.onclick=async()=>{z.textContent='…';try{window.hwAdd(await crop(fx0-.005,fy0,fx1+.005,fy1));z.textContent='✓'}catch(e){z.textContent='+ ДЗ'}};ov.append(z)}
  });
  for(const a of await page.getAnnotations()){
   if(a.subtype!=='Link'||!a.dest)continue;
@@ -384,13 +414,16 @@ ov.addEventListener('pointerup',()=>{
  const ok=document.createElement('button'),no=document.createElement('button');
  ok.textContent='→ На доску';no.textContent='✕';
  ok.onclick=()=>{const w=sel.r.width,h=sel.r.height;send(x0/w,y0/h,x1/w,y1/h,null);clearSel()};
- no.onclick=clearSel;bar.append(ok,no);bar.onpointerdown=e=>e.stopPropagation();ov.appendChild(bar);sel.bar=bar;
+ no.onclick=clearSel;bar.append(ok);
+ if(window.hwDraft){const z=document.createElement('button');z.textContent='→ В домашку';z.onclick=async()=>{const w=sel.r.width,h=sel.r.height;clearSel();window.hwAdd(await crop(x0/w,y0/h,x1/w,y1/h))};bar.append(z)}
+ bar.append(no);bar.onpointerdown=e=>e.stopPropagation();ov.appendChild(bar);sel.bar=bar;
 });
 
 $('tk').onclick=()=>{
  const p=$('tasks'),open=p.hidden;p.hidden=!open;
  if(open&&!inited){inited=true;refresh()}else if(open&&pdf)render();
 };
+window.hwTasksRedraw=()=>{if(pdf&&!$('tasks').hidden)render()};window.hwOpenTasks=()=>{if($('tasks').hidden)$('tk').click()};
 $('tclose').onclick=()=>{$('tasks').hidden=true};
 $('tgap').value=localStorage.getItem('tgap')||'350';if(!$('tgap').value)$('tgap').value='350';$('tgap').onchange=()=>localStorage.setItem('tgap',$('tgap').value);
 $('tadd').onclick=()=>$('tfile').click();
@@ -461,6 +494,7 @@ document.addEventListener('paste',e=>{
  for(let i=0;i<it.length&&!f;i++)if(it[i].kind==='file'&&/^image\//.test(it[i].type))f=it[i].getAsFile();
  if(!f)for(const x of (dt.files||[]))if(/^image\/|\.(heic|heif)$/i.test(x.type||x.name)){f=x;break}
  if(!f)return;e.preventDefault();if(a&&a!==document.body)a.blur();
+ if(window.hwDraft&&window.hwAddFile){window.hwAddFile(f);return} // собираем домашку
  const r=new FileReader();r.onload=()=>{$('fr').contentWindow.postMessage({t:'pasteimg',src:r.result,heic:/heic|heif/i.test(f.type+' '+(f.name||''))},location.origin);$('fr').focus()};r.readAsDataURL(f);
 },true);
 // Safari присылает «вставку», только если фокус в поле ввода: на ⌘V подставляем невидимое поле
@@ -514,6 +548,146 @@ async function start(){
  setInterval(makeBackup,180000);
 }
 const tt=setInterval(()=>{if(!$('app').hidden){clearInterval(tt);start()}},700);
+})();
+</script>
+<script>
+// Домашние задания: собрать домашку (из сборника, скриншота, файла или текстом), посмотреть сданные и проверить
+(function(){
+const $=i=>document.getElementById(i),C=()=>window.hwCtx;
+const api=(p,o)=>window.boardApi(p,o);
+const el=(tag,props,...kids)=>{const e=Object.assign(document.createElement(tag),props||{});kids.forEach(k=>k!=null&&e.append(k));return e};
+const day=t=>t?new Date(t).toLocaleDateString('ru-RU',{day:'numeric',month:'short'}):'';
+const sName=id=>(C().students().find(s=>s.id===id)||{}).name||'';
+let draft=null; // {sid, tasks:[{src,w,h,text,num,ans}]}
+
+// ---------- счётчик «ждут проверки» ----------
+async function pending(){
+ try{const r=await api('/api/admin/hw-pending');if(!r.ok)return;window.hwPend=await r.json();C().render()}catch(e){}
+}
+window.hwOnPick=()=>{const n=(window.hwPend||{})[C().cur()];$('hwkn').textContent=n?n:''};
+setInterval(()=>{if(!$('app').hidden)pending()},60000);
+const st0=setInterval(()=>{if(!$('app').hidden&&C()){clearInterval(st0);pending()}},800);
+
+// ---------- картинка → не больше ~850 КБ (столько принимает доска) ----------
+function fit(src){return new Promise((res,rej)=>{const im=new Image();im.onload=()=>{
+ for(const m of [1400,1100,850,650]){const k=Math.min(1,m/Math.max(im.width,im.height)),w=Math.round(im.width*k),h=Math.round(im.height*k);
+  const c=el('canvas',{width:w,height:h}),x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);
+  let s=c.toDataURL('image/png');if(s.length>850000)s=c.toDataURL('image/jpeg',.85);if(s.length<=850000)return res({src:s,w,h})}
+ rej()};im.onerror=rej;im.src=src})}
+
+// ---------- сбор новой домашки (полоса под доской) ----------
+window.hwAdd=async src=>{if(!draft)return;try{const r=await fit(src);draft.tasks.push(Object.assign(r,{text:'',num:0,ans:''}));tray(true)}catch(e){alert('Не получилось открыть картинку')}};
+window.hwAddFile=f=>{if(/heic|heif/i.test(f.type+' '+(f.name||''))){alert('Фото в формате HEIC браузер не открывает. Сделайте скриншот или сохраните как JPG.');return}
+ const r=new FileReader();r.onload=()=>window.hwAdd(r.result);r.readAsDataURL(f)};
+function startDraft(){
+ const sid=C().cur();if(!sid){alert('Сначала выберите ученика слева');return}
+ if(draft&&draft.tasks.length&&draft.sid!==sid&&!confirm('Сейчас собирается домашка для «'+sName(draft.sid)+'». Начать заново для «'+sName(sid)+'»?'))return;
+ if(!draft||draft.sid!==sid)draft={sid,tasks:[],title:'',due:''};
+ window.hwDraft=true;tray();if(window.hwTasksRedraw)window.hwTasksRedraw();
+}
+function stopDraft(){draft=null;window.hwDraft=false;$('hwtray').hidden=true;if(window.hwTasksRedraw)window.hwTasksRedraw()}
+function tray(scrollEnd){
+ const t=$('hwtray');t.hidden=false;t.innerHTML='';
+ const ti=el('input',{value:draft.title,placeholder:'Название, например «Тригонометрия»',style:'flex:1;min-width:180px'});ti.oninput=()=>{draft.title=ti.value};
+ const du=el('input',{type:'date',value:draft.due,title:'Сдать до'});du.oninput=()=>{draft.due=du.value};
+ const fileIn=el('input',{type:'file',accept:'image/*',multiple:true,hidden:true});fileIn.onchange=()=>{[...fileIn.files].forEach(window.hwAddFile);fileIn.value=''};
+ const go=el('button',{className:'pri',textContent:'Отправить ученику',disabled:!draft.tasks.length,onclick:sendDraft});
+ go.style.cssText='background:var(--ac);color:#fff;border-color:var(--ac)';
+ t.append(
+  el('div',{className:'r'},el('b',{textContent:'Новая домашка: '+sName(draft.sid)}),ti,el('span',{textContent:'сдать до'}),du,go,el('button',{textContent:'Отмена',onclick:()=>{if(!draft.tasks.length||confirm('Отменить эту домашку? Собранные задачи пропадут.'))stopDraft()}})),
+  el('div',{className:'r'},
+   el('button',{textContent:'📚 Из сборника',title:'В панели «Задачи» у каждой задачи появится кнопка «+ ДЗ»; можно выделить область и нажать «В домашку»',onclick:()=>window.hwOpenTasks&&window.hwOpenTasks()}),
+   el('button',{textContent:'📋 Вставить скриншот',onclick:pasteBtn}),
+   el('button',{textContent:'🖼 Файл',onclick:()=>fileIn.click()}),fileIn,
+   el('button',{textContent:'✎ Текстом',onclick:()=>{draft.tasks.push({src:null,text:'',num:0,ans:''});tray(true);const a=$('hwcards').lastChild;if(a)a.querySelector('textarea').focus()}}),
+   el('span',{className:'hint',textContent:'Скриншот задачи с сайта: сделайте снимок экрана и нажмите ⌘V (Ctrl+V) здесь. Если у задачи короткий ответ — впишите его, он проверится сам.'})));
+ const cs=el('div',{id:'hwcards'});
+ if(!draft.tasks.length)cs.append(el('div',{className:'hint',textContent:'Пока нет задач.'}));
+ draft.tasks.forEach((k,i)=>{
+  const c=el('div',{className:'hc'});
+  c.append(el('b',{textContent:'Задача '+(i+1)}));
+  if(k.src)c.append(el('img',{src:k.src}));
+  const tx=el('textarea',{value:k.text,placeholder:k.src?'Подпись (необязательно)':'Условие задачи',rows:k.src?1:4,style:'font-size:13px;resize:vertical;width:100%;border:1px solid var(--bd);border-radius:6px;background:var(--panel);color:var(--tx)'});tx.oninput=()=>{k.text=tx.value};c.append(tx);
+  const sel=el('select',{title:'Номер задания ЕГЭ — для прогресса ученика'});sel.append(el('option',{value:0,textContent:'№ ЕГЭ — не указан'}));
+  for(let n=1;n<=19;n++)sel.append(el('option',{value:n,textContent:'№'+n+' ЕГЭ'}));sel.value=k.num;sel.onchange=()=>{k.num=+sel.value};c.append(sel);
+  const an=el('input',{value:k.ans,placeholder:'Ответ (если короткий)',title:'Ученик впишет ответ, и он проверится сам. Несколько вариантов — через ;'});an.oninput=()=>{k.ans=an.value};c.append(an);
+  c.append(el('button',{className:'x',textContent:'✕',title:'Убрать задачу',onclick:()=>{draft.tasks.splice(i,1);tray()}}));
+  cs.append(c)});
+ t.append(cs);if(scrollEnd)cs.scrollLeft=1e6;
+}
+async function pasteBtn(){
+ try{const it=await navigator.clipboard.read();for(const x of it){const ty=x.types.find(v=>/^image\//.test(v));if(ty){window.hwAddFile(await x.getType(ty));return}}
+  alert('В буфере обмена нет картинки. Сделайте скриншот задачи (на Mac: ⌘⇧4 с Ctrl — сразу в буфер) и нажмите снова.')}
+ catch(e){alert('Нажмите ⌘V (на Windows — Ctrl+V), пока открыта эта полоса.')}
+}
+async function sendDraft(){
+ const d=draft;if(!d||!d.tasks.length)return;
+ if(d.tasks.some(k=>!k.src&&!k.text.trim())){alert('Есть пустая задача без условия — заполните или уберите её');return}
+ const due=d.due?new Date(d.due+'T23:59').getTime():0;
+ const r=await api('/api/admin/hw',{method:'POST',body:JSON.stringify({t:'add',s:d.sid,title:d.title,due,tasks:d.tasks.map(k=>({img:k.src,w:k.w,h:k.h,text:k.text,num:k.num,ans:k.ans}))})});
+ const j=r.ok?await r.json():{error:'Не получилось отправить (слишком большие картинки?)'};
+ if(j.error){alert(j.error);return}
+ stopDraft();alert('Домашка отправлена! Ученик увидит её в своём кабинете: кнопка «📚 Домашка» на его доске.');
+}
+
+// ---------- окно «Домашка ученика» ----------
+function dlg(){const o=el('div',{className:'dlg'}),b=el('div',{className:'wide'});o.append(b);o.addEventListener('pointerdown',e=>{if(e.target===o)o.remove()});document.body.append(o);return{o,b,close:()=>o.remove()}}
+const chip=h=>h.st==='sent'?el('span',{className:'chip sent',textContent:'Ждёт проверки'}):h.st==='checked'?el('span',{className:'chip checked',textContent:'Проверено'}):el('span',{className:'chip',textContent:h.due&&Date.now()>h.due+864e5?'Просрочено':'Не сдано'});
+const imgU=(sid,n)=>'/hwimg/'+sid+'/'+n;
+async function load(sid){const r=await api('/api/admin/hw?s='+sid);return r.ok?r.json():null}
+async function post(o){const r=await api('/api/admin/hw',{method:'POST',body:JSON.stringify(o)});const j=r.ok?await r.json():{error:'Не получилось'};if(j.error){alert(j.error);return null}pending();return j}
+async function openList(d,sid){
+ const L=await load(sid);if(!L){alert('Не получилось загрузить');return}
+ d.b.innerHTML='';
+ const link=location.origin+'/s/'+sid;
+ d.b.append(el('h2',{textContent:'Домашка: '+sName(sid)}),
+  el('div',{className:'row'},el('button',{className:'pri',textContent:'+ Задать домашку',onclick:()=>{d.close();startDraft()}}),
+   el('span',{className:'mut grow',textContent:'Кабинет ученика: '+link}),el('button',{textContent:'Копировать',onclick:e=>{const b=e.target;(navigator.clipboard?navigator.clipboard.writeText(link):Promise.reject()).then(()=>{b.textContent='Скопировано'},()=>prompt('Ссылка:',link))}}),
+   el('button',{textContent:'Закрыть',onclick:d.close})));
+ if(!L.length)d.b.append(el('p',{className:'mut',textContent:'Домашек пока нет. Нажмите «+ Задать домашку».'}));
+ L.forEach(h=>{
+  const ms=h.tasks.map(t=>h.marks[t.id]!==undefined?h.marks[t.id]:h.auto[t.id]).filter(v=>v!==undefined);
+  d.b.append(el('div',{className:'hwi'},
+   el('div',{className:'grow'},el('b',{textContent:h.title}),el('div',{className:'mut',textContent:h.tasks.length+' зад. · задано '+day(h.created)+(h.due?' · до '+day(h.due):'')+(h.sentAt&&h.st!=='new'?' · сдано '+day(h.sentAt):'')+(h.st==='checked'&&ms.length?' · верно '+ms.filter(Boolean).length+' из '+ms.length:'')})),
+   chip(h),
+   el('button',{className:h.st==='sent'?'pri':'',textContent:h.st==='sent'?'Проверить':'Открыть',onclick:()=>openOne(d,sid,h.id)}),
+   el('button',{textContent:'Удалить',onclick:async()=>{if(confirm('Удалить домашку «'+h.title+'» вместе с ответами и фото ученика?')&&await post({t:'del',s:sid,id:h.id}))openList(d,sid)}})));
+ });
+}
+async function openOne(d,sid,id){
+ const L=await load(sid),h=L&&L.find(x=>x.id===id);if(!h)return openList(d,sid);
+ d.b.innerHTML='';
+ const marks={};h.tasks.forEach(t=>{const v=h.marks[t.id]!==undefined?h.marks[t.id]:h.auto[t.id];if(v!==undefined)marks[t.id]=v});
+ d.b.append(el('div',{className:'row'},el('button',{textContent:'← К списку',onclick:()=>openList(d,sid)}),el('h2',{className:'grow',textContent:h.title}),chip(h)));
+ if(h.st==='new')d.b.append(el('p',{className:'mut',textContent:'Ученик ещё не сдал. Ниже — что он успел сделать.'}));
+ h.tasks.forEach((t,i)=>{
+  const c=el('div',{className:'ct'});
+  c.append(el('div',{className:'r'},el('b',{textContent:'Задача '+(i+1)}),t.num?el('span',{className:'chip',textContent:'№'+t.num+' ЕГЭ'}):null));
+  if(t.text)c.append(el('div',{textContent:t.text,style:'white-space:pre-wrap'}));
+  if(t.img){const im=el('img',{src:imgU(sid,t.img),loading:'lazy'});im.onclick=()=>window.open(im.src);c.append(im)}
+  const r=el('div',{className:'r'});
+  if(t.ans){const a=h.answers[t.id];r.append(el('span',{textContent:'Ответ ученика: '}),el('b',{textContent:a||'—'}),el('span',{className:'mut',textContent:'(правильный: '+t.ans+')'}));
+   if(h.auto[t.id]!==undefined)r.append(el('span',{className:h.auto[t.id]?'ok':'no',textContent:h.auto[t.id]?'✓ автопроверка':'✗ автопроверка'}))}
+  else r.append(el('span',{className:'mut',textContent:'Развёрнутое решение — смотрите доску или фото'}));
+  const y=el('button',{className:'mk2 y',textContent:'✓ Верно'}),n=el('button',{className:'mk2 n',textContent:'✗ Неверно'});
+  const upd=()=>{y.classList.toggle('on',marks[t.id]===1);n.classList.toggle('on',marks[t.id]===0)};
+  y.onclick=()=>{marks[t.id]=marks[t.id]===1?undefined:1;upd()};n.onclick=()=>{marks[t.id]=marks[t.id]===0?undefined:0;upd()};upd();
+  r.append(el('span',{style:'margin-left:auto'}),y,n);c.append(r);d.b.append(c);
+ });
+ d.b.append(el('b',{textContent:'Решение ученика'}));
+ const sol=el('div',{className:'r',style:'display:flex;gap:8px;flex-wrap:wrap;align-items:center'});
+ if(h.board)sol.append(el('button',{textContent:'Открыть доску с решением',onclick:()=>{d.close();C().open(sid,'#p='+h.board)}}));
+ if(!h.board&&!h.photos.length)sol.append(el('span',{className:'mut',textContent:'Ни доски, ни фото пока нет.'}));
+ d.b.append(sol);
+ if(h.photos.length){const ph=el('div',{className:'phs'});h.photos.forEach(p=>{const im=el('img',{src:imgU(sid,p)});im.onclick=()=>window.open(im.src);ph.append(im)});d.b.append(ph)}
+ const cm=el('textarea',{value:h.comment||'',placeholder:'Комментарий ученику (необязательно)'});d.b.append(cm);
+ const pack=()=>{const m={};for(const k in marks)if(marks[k]===0||marks[k]===1)m[k]=marks[k];return m};
+ d.b.append(el('div',{className:'row'},
+  el('button',{className:'pri',textContent:h.st==='checked'?'Сохранить оценки':'Проверено ✓',onclick:async()=>{if(await post({t:'check',s:sid,id,marks:pack(),comment:cm.value}))openList(d,sid)}}),
+  h.st!=='new'?el('button',{textContent:'Вернуть на доработку',title:'Ученик сможет исправить ответы и сдать снова',onclick:async()=>{if(await post({t:'return',s:sid,id,comment:cm.value}))openList(d,sid)}}):null,
+  el('button',{textContent:'Закрыть',onclick:d.close})));
+}
+$('hwk').onclick=()=>{const sid=C().cur();if(!sid){alert('Сначала выберите ученика слева');return}const d=dlg();d.b.append(el('p',{className:'mut',textContent:'Загружаю…'}));openList(d,sid)};
 })();
 </script>
 </body>

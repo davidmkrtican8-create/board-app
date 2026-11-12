@@ -122,7 +122,7 @@ body.focus #main{padding:4px;gap:4px}
 </style>
 </head>
 <body>
-<div id="side"><div id="who"></div><div id="pl"></div><button id="add">+ Доска</button><button id="cp">Копировать ссылку</button></div>
+<div id="side"><div id="who"></div><div id="pl"></div><button id="add">+ Доска</button><button id="cp">Копировать ссылку</button><button id="hwb" hidden>📚 Домашка</button></div>
 <div id="main">
  <div id="bar">
   <button id="hp" title="Скрыть или показать список досок">◧</button>
@@ -144,7 +144,7 @@ body.focus #main{padding:4px;gap:4px}
   <button id="zo" class="opt" title="Уменьшить">−</button><button id="zi" class="opt" title="Увеличить">+</button><button id="fit" class="opt">По ширине</button>
   <select id="fm" class="opt"><option value="">Файл…</option><option value="img">Вставить картинку…</option><option value="pdf1">Скачать PDF: эта доска</option><option value="pdfa">Скачать PDF: все доски</option><option value="clr">Очистить доску…</option><option value="delp">Удалить эту доску…</option></select>
   <button id="gear" class="opt" title="Настройки">⚙</button>
-  <button id="fs2" class="keep opt" title="Фокус: убрать панели">⛶</button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button>
+  <button id="fs2" class="keep opt" title="Фокус: убрать панели">⛶</button><button id="hwt" class="keep" hidden title="Мой кабинет: домашка и прогресс">📚<span class="lbl"> Домашка</span></button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button>
   <span id="st" class="opt">Подключение…</span>
   <input type="file" id="fi" accept="image/*" hidden>
  </div>
@@ -180,7 +180,8 @@ body.focus #main{padding:4px;gap:4px}
 const cv=document.getElementById('cv'),rg=document.getElementById('ovl'),wrap=document.getElementById('wrap');
 let ctx=cv.getContext('2d');const rctx=rg.getContext('2d'),mctx=document.createElement('canvas').getContext('2d');
 const room=location.pathname.split('/')[2],me='c'+Math.random().toString(36).slice(2,10).padEnd(8,'0');
-const isTeacher=window.self!==window.top;
+const isTeacher=window.self!==window.top;let initDone=false;
+addEventListener('hashchange',()=>{const hp=(location.hash.match(/^#p=([\w-]+)$/)||[])[1];if(hp&&pages.some(p=>p.id===hp))openPage(hp)});
 let pages=[],strokes={},images={},page=null,live={},color='#1a1a1a',bg='grid',cur=null,lastEmit=0,mine=[],redo=[];
 let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,lastP=[0,0],editImg=null,editStroke=null,jump=null,fingerPan=false;
 let rectC=null,rq=0,pendErase=[],pendPage=null,eraseT=0,peersTxt='';
@@ -569,6 +570,7 @@ function onOp(o){
  if(o.from===me&&(o.t==='strokeset'||o.t==='imgset'||o.t==='stroke'))return; // своё эхо со старым положением заставляло объект дёргаться
  if(o.t==='rtc'){onRtc(o);return}
  if(o.t==='init'){callInit(o.call);myName=o.name||null;$('who').textContent=o.name?'Кабинет: '+o.name:'Доска';document.title=o.name||'Доска';pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};for(const pg in strokes)for(const id in strokes[pg])strokes[pg][id].id=id; // у загруженных объектов нет поля id — проставляем
+ const hp=(location.hash.match(/^#p=([\w-]+)$/)||[])[1];if(hp&&!initDone&&pages.some(p=>p.id===hp))page=hp;initDone=true; // ссылка на конкретную доску (из кабинета ученика)
  if(!page||!pages.some(p=>p.id===page))page=pages[0].id;openPage(page);return}
  if(o.t==='peers'){$('st').textContent=peersTxt='Онлайн: '+o.n;if(lead)sendView(true);return}
  if(o.t==='laser'){if(o.from!==me&&Array.isArray(o.pts)){const l=(lasers[o.from]=lasers[o.from]||{page:o.page,pts:[]}),n0=performance.now();l.page=o.page;
@@ -1721,7 +1723,8 @@ $('fm').onchange=async()=>{
  else if(v==='delp')delPage();
  else if(v==='clr'&&!viewOnly&&await modal('Очистить эту доску для всех? Вернуть нельзя.',{ok:'Очистить'})){strokes[page]={};images[page]={};redraw();send({t:'clear',page:page})}
 };
-$('cp').onclick=()=>{const t=location.href;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{$('cp').textContent='Скопировано'},()=>{prompt('Ссылка:',t)});setTimeout(()=>{$('cp').textContent='Копировать ссылку'},1500)};
+if(!isTeacher){['hwb','hwt'].forEach(i=>{$(i).hidden=false;$(i).onclick=()=>{location.href='/s/'+room}})}
+$('cp').onclick=()=>{const t=location.origin+location.pathname;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{$('cp').textContent='Скопировано'},()=>{prompt('Ссылка:',t)});setTimeout(()=>{$('cp').textContent='Копировать ссылку'},1500)};
 function setColor(c){ // выбрать цвет пера (из быстрых кружков или палитры 🎨)
  color=c;if(['er','ers','mv','hand','hl'].includes(tool()))setTool('pen');setCursor();
  let q=false;document.querySelectorAll('#cols .sw').forEach(x=>{const on=x.dataset.c===c;x.classList.toggle('on',on);if(on)q=true});

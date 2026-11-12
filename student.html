@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="УчиДоска">
+<title>Мой кабинет</title>
+<style>
+:root{--bg:#f4f1fa;--panel:#fff;--tx:#201c2b;--mut:#6b6580;--ac:#6a3fc4;--bd:#ddd6ee;--ok:#2e7d32;--bad:#d32f2f;--warn:#b26a00;--soft:color-mix(in srgb,var(--ac) 10%,transparent)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17141f;--panel:#221e2e;--tx:#ece8f5;--mut:#9a93b0;--ac:#a98bf0;--bd:#3a3450;--ok:#66bb6a;--bad:#ef5350;--warn:#ffb74d}}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-tap-highlight-color:transparent}
+button,input,textarea{font:inherit;color:var(--tx);background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:8px 12px}
+button{cursor:pointer}button.pri{background:var(--ac);border-color:var(--ac);color:#fff}button:disabled{opacity:.5;cursor:default}
+a{color:var(--ac)}
+.wrap{max-width:820px;margin:0 auto;padding:18px 16px 60px}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+header h1{font-size:24px;margin:0;flex:1;min-width:200px}header .mut{display:block;font-size:14px;font-weight:400}
+.mut{color:var(--mut)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+.stat{background:var(--panel);border:1px solid var(--bd);border-radius:14px;padding:12px 14px}
+.stat b{display:block;font-size:26px;line-height:1.1}.stat span{font-size:13px;color:var(--mut)}
+h2{font-size:19px;margin:24px 0 10px}
+.card{background:var(--panel);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.card .t{flex:1;min-width:180px}.card .t b{display:block}.card .t span{font-size:14px;color:var(--mut)}
+.chip{font-size:13px;padding:3px 10px;border-radius:20px;background:var(--soft);white-space:nowrap}
+.chip.new{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.chip.late{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}
+.chip.sent{background:var(--soft);color:var(--ac)}
+.chip.checked{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
+.empty{color:var(--mut);background:var(--panel);border:1px dashed var(--bd);border-radius:14px;padding:18px;text-align:center}
+.bar{display:flex;align-items:center;gap:10px;margin:7px 0}.bar .n{width:58px;font-size:14px}
+.bar .tr{flex:1;height:12px;border-radius:6px;background:var(--soft);overflow:hidden}.bar .tr i{display:block;height:100%;border-radius:6px}
+.bar .v{width:76px;text-align:right;font-size:13px;color:var(--mut)}
+.boards{display:flex;gap:8px;flex-wrap:wrap}.boards a{background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:8px 12px;text-decoration:none;color:var(--tx)}
+/* открытая домашка */
+#hw[hidden],#home[hidden]{display:none}
+.back{margin-bottom:12px}
+.task{background:var(--panel);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:12px}
+.task .hd{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}.task .hd b{flex:1}
+.task img{display:block;max-width:100%;border-radius:8px;background:#fff;margin:6px 0}
+.task .txt{white-space:pre-wrap;margin:6px 0}
+.ans{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}.ans input{width:170px}
+.res{font-weight:600}.res.ok{color:var(--ok)}.res.bad{color:var(--bad)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+.photos{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
+.ph{position:relative}.ph img{width:120px;height:150px;object-fit:cover;border-radius:10px;border:1px solid var(--bd);display:block;cursor:zoom-in}
+.ph button{position:absolute;top:4px;right:4px;padding:0 8px;font-size:14px;border-radius:20px}
+.note{background:var(--soft);border-radius:12px;padding:12px 14px;margin:12px 0;white-space:pre-wrap}
+#zoom{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:9;padding:10px}
+#zoom[hidden]{display:none}#zoom img{max-width:100%;max-height:100%}
+#st{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:8px 14px;border-radius:20px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
+#st.on{opacity:.92}
+@media (max-width:520px){.stats{grid-template-columns:1fr 1fr 1fr;gap:6px}.stat{padding:10px}.stat b{font-size:21px}.stat span{font-size:12px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <div id="home">
+  <header><h1 id="hi">Мой кабинет<span class="mut" id="tch"></span></h1><a id="toBoard" href="#"><button class="pri">Открыть доску</button></a></header>
+  <div class="stats">
+   <div class="stat"><b id="s1">–</b><span>домашек сдано</span></div>
+   <div class="stat"><b id="s2">–</b><span>верных решений</span></div>
+   <div class="stat"><b id="s3">–</b><span>досок с уроков</span></div>
+  </div>
+  <h2>Домашка</h2><div id="list"></div>
+  <h2>Прогресс по номерам ЕГЭ</h2><div id="prog"></div>
+  <h2>Доски с уроков</h2><div class="boards" id="boards"></div>
+ </div>
+ <div id="hw" hidden></div>
+</div>
+<div id="zoom" hidden><img alt=""></div>
+<div id="st"></div>
+<input type="file" id="pf" accept="image/*" multiple hidden>
+<script>
+(function(){
+const $=i=>document.getElementById(i),sid=location.pathname.split('/').pop();
+let D=null,open=null,saveT=null;
+const el=(tag,props,...kids)=>{const e=Object.assign(document.createElement(tag),props||{});kids.forEach(k=>k!=null&&e.append(k));return e};
+const toast=(t,ms)=>{const s=$('st');s.textContent=t;s.classList.add('on');clearTimeout(s._t);s._t=setTimeout(()=>s.classList.remove('on'),ms||2200)};
+const img=n=>'/hwimg/'+sid+'/'+n;
+const day=t=>new Date(t).toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
+const late=h=>h.st==='new'&&h.due&&Date.now()>h.due+864e5;
+async function call(o){
+ const r=await fetch('/api/'+sid+'/hw',o?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)}:{});
+ const j=r.ok?await r.json().catch(()=>null):null;
+ if(!j){toast('Нет связи с сервером, попробуйте ещё раз',3500);return null}
+ if(j.error){toast(j.error,3500);return null}
+ D=j;return j;
+}
+// оценка задачи: оценка преподавателя важнее автопроверки
+const mark=(h,t)=>h.marks[t.id]!==undefined?h.marks[t.id]:h.auto[t.id];
+function stats(){
+ const L=D.list,done=L.filter(h=>h.st!=='new').length;let ok=0,all=0;const by={};
+ L.forEach(h=>{if(h.st==='new')return;h.tasks.forEach(t=>{const m=mark(h,t);if(m===undefined)return;all++;ok+=m;
+  if(t.num){const b=by[t.num]=by[t.num]||{ok:0,all:0};b.all++;b.ok+=m}})});
+ $('s1').textContent=done+' из '+L.length;$('s2').textContent=all?Math.round(ok/all*100)+'%':'–';$('s3').textContent=D.pages.length;
+ const p=$('prog');p.innerHTML='';
+ const ks=Object.keys(by).map(Number).sort((a,b)=>a-b);
+ if(!ks.length)p.append(el('div',{className:'empty',textContent:'Появится, когда преподаватель проверит первые задачи с номерами ЕГЭ.'}));
+ ks.forEach(k=>{const b=by[k],v=Math.round(b.ok/b.all*100),c=v>=75?'var(--ok)':v>=45?'var(--warn)':'var(--bad)';
+  const i=el('i');i.style.width=v+'%';i.style.background=c;
+  p.append(el('div',{className:'bar'},el('span',{className:'n',textContent:'№'+k}),el('div',{className:'tr'},i),el('span',{className:'v',textContent:v+'% · '+b.ok+'/'+b.all})))});
+}
+function chip(h){
+ if(h.st==='checked'){const ms=h.tasks.map(t=>mark(h,t)).filter(m=>m!==undefined);return el('span',{className:'chip checked',textContent:'Проверено'+(ms.length?' · '+ms.filter(Boolean).length+' из '+ms.length:'')})}
+ if(h.st==='sent')return el('span',{className:'chip sent',textContent:'На проверке'});
+ if(late(h))return el('span',{className:'chip late',textContent:'Просрочено'});
+ return el('span',{className:'chip new',textContent:h.due?'Сдать до '+day(h.due):'Не сдано'});
+}
+function home(){
+ $('hw').hidden=true;$('home').hidden=false;open=null;
+ $('hi').firstChild.textContent=D.name;$('tch').textContent=D.teacher?'Преподаватель: '+D.teacher:'';document.title=D.name+' — кабинет';
+ $('toBoard').href='/b/'+sid;
+ const l=$('list');l.innerHTML='';
+ if(!D.list.length)l.append(el('div',{className:'empty',textContent:'Домашних заданий пока нет 🎉'}));
+ const order=h=>h.st==='new'?0:h.st==='sent'?1:2;
+ D.list.slice().sort((a,b)=>order(a)-order(b)).forEach(h=>{
+  const btn=el('button',{className:h.st==='new'?'pri':'',textContent:h.st==='new'?'Решать':'Открыть',onclick:()=>show(h.id)});
+  l.append(el('div',{className:'card'},el('div',{className:'t'},el('b',{textContent:h.title}),el('span',{textContent:h.tasks.length+' '+plural(h.tasks.length,'задача','задачи','задач')+' · задано '+day(h.created)})),chip(h),btn));
+ });
+ const bs=$('boards');bs.innerHTML='';
+ D.pages.slice().reverse().forEach(p=>bs.append(el('a',{href:'/b/'+sid+'#p='+p.id,textContent:p.title||'Доска'})));
+ stats();
+}
+const plural=(n,a,b,c)=>{n%=100;if(n>10&&n<20)return c;n%=10;return n===1?a:n>1&&n<5?b:c};
+function show(id){
+ const h=D.list.find(x=>x.id===id);if(!h)return home();open=id;
+ $('home').hidden=true;const w=$('hw');w.hidden=false;w.innerHTML='';
+ const edit=h.st==='new';
+ w.append(el('button',{className:'back',textContent:'← Назад',onclick:()=>{flush();home()}}));
+ w.append(el('header',null,el('h1',{textContent:h.title}),chip(h)));
+ if(h.st==='checked'&&h.comment)w.append(el('div',{className:'note',textContent:'💬 Преподаватель: '+h.comment}));
+ if(edit&&h.comment)w.append(el('div',{className:'note',textContent:'💬 Вернули на доработку: '+h.comment}));
+ if(edit)w.append(el('p',{className:'mut',textContent:'Короткие ответы впишите в поля. Развёрнутые решения — на доске или фото тетради. Когда всё готово, нажмите «Сдать на проверку».'}));
+ h.tasks.forEach((t,i)=>{
+  const c=el('div',{className:'task'});
+  c.append(el('div',{className:'hd'},el('b',{textContent:'Задача '+(i+1)}),t.num?el('span',{className:'chip',textContent:'№'+t.num+' ЕГЭ'}):null));
+  if(t.text)c.append(el('div',{className:'txt',textContent:t.text}));
+  if(t.img){const im=el('img',{src:img(t.img),alt:'Условие задачи',loading:'lazy'});im.onclick=()=>zoom(im.src);c.append(im)}
+  const m=mark(h,t);
+  if(t.short){
+   const inp=el('input',{value:h.answers[t.id]||'',placeholder:'Ваш ответ',disabled:!edit,inputMode:'decimal',autocomplete:'off'});
+   inp.dataset.t=t.id;inp.oninput=()=>{clearTimeout(saveT);saveT=setTimeout(flush,900)};
+   const a=el('div',{className:'ans'},el('span',{textContent:'Ответ:'}),inp);
+   if(m!==undefined)a.append(el('span',{className:'res '+(m?'ok':'bad'),textContent:m?'✓ верно':'✗ неверно'}));
+   if(t.ans!==undefined&&!m)a.append(el('span',{className:'mut',textContent:'правильный: '+t.ans}));
+   c.append(a);
+  }else if(m!==undefined)c.append(el('div',{className:'ans'},el('span',{className:'res '+(m?'ok':'bad'),textContent:m?'✓ решено верно':'✗ есть ошибки'})));
+  w.append(c);
+ });
+ // решение: доска и фото
+ w.append(el('h2',{textContent:'Решение'}));
+ const acts=el('div',{className:'actions'});
+ acts.append(el('button',{className:edit?'pri':'',textContent:h.board?'Открыть доску с решением':'Решать на доске',onclick:async()=>{
+  if(h.board){location.href='/b/'+sid+'#p='+h.board;return}
+  toast('Готовлю доску…');await flush();const j=await call({t:'board',id:h.id});if(!j)return;
+  const n=j.list.find(x=>x.id===h.id);if(n&&n.board)location.href='/b/'+sid+'#p='+n.board}}));
+ if(edit)acts.append(el('button',{textContent:'📷 Добавить фото тетради',onclick:()=>$('pf').click()}));
+ w.append(acts);
+ const ph=el('div',{className:'photos'});
+ h.photos.forEach(n=>{const im=el('img',{src:img(n),alt:'Фото решения'});im.onclick=()=>zoom(im.src);
+  const box=el('div',{className:'ph'},im);
+  if(edit)box.append(el('button',{textContent:'✕',title:'Убрать фото',onclick:async()=>{if(confirm('Убрать это фото?')&&await call({t:'photo-del',id:h.id,name:n}))show(h.id)}}));
+  ph.append(box)});
+ if(h.photos.length)w.append(ph);
+ if(edit)w.append(el('div',{className:'actions'},el('button',{className:'pri',textContent:'Сдать на проверку',onclick:submit})));
+ else if(h.st==='sent')w.append(el('p',{className:'mut',textContent:'Сдано '+day(h.sentAt)+'. Преподаватель проверит и поставит оценки.'}));
+ scrollTo(0,0);
+}
+function answers(){const a={};document.querySelectorAll('#hw input[data-t]').forEach(i=>{if(i.value.trim())a[i.dataset.t]=i.value.trim()});return a}
+async function flush(){
+ clearTimeout(saveT);if(!open)return;const h=D.list.find(x=>x.id===open);if(!h||h.st!=='new')return;
+ const a=answers();if(JSON.stringify(a)===JSON.stringify(h.answers))return;
+ if(await call({t:'answers',id:open,answers:a}))toast('Ответы сохранены',1200);
+}
+async function submit(){
+ const h=D.list.find(x=>x.id===open);if(!h)return;
+ const a=answers(),empty=h.tasks.filter(t=>t.short&&!a[t.id]).length;
+ if(!confirm((empty?'Не заполнено ответов: '+empty+'. ':'')+'Сдать домашку? После этого изменить ответы будет нельзя.'))return;
+ await flush();if(await call({t:'submit',id:h.id})){toast('Сдано! 👍');show(h.id)}
+}
+// фото тетради: уменьшаем на телефоне до ~1600 px, чтобы грузилось быстро и не занимало место
+function shrink(f){return new Promise((res,rej)=>{const u=URL.createObjectURL(f),im=new Image();
+ im.onload=()=>{const k=Math.min(1,1600/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);
+  c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);res(c.toDataURL('image/jpeg',.72))};
+ im.onerror=()=>{URL.revokeObjectURL(u);rej()};im.src=u})}
+$('pf').onchange=async()=>{const fl=[...$('pf').files];$('pf').value='';if(!fl.length||!open)return;
+ const id=open;for(const f of fl){toast('Загружаю фото…',20000);let s;try{s=await shrink(f)}catch(e){toast('Это фото не открылось. Попробуйте сделать снимок ещё раз.',4000);continue}
+  if(!await call({t:'photo',id,src:s}))break}
+ toast('Фото добавлено',1500);show(id)};
+function zoom(src){$('zoom').querySelector('img').src=src;$('zoom').hidden=false}
+$('zoom').onclick=()=>{$('zoom').hidden=true};
+addEventListener('pagehide',()=>{if(open){const a=answers();navigator.sendBeacon&&navigator.sendBeacon('/api/'+sid+'/hw',new Blob([JSON.stringify({t:'answers',id:open,answers:a})],{type:'application/json'}))}});
+call().then(j=>{if(!j){document.querySelector('.wrap').innerHTML='<div class="empty">Не получилось открыть кабинет. Обновите страницу.</div>';return}
+ const q=new URLSearchParams(location.search).get('hw');if(q&&j.list.some(h=>h.id===q))show(q);else home()});
+})();
+</script>
+</body>
+</html>

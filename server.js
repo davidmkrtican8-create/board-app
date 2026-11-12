@@ -245,9 +245,148 @@ function body(req, res, lim, cb) {
 }
 const PAGE = f => (req, res) => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); fs.createReadStream(path.join(__dirname, f)).pipe(res); };
 
+// ---------- домашние задания ----------
+// у каждого ученика свой файл hw/<id>.json (только текст), картинки задач и фото тетрадей — отдельными файлами в hw/<id>/
+const HWD = path.join(DIR, 'hw');
+try { fs.mkdirSync(HWD, { recursive: true }); } catch (e) {}
+const hwc = {};
+function hwOf(sid) {
+  if (hwc[sid]) return hwc[sid];
+  let v; try { v = JSON.parse(fs.readFileSync(path.join(HWD, sid + '.json'), 'utf8')); } catch (e) { v = { list: [] }; }
+  return (hwc[sid] = v);
+}
+const hwSave = sid => fs.writeFileSync(path.join(HWD, sid + '.json'), JSON.stringify(hwc[sid]));
+const HIMG = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+\/=]+)$/, HNAME = /^[a-f0-9]{16}\.(jpg|png|webp)$/;
+function hwImg(sid, src, lim) { // сохранить картинку, вернуть имя файла
+  if (typeof src !== 'string' || src.length > lim) return null;
+  const m = HIMG.exec(src); if (!m) return null;
+  const n = crypto.randomBytes(8).toString('hex') + '.' + (m[1] === 'jpeg' ? 'jpg' : m[1]);
+  fs.mkdirSync(path.join(HWD, sid), { recursive: true });
+  fs.writeFileSync(path.join(HWD, sid, n), Buffer.from(m[2], 'base64'));
+  return n;
+}
+const hwRm = (sid, n) => { if (HNAME.test(String(n))) fs.unlink(path.join(HWD, sid, n), () => {}); };
+const norm = a => String(a == null ? '' : a).toLowerCase().replace(/\s+/g, '').replace(/,/g, '.').replace(/[−–—]/g, '-');
+const right = (ans, a) => !!norm(a) && String(ans).split(/[;|]/).some(x => norm(x) && norm(x) === norm(a)); // в ответе можно указать варианты через ;
+const hwPending = sid => hwOf(sid).list.filter(h => h.st === 'sent').length;
+function hwPublic(h) { // что видит ученик: правильные ответы — только после проверки
+  const done = h.st === 'checked';
+  return {
+    id: h.id, title: h.title, due: h.due, created: h.created, st: h.st, sentAt: h.sentAt, checkedAt: h.checkedAt,
+    comment: done ? h.comment : '', photos: h.photos, board: h.board, answers: h.answers,
+    auto: h.st === 'new' ? {} : h.auto, marks: done ? h.marks : {},
+    tasks: h.tasks.map(t => ({ id: t.id, img: t.img, w: t.w, h: t.h, text: t.text, num: t.num, short: !!t.ans, ans: done ? t.ans : undefined }))
+  };
+}
+function hwBoard(sid, h) { // «Решать на доске»: отдельная доска с задачами и местом под решение
+  const r = room(sid); if (!r) return null;
+  const pid = 'h' + h.id;
+  if (r.s.pages.some(p => p.id === pid)) return pid;
+  const PH = 1414, PS = 1442, ops = [{ t: 'addPage', id: pid, title: ('ДЗ: ' + h.title).slice(0, 80) }];
+  let y = 40;
+  const fit = hh => { const k = Math.floor(y / PS); if (y + hh > k * PS + PH - 20) y = (k + 1) * PS + 40; };
+  h.tasks.forEach((t, i) => {
+    const label = 'Задача ' + (i + 1) + (t.num ? ' (№' + t.num + ' ЕГЭ)' : '');
+    const words = String(t.text || '').split(/\s+/).filter(Boolean), lines = [label];
+    let ln = '';
+    for (const w of words) { if ((ln + ' ' + w).trim().length > 58) { lines.push(ln); ln = w; } else ln = (ln + ' ' + w).trim(); }
+    if (ln) lines.push(ln);
+    const th = lines.length * 26 * 1.25;
+    let src = null, dw = 880, dh = 0;
+    if (t.img) {
+      try { const b = fs.readFileSync(path.join(HWD, sid, t.img)); src = 'data:image/' + (t.img.endsWith('png') ? 'png' : t.img.endsWith('webp') ? 'webp' : 'jpeg') + ';base64,' + b.toString('base64'); } catch (e) {}
+      if (src && src.length > 900000) src = null;
+      if (src) { dh = dw * (t.h || 1) / (t.w || 1); if (dh > PH * 0.6) { dh = PH * 0.6; dw = dh * (t.w || 1) / (t.h || 1); } }
+    }
+    fit(th + 12 + dh); // подпись и условие — на одном листе
+    ops.push({ t: 'stroke', page: pid, stroke: { id: 'h' + t.id + 't', k: 'text', pts: [60, y], c: '#201c2b', w: 26, s: lines.join('\n').slice(0, 800) } });
+    y += th + 12;
+    if (src) {
+      ops.push({ t: 'image', page: pid, img: { id: 'h' + t.id + 'i', src, x: Math.round((1000 - dw) / 2), y: Math.round(y), w: Math.round(dw), h: Math.round(dh) } });
+      y += dh;
+    }
+    y += 380; // место под решение
+  });
+  for (const op of ops) if (apply(r.s, op)) bcast(r, Object.assign({ from: 'srv' }, op));
+  save(r);
+  return pid;
+}
+function hwTeacher(req, res, u, me) { // /api/admin/hw…
+  const own = id => index.students.find(x => x.id === id && x.owner === me.id);
+  if (req.method === 'GET' && u.pathname === '/api/admin/hw-pending') {
+    const o = {}; index.students.filter(s => s.owner === me.id).forEach(s => { const n = hwPending(s.id); if (n) o[s.id] = n; });
+    return json(res, o);
+  }
+  if (req.method === 'GET' && u.pathname === '/api/admin/hw') {
+    const sid = String(u.searchParams.get('s') || '');
+    if (!own(sid)) { res.writeHead(404); return res.end(); }
+    return json(res, hwOf(sid).list);
+  }
+  if (req.method === 'POST' && u.pathname === '/api/admin/hw') return body(req, res, 60e6, j => {
+    const sid = String(j.s || ''); if (!own(sid)) { res.writeHead(404); return res.end(); }
+    const H = hwOf(sid), h = H.list.find(x => x.id === j.id);
+    if (j.t === 'add') {
+      if (!Array.isArray(j.tasks) || !j.tasks.length || j.tasks.length > 40) return json(res, { error: 'Добавьте от 1 до 40 задач' });
+      if (H.list.length >= 300) return json(res, { error: 'Слишком много домашек у ученика: удалите старые' });
+      const tasks = [];
+      for (const t of j.tasks) {
+        const text = String(t.text || '').trim().slice(0, 2000), img = t.img ? hwImg(sid, t.img, 880000) : null;
+        if (!img && !text) continue;
+        tasks.push({ id: crypto.randomBytes(4).toString('hex'), img, w: num(t.w, 1, 1e5, 1000), h: num(t.h, 1, 1e5, 600), text, num: Math.round(num(t.num, 0, 19, 0)), ans: String(t.ans || '').trim().slice(0, 80) });
+      }
+      if (!tasks.length) return json(res, { error: 'В задачах нет ни картинки, ни текста' });
+      const due = Number.isFinite(+j.due) && +j.due > 0 ? +j.due : null;
+      H.list.unshift({ id: crypto.randomBytes(5).toString('hex'), title: String(j.title || '').trim().slice(0, 80) || 'Домашка', due, created: Date.now(), tasks, st: 'new', answers: {}, auto: {}, marks: {}, photos: [], board: null, comment: '' });
+    } else if (!h) return json(res, { error: 'Домашка не найдена' });
+    else if (j.t === 'check') {
+      h.marks = {}; for (const t of h.tasks) { const v = (j.marks || {})[t.id]; if (v === 0 || v === 1) h.marks[t.id] = v; }
+      h.comment = String(j.comment || '').slice(0, 2000); h.st = 'checked'; h.checkedAt = Date.now();
+    } else if (j.t === 'return') { h.st = 'new'; h.comment = String(j.comment || h.comment || '').slice(0, 2000); }
+    else if (j.t === 'del') {
+      h.tasks.forEach(t => hwRm(sid, t.img)); h.photos.forEach(p => hwRm(sid, p));
+      H.list = H.list.filter(x => x !== h);
+    } else { res.writeHead(400); return res.end(); }
+    hwSave(sid); json(res, H.list);
+  });
+  res.writeHead(404); res.end();
+}
+function hwStudent(req, res, sid) { // /api/<id>/hw — открывается по ссылке ученика
+  const s = index.students.find(x => x.id === sid);
+  if (!s) { res.writeHead(404); return res.end(); }
+  const H = hwOf(sid);
+  const out = () => {
+    const r = room(sid), t = byId(s.owner);
+    json(res, { name: s.name, teacher: t ? t.name : '', list: H.list.map(hwPublic), pages: r ? r.s.pages.map(p => ({ id: p.id, title: p.title })) : [] });
+  };
+  if (req.method === 'GET') return out();
+  if (req.method !== 'POST') { res.writeHead(405); return res.end(); }
+  body(req, res, 3e6, j => {
+    const h = H.list.find(x => x.id === j.id);
+    if (!h) return json(res, { error: 'Домашка не найдена' });
+    if (j.t === 'board') { h.board = hwBoard(sid, h); hwSave(sid); return out(); }
+    if (h.st !== 'new') return json(res, { error: 'Домашка уже сдана' });
+    if (j.t === 'answers') {
+      h.answers = {}; for (const t of h.tasks) { const a = String((j.answers || {})[t.id] || '').slice(0, 80); if (a) h.answers[t.id] = a; }
+    } else if (j.t === 'photo') {
+      if (h.photos.length >= 12) return json(res, { error: 'Не больше 12 фото к одной домашке' });
+      const n = hwImg(sid, j.src, 2.5e6); if (!n) return json(res, { error: 'Фото не подошло' });
+      h.photos.push(n);
+    } else if (j.t === 'photo-del') {
+      if (h.photos.includes(j.name)) { hwRm(sid, j.name); h.photos = h.photos.filter(p => p !== j.name); }
+    } else if (j.t === 'submit') {
+      h.auto = {}; for (const t of h.tasks) if (t.ans) h.auto[t.id] = right(t.ans, h.answers[t.id]) ? 1 : 0;
+      h.st = 'sent'; h.sentAt = Date.now();
+    } else { res.writeHead(400); return res.end(); }
+    hwSave(sid); out();
+  });
+}
+
 function dropRoom(id) { // удалить доску ученика целиком
   const r = rooms[id]; if (r) { r.clients.forEach(c => c.end()); delete rooms[id]; }
-  if (RID.test(String(id))) fs.unlink(path.join(DIR, id + '.json'), () => {});
+  if (RID.test(String(id))) {
+    fs.unlink(path.join(DIR, id + '.json'), () => {});
+    delete hwc[id]; fs.unlink(path.join(HWD, id + '.json'), () => {}); fs.rm(path.join(HWD, id), { recursive: true, force: true }, () => {});
+  }
 }
 function admin(req, res, u) {
   const me = auth(req);
@@ -256,6 +395,7 @@ function admin(req, res, u) {
   const isOwner = me.id === 'owner';
   if (req.method === 'GET' && u.pathname === '/api/admin/me') return json(res, who(me));
   if (req.method === 'GET' && u.pathname === '/api/admin/students') return json(res, mine());
+  if (u.pathname === '/api/admin/hw' || u.pathname === '/api/admin/hw-pending') return hwTeacher(req, res, u, me);
   if (req.method === 'GET' && u.pathname === '/api/admin/backup') {
     const all = {}; mine().forEach(s => { const r = room(s.id); if (r) all[s.id] = r.s; });
     return json(res, { index: { students: mine() }, rooms: all });
@@ -346,6 +486,20 @@ http.createServer((req, res) => {
     const mn = Math.floor(Date.now() / 60000); if (logMin !== mn) { logMin = mn; logN = 0; }
     if (++logN > 60) { res.writeHead(204); return res.end(); }
     return body(req, res, 4000, j => { console.log('client-error', JSON.stringify(j).slice(0, 1500)); res.writeHead(204); res.end(); });
+  }
+  const hm = u.pathname.match(/^\/api\/([a-z0-9]{4,32})\/hw$/);
+  if (hm) return hwStudent(req, res, hm[1]);
+  const hi = u.pathname.match(/^\/hwimg\/([a-z0-9]{4,32})\/([a-f0-9]{16}\.(jpg|png|webp))$/);
+  if (hi) { // картинки задач и фото тетрадей
+    const f = path.join(HWD, hi[1], hi[2]);
+    if (!index.students.some(x => x.id === hi[1]) || !fs.existsSync(f)) { res.writeHead(404); return res.end(); }
+    res.writeHead(200, { 'Content-Type': 'image/' + (hi[3] === 'jpg' ? 'jpeg' : hi[3]), 'Cache-Control': 'private, max-age=604800' });
+    return fs.createReadStream(f).pipe(res);
+  }
+  const sp = u.pathname.match(/^\/s\/([a-z0-9]{4,32})$/);
+  if (sp) { // кабинет ученика
+    if (!index.students.some(x => x.id === sp[1])) { res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end('<!doctype html><meta charset="utf-8"><body style="font:16px system-ui;max-width:420px;margin:12vh auto;padding:0 18px"><h2>Кабинет не найден</h2><p>Попросите у преподавателя новую ссылку.</p>'); }
+    return PAGE('student.html')(req, res);
   }
   const m = u.pathname.match(/^\/api\/([a-z0-9]{4,32})\/(events|op)$/);
   if (m) {
