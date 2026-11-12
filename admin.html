@@ -310,6 +310,41 @@ async function resolveDest(d){
  const ref=d[0],idx=typeof ref==='object'?await pdf.getPageIndex(ref):ref;
  return{page:idx+1,y:(d[1]&&d[1].name==='XYZ'&&typeof d[3]==='number')?d[3]:null};
 }
+// ---------- ответ и номер задачи из сборника (сборники MathStart: у карточки есть кнопка «Ответ» — ссылка на страницу ответов) ----------
+let leafCache=null;
+async function bookLeaves(){ // разделы оглавления: страница начала, раздел верхнего уровня
+ if(leafCache)return leafCache;const L=[];
+ for(const top of (await pdf.getOutline())||[])for(const o of (top.items&&top.items.length?top.items:[top])){let p=null;try{const t=await resolveDest(o.dest);p=t&&t.page}catch(e){}L.push({top:String(top.title||''),p})}
+ return(leafCache=L);
+}
+async function destXY(d){if(typeof d==='string')d=await pdf.getDestination(d);if(!Array.isArray(d))return null;return{page:(await pdf.getPageIndex(d[0]))+1,x:+d[2]||0,y:+d[3]||0}}
+async function cardInfo(fy0,fy1){
+ const pg=await pdf.getPage(pageNo),H=pg.getViewport({scale:1}).height,top=H*(1-fy0),bot=H*(1-fy1);
+ const links=(await pg.getAnnotations()).filter(a=>a.subtype==='Link'&&a.dest&&a.rect[1]>=bot-2&&a.rect[3]<=top+2).sort((a,b)=>b.rect[0]-a.rect[0]);
+ if(!links.length)return null;
+ const A=links[0],t=await destXY(A.dest);if(!t)return null;
+ const L=await bookLeaves(),out={};
+ // номер: из имени ссылки «ans::4.19», из заголовка «Задача 4.19.», иначе по разделу оглавления (аналоги — через ссылку на прототип)
+ const m=typeof A.dest==='string'&&A.dest.match(/^ans::(\d+)\./);
+ let leafPage=pageNo;const lastP=Math.max(0,...L.map(l=>l.p||0));
+ if(pageNo>lastP+20&&links[1]){const pr=await destXY(links[1].dest);if(pr)leafPage=pr.page}
+ let li=-1;L.forEach((l,k)=>{if(l.p&&l.p<=leafPage)li=k});
+ const ext=li>=0&&/РАЗВ[ЁЕ]РНУТ/i.test(L[li].top),prac=l=>/ПРАКТИЧ/i.test(l.top),hasPr=L.some(prac);
+ if(m)out.num=+m[1];
+ else{const tx=(await pg.getTextContent()).items.find(i=>/^(Задача|Аналог|Прототип)\s+\d+\./.test(i.str)&&i.transform[5]<=top+2&&i.transform[5]>=top-45);
+  if(tx)out.num=+tx.str.match(/(\d+)\./)[1];
+  else if(li>=0&&!prac(L[li]))out.num=L.slice(0,li).filter(l=>!prac(l)).length+(hasPr?6:1);}
+ if(!(out.num>=1&&out.num<=19))delete out.num;
+ // ответ: текст справа от номера на странице ответов (только простое число на одной строке)
+ if(!ext){
+  const tc=await (await pdf.getPage(t.page)).getTextContent();
+  const it=tc.items.filter(i=>i.str.trim()&&i.transform[4]>t.x+30&&i.transform[4]<t.x+160&&i.transform[5]<=t.y+2&&i.transform[5]>=t.y-20).sort((a,b)=>a.transform[4]-b.transform[4]);
+  const ys=it.map(i=>i.transform[5]),flat=ys.length&&Math.max(...ys)-Math.min(...ys)<2.5;
+  const a=it.map(i=>i.str).join('').trim().replace(/\.$/,'').replace(/[↑−–]/g,'-').replace(/\s+/g,'');
+  if(flat&&/^-?\d+([.,]\d+)?$/.test(a))out.ans=a;
+ }
+ return out;
+}
 function goto(p,y,push=true){
  if(!pdf)return;p=Math.max(1,Math.min(pdf.numPages,p|0));
  if(push&&p!==pageNo)hist.push(pageNo);
@@ -337,7 +372,7 @@ async function render(markY){
   b.onclick=()=>send(fx0-.005,fy0,fx1+.005,fy1,b);
   ov.append(c,b);
   if(window.hwDraft){const z=document.createElement('button');z.className='plus hwplus';z.textContent='+ ДЗ';z.title='Добавить эту задачу в домашку';z.style.cssText='top:calc('+fy0*100+'% + 34px);left:1%';
-   z.onclick=async()=>{z.textContent='…';try{window.hwAdd(await crop(fx0-.005,fy0,fx1+.005,fy1));z.textContent='✓'}catch(e){z.textContent='+ ДЗ'}};ov.append(z)}
+   z.onclick=async()=>{z.textContent='…';try{const [src,info]=await Promise.all([crop(fx0-.005,fy0,fx1+.005,fy1),cardInfo(fy0,fy1).catch(()=>null)]);window.hwAdd(src,info);z.textContent='✓'}catch(e){z.textContent='+ ДЗ'}};ov.append(z)}
  });
  for(const a of await page.getAnnotations()){
   if(a.subtype!=='Link'||!a.dest)continue;
@@ -379,7 +414,7 @@ async function openBook(name){
   const blob=await bookGet(name);if(!blob){msg('Сборник не найден');return}
   if(pdf){try{pdf.destroy()}catch(e){}}
   pdf=await pdfjs.getDocument({data:new Uint8Array(await blob.arrayBuffer())}).promise;
-  book=name;localStorage.setItem('tbook',name);hist=[];$('tcnt').textContent='/ '+pdf.numPages;
+  book=name;leafCache=null;localStorage.setItem('tbook',name);hist=[];$('tcnt').textContent='/ '+pdf.numPages;
   ol=[];(function w(a,d){for(const o of a||[]){ol.push({t:o.title,d:o.dest,depth:d});w(o.items,d+1)}})(await pdf.getOutline(),0);
   const s=$('tol');s.innerHTML='<option value="">Оглавление…</option>';
   ol.forEach((o,i)=>{const e=document.createElement('option');e.value=i;e.textContent='\u2003'.repeat(o.depth)+o.t;s.appendChild(e)});
@@ -421,7 +456,7 @@ ov.addEventListener('pointerup',()=>{
  ok.textContent='→ На доску';no.textContent='✕';
  ok.onclick=()=>{const w=sel.r.width,h=sel.r.height;send(x0/w,y0/h,x1/w,y1/h,null);clearSel()};
  no.onclick=clearSel;bar.append(ok);
- if(window.hwDraft){const z=document.createElement('button');z.textContent='→ В домашку';z.onclick=async()=>{const w=sel.r.width,h=sel.r.height;clearSel();window.hwAdd(await crop(x0/w,y0/h,x1/w,y1/h))};bar.append(z)}
+ if(window.hwDraft){const z=document.createElement('button');z.textContent='→ В домашку';z.onclick=async()=>{const w=sel.r.width,h=sel.r.height;clearSel();const [src,info]=await Promise.all([crop(x0/w,y0/h,x1/w,y1/h),cardInfo(y0/h,y1/h).catch(()=>null)]);window.hwAdd(src,info)};bar.append(z)}
  bar.append(no);bar.onpointerdown=e=>e.stopPropagation();ov.appendChild(bar);sel.bar=bar;
 });
 
@@ -582,7 +617,7 @@ function fit(src){return new Promise((res,rej)=>{const im=new Image();im.onload=
  rej()};im.onerror=rej;im.src=src})}
 
 // ---------- сбор новой домашки (полоса под доской) ----------
-window.hwAdd=async src=>{if(!draft)return;try{const r=await fit(src);draft.tasks.push(Object.assign(r,{text:'',num:0,ans:''}));tray(true)}catch(e){alert('Не получилось открыть картинку')}};
+window.hwAdd=async(src,info)=>{if(!draft)return;try{const r=await fit(src);info=info||{};draft.tasks.push(Object.assign(r,{text:'',num:info.num||0,ans:info.ans||'',auto:!!info.ans}));tray(true)}catch(e){alert('Не получилось открыть картинку')}};
 window.hwAddFile=f=>{if(/heic|heif/i.test(f.type+' '+(f.name||''))){alert('Фото в формате HEIC браузер не открывает. Сделайте скриншот или сохраните как JPG.');return}
  const r=new FileReader();r.onload=()=>window.hwAdd(r.result);r.readAsDataURL(f)};
 function startDraft(){
@@ -616,7 +651,8 @@ function tray(scrollEnd){
   const tx=el('textarea',{value:k.text,placeholder:k.src?'Подпись (необязательно)':'Условие задачи',rows:k.src?1:4,style:'font-size:13px;resize:vertical;width:100%;border:1px solid var(--bd);border-radius:6px;background:var(--panel);color:var(--tx)'});tx.oninput=()=>{k.text=tx.value};c.append(tx);
   const sel=el('select',{title:'Номер задания ЕГЭ — для прогресса ученика'});sel.append(el('option',{value:0,textContent:'№ ЕГЭ — не указан'}));
   for(let n=1;n<=19;n++)sel.append(el('option',{value:n,textContent:'№'+n+' ЕГЭ'}));sel.value=k.num;sel.onchange=()=>{k.num=+sel.value};c.append(sel);
-  const an=el('input',{value:k.ans,placeholder:'Ответ (если короткий)',title:'Ученик впишет ответ, и он проверится сам. Несколько вариантов — через ;'});an.oninput=()=>{k.ans=an.value};c.append(an);
+  const an=el('input',{value:k.ans,placeholder:'Ответ (если короткий)',title:'Ученик впишет ответ, и он проверится сам. Несколько вариантов — через ;'});an.oninput=()=>{k.ans=an.value;k.auto=false;c.querySelector('.auto')&&c.querySelector('.auto').remove()};c.append(an);
+  if(k.auto)c.append(el('span',{className:'auto',textContent:'✓ ответ из сборника',style:'font-size:11px;color:#2e7d32'}));
   c.append(el('button',{className:'x',textContent:'✕',title:'Убрать задачу',onclick:()=>{draft.tasks.splice(i,1);tray()}}));
   cs.append(c)});
  t.append(cs);if(scrollEnd)cs.scrollLeft=1e6;

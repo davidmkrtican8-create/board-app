@@ -141,7 +141,7 @@ function show(id){
  w.append(el('header',null,el('h1',{textContent:h.title}),chip(h)));
  if(h.st==='checked'&&h.comment)w.append(el('div',{className:'note',textContent:'💬 Преподаватель: '+h.comment}));
  if(edit&&h.comment)w.append(el('div',{className:'note',textContent:'💬 Вернули на доработку: '+h.comment}));
- if(edit)w.append(el('p',{className:'mut',textContent:'Короткие ответы впишите в поля. Развёрнутые решения — на доске или фото тетради. Когда всё готово, нажмите «Сдать на проверку».'}));
+ if(edit)w.append(el('p',{className:'mut',textContent:'Короткие ответы впишите в поля. Решение обязательно: на доске или фото тетради. Когда всё готово, нажмите «Сдать на проверку».'}));
  h.tasks.forEach((t,i)=>{
   const c=el('div',{className:'task'});
   c.append(el('div',{className:'hd'},el('b',{textContent:'Задача '+(i+1)}),t.num?el('span',{className:'chip',textContent:'№'+t.num+' ЕГЭ'}):null));
@@ -185,6 +185,7 @@ async function flush(){
 }
 async function submit(){
  const h=D.list.find(x=>x.id===open);if(!h)return;
+ if(!h.photos.length&&!h.board){alert('Чтобы сдать домашку, прикрепите фото решения из тетради («📷 Добавить фото тетради») или решите задачи на доске («Решать на доске»).');return}
  const a=answers(),empty=h.tasks.filter(t=>t.short&&!a[t.id]).length;
  if(!confirm((empty?'Не заполнено ответов: '+empty+'. ':'')+'Сдать домашку? После этого изменить ответы будет нельзя.'))return;
  await flush();if(await call({t:'submit',id:h.id})){toast('Сдано! 👍');show(h.id)}

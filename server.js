@@ -565,6 +565,11 @@ function hwStudent(req, res, sid) { // /api/<id>/hw — открывается �
     } else if (j.t === 'photo-del') {
       if (h.photos.includes(j.name)) { hwRm(sid, j.name); h.photos = h.photos.filter(p => p !== j.name); }
     } else if (j.t === 'submit') {
+      // без решения сдать нельзя: нужно фото тетради или своё решение на доске домашки
+      let work = h.photos.length > 0;
+      const rr = h.board && room(sid);
+      if (!work && rr) work = Object.keys(rr.s.strokes[h.board] || {}).some(id => !/^h[0-9a-f]+t$/.test(id)) || Object.keys(rr.s.images[h.board] || {}).some(id => !/^h[0-9a-f]+i$/.test(id));
+      if (!work) return json(res, { error: h.board ? 'На доске с домашкой пока нет решения. Решите задачи на доске или прикрепите фото тетради.' : 'Прикрепите фото решения из тетради или решите задачи на доске — без решения домашку сдать нельзя.' });
       h.auto = {}; for (const t of h.tasks) if (t.ans) h.auto[t.id] = right(t.ans, h.answers[t.id]) ? 1 : 0;
       h.st = 'sent'; h.sentAt = Date.now();
       const okA = Object.values(h.auto).filter(Boolean).length, nA = Object.keys(h.auto).length;
