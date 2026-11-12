@@ -1,5 +1,5 @@
 // Доска репетитора: сервер без зависимостей (только встроенный Node.js)
-const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
+const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto'), zlib = require('zlib');
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0'; // на своём сервере HOST=127.0.0.1: снаружи доступен только защищённый адрес
 const DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -243,7 +243,21 @@ function body(req, res, lim, cb) {
   req.on('data', c => { b += c; if (b.length > lim) req.destroy(); });
   req.on('end', () => { let j; try { j = JSON.parse(b); } catch (e) { res.writeHead(400); return res.end(); } cb(j); });
 }
-const PAGE = f => (req, res) => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); fs.createReadStream(path.join(__dirname, f)).pipe(res); };
+// страницы и скрипты отдаём сжатыми (в 4–5 раз меньше) и с меткой версии: браузер берёт их из своего кэша, пока файл не обновился
+const GZC = {};
+function sendFile(req, res, f, type, cc) {
+  let st; try { st = fs.statSync(f); } catch (e) { res.writeHead(404); return res.end(); }
+  let c = GZC[f];
+  if (!c || c.m !== st.mtimeMs) {
+    const raw = fs.readFileSync(f);
+    c = GZC[f] = { m: st.mtimeMs, raw, gz: zlib.gzipSync(raw, { level: 9 }), br: zlib.brotliCompressSync(raw, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 10 } }), tag: '"' + crypto.createHash('sha1').update(raw).digest('base64url').slice(0, 16) + '"' };
+  }
+  const h = { 'Content-Type': type, 'Cache-Control': cc || 'no-cache', 'ETag': c.tag, 'Vary': 'Accept-Encoding' };
+  if (req.headers['if-none-match'] === c.tag) { res.writeHead(304, h); return res.end(); }
+  const ae = String(req.headers['accept-encoding'] || ''), body = /\bbr\b/.test(ae) ? (h['Content-Encoding'] = 'br', c.br) : /\bgzip\b/.test(ae) ? (h['Content-Encoding'] = 'gzip', c.gz) : c.raw;
+  h['Content-Length'] = body.length; res.writeHead(200, h); res.end(req.method === 'HEAD' ? undefined : body);
+}
+const PAGE = f => (req, res) => sendFile(req, res, path.join(__dirname, f), 'text/html; charset=utf-8');
 
 // ---------- домашние задания ----------
 // у каждого ученика свой файл hw/<id>.json (только текст), картинки задач и фото тетрадей — отдельными файлами в hw/<id>/
@@ -720,10 +734,7 @@ http.createServer((req, res) => {
   if (['/api/login', '/api/register', '/api/invite'].includes(u.pathname)) return account(req, res, u);
   const pj = u.pathname.match(/^\/pdfjs\/(pdf(?:\.worker)?\.min\.mjs)$/);
   if (pj) { // pdf.js для просмотра сборников задач в кабинете преподавателя
-    const f = path.join(__dirname, pj[1]);
-    if (!fs.existsSync(f)) { res.writeHead(404); return res.end(); }
-    res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=86400' });
-    return fs.createReadStream(f).pipe(res);
+    return sendFile(req, res, path.join(__dirname, pj[1]), 'text/javascript; charset=utf-8', 'public, max-age=86400');
   }
   if (u.pathname === '/api/ice') { // ключи TURN выдаём только тем, кто открыл существующую доску
     const rr = String(u.searchParams.get('r') || '');
@@ -756,14 +767,21 @@ http.createServer((req, res) => {
     const r = room(m[1]);
     if (!r) { res.writeHead(404); return res.end(); }
     if (m[2] === 'events' && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' });
+      // поток событий сжимаем: доска с картинками при открытии приходит в 3–5 раз быстрее, каждое сообщение уходит сразу (flush)
+      const gz = /\bgzip\b/.test(String(req.headers['accept-encoding'] || ''));
+      res.writeHead(200, Object.assign({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' }, gz ? { 'Content-Encoding': 'gzip' } : {}));
+      let cl = res;
+      if (gz) {
+        const z = zlib.createGzip({ level: 6, memLevel: 7 }); z.pipe(res); z.on('error', () => {});
+        cl = { write: d => { z.write(d); z.flush(); }, end: () => z.end() };
+      }
       const cid = String(u.searchParams.get('c') || '');
-      res.write('data: ' + JSON.stringify({ t: 'init', s: r.s, name: nameOf(r.id), call: [...r.call] }) + '\n\n');
-      r.clients.add(res);
+      cl.write('data: ' + JSON.stringify({ t: 'init', s: r.s, name: nameOf(r.id), call: [...r.call] }) + '\n\n');
+      r.clients.add(cl);
       bcast(r, { t: 'peers', n: r.clients.size });
-      const ping = setInterval(() => res.write(': ping\n\n'), 20000);
+      const ping = setInterval(() => cl.write(': ping\n\n'), 20000);
       req.on('close', () => {
-        clearInterval(ping); r.clients.delete(res); bcast(r, { t: 'peers', n: r.clients.size });
+        clearInterval(ping); r.clients.delete(cl); if (gz) cl.end(); bcast(r, { t: 'peers', n: r.clients.size });
         if (RID.test(cid) && r.call.delete(cid)) bcast(r, { t: 'rtc', kind: 'bye', from: cid });
       });
       return;
