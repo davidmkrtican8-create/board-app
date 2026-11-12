@@ -66,7 +66,8 @@ button,input{font:inherit;color:var(--tx);background:var(--panel);border:1px sol
 .dlg code{font-size:12px;word-break:break-all;background:color-mix(in srgb,var(--ac) 10%,transparent);padding:4px 6px;border-radius:6px}
 body.nosidebar #side{display:none}
 .badge{background:#d32f2f;color:#fff;border-radius:10px;font-size:11px;font-weight:700;padding:1px 6px;margin-left:auto}
-#hwkn:not(:empty){background:#d32f2f;color:#fff;border-radius:10px;font-size:11px;font-weight:700;padding:1px 6px;margin-left:6px}
+#hwk{background:color-mix(in srgb,var(--ac) 9%,var(--panel));color:color-mix(in srgb,var(--ac) 85%,var(--tx));border:1px solid color-mix(in srgb,var(--ac) 28%,var(--panel));font-weight:700}#hwk:hover{background:color-mix(in srgb,var(--ac) 15%,var(--panel))}
+#hwkn:not(:empty){background:var(--ac);color:var(--panel);border-radius:10px;font-size:11px;font-weight:800;padding:1px 6px;margin-left:6px}
 .dlg>div.wide{max-width:920px}
 .hwplus{width:auto;padding:0 8px;font-size:12px;border-radius:15px;background:var(--ac);border-color:var(--ac)}
 #hwtray{border-top:2px solid var(--ac);background:var(--panel);padding:8px 10px;display:flex;flex-direction:column;gap:6px;max-height:46%;min-height:0}
@@ -123,7 +124,7 @@ body.nosidebar #side{display:none}
   <div class="foot"><button id="tch" hidden title="Пригласить репетиторов и управлять их аккаунтами">Репетиторы</button><button id="tgb" title="Telegram-бот: уведомления и конспекты">Telegram</button><button id="cpw" title="Сменить свой пароль">Пароль</button><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden><button id="lo" title="Выйти из кабинета на этом устройстве">Выйти</button><button id="rb" title="Вернуть учеников и доски из копии, которую кабинет сам сохраняет в вашем браузере">Восстановить из автокопии</button><div id="bkst" style="font-size:12px;color:var(--mut);width:100%"></div></div>
  </div>
  <div id="main">
-  <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk" class="keep">Задачи</button><button id="hwk" title="Домашние задания ученика">Домашка<span id="hwkn"></span></button><button id="tgs" title="Отправить конспект урока ученику и родителям в Telegram">📨 Конспект</button><button id="lnk">Ссылка ученика</button><button id="ren">Переименовать</button><button id="del">Удалить</button><button id="fs" class="keep" title="Фокус: убрать панели">⛶</button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button><button id="th" class="keep" title="Светлая / тёмная тема">◐</button></div>
+  <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk" class="keep">Задачи</button><button id="hwk" title="Домашние задания ученика">📚 Домашка<span id="hwkn"></span></button><button id="tgs" title="Отправить конспект урока ученику и родителям в Telegram">📨 Конспект</button><button id="lnk">Ссылка ученика</button><button id="ren">Переименовать</button><button id="del">Удалить</button><button id="fs" class="keep" title="Фокус: убрать панели">⛶</button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button><button id="th" class="keep" title="Светлая / тёмная тема">◐</button></div>
   <div id="work">
    <iframe id="fr" allow="microphone; camera; autoplay; clipboard-write"></iframe>
    <div id="tasks" hidden>
