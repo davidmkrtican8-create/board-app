@@ -1135,6 +1135,7 @@ window.addEventListener('message',e=>{
  if(e.origin!==location.origin)return;const d=e.data;if(!d)return;
  if(d.t==='key'){if(!viewOnly)(d.a==='redo'?redoAct:undo)();return}
  if(d.t==='theme'&&['auto','light','dark'].includes(d.v)){S.theme=d.v;$('theme').value=d.v;saveS();applyTheme();return}
+ if(d.t==='hotkey'&&/^(Key[VEPBHL]|Delete|Escape)$/.test(d.code)){document.dispatchEvent(new KeyboardEvent('keydown',{code:d.code,key:d.key||''}));return} // клавиша нажата, когда фокус в кабинете
  if(d.t==='snapnow'){snapAll(true).finally(()=>e.source.postMessage({t:'snapdone'},location.origin));return}
  if(d.t==='pdfreq'){buildPDF(false).then(async r=>{const b=new Uint8Array(await r.blob.arrayBuffer());let s='';for(let i=0;i<b.length;i+=32768)s+=String.fromCharCode.apply(null,b.subarray(i,i+32768));
   e.source.postMessage({t:'pdfres',b64:btoa(s),fname:r.fname,title:r.title},location.origin)}).catch(()=>e.source.postMessage({t:'pdfres',err:1},location.origin));return} // конспект в Telegram из кабинета

@@ -67,7 +67,7 @@ h2{font-size:19px;margin:24px 0 10px}
   </div>
   <div id="tgc"></div>
   <h2>Домашка</h2><div id="list"></div>
-  <h2>Прогресс по номерам ЕГЭ</h2><div id="prog"></div>
+  <h2>Прогресс</h2><div id="prog"></div>
   <h2>Доски с уроков</h2><div class="boards" id="boards"></div>
  </div>
  <div id="hw" hidden></div>
@@ -100,7 +100,7 @@ function stats(){
  $('s1').textContent=done+' из '+L.length;$('s2').textContent=all?Math.round(ok/all*100)+'%':'–';$('s3').textContent=D.pages.length;
  const p=$('prog');p.innerHTML='';
  const ks=Object.keys(by).map(Number).sort((a,b)=>a-b);
- if(!ks.length)p.append(el('div',{className:'empty',textContent:'Появится, когда преподаватель проверит первые задачи с номерами ЕГЭ.'}));
+ if(!ks.length)p.append(el('div',{className:'empty',textContent:'Появится, когда преподаватель проверит первые задачи'}));
  ks.forEach(k=>{const b=by[k],v=Math.round(b.ok/b.all*100),c=v>=75?'var(--ok)':v>=45?'var(--warn)':'var(--bad)';
   const i=el('i');i.style.width=v+'%';i.style.background=c;
   p.append(el('div',{className:'bar'},el('span',{className:'n',textContent:'№'+k}),el('div',{className:'tr'},i),el('span',{className:'v',textContent:v+'% · '+b.ok+'/'+b.all})))});
@@ -144,7 +144,7 @@ function show(id){
  if(edit)w.append(el('p',{className:'mut',textContent:'Короткие ответы впишите в поля. Решение обязательно: на доске или фото тетради. Когда всё готово, нажмите «Сдать на проверку».'}));
  h.tasks.forEach((t,i)=>{
   const c=el('div',{className:'task'});
-  c.append(el('div',{className:'hd'},el('b',{textContent:'Задача '+(i+1)}),t.num?el('span',{className:'chip',textContent:'№'+t.num+' ЕГЭ'}):null));
+  c.append(el('div',{className:'hd'},el('b',{textContent:'Задача '+(i+1)}),t.num?el('span',{className:'chip',textContent:'№'+t.num}):null));
   if(t.text)c.append(el('div',{className:'txt',textContent:t.text}));
   if(t.img){const im=el('img',{src:img(t.img),alt:'Условие задачи',loading:'lazy'});im.onclick=()=>zoom(im.src);c.append(im)}
   const m=mark(h,t);

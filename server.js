@@ -286,7 +286,7 @@ function hwBoard(sid, h) { // «Решать на доске»: отдельна
   let y = 40;
   const fit = hh => { const k = Math.floor(y / PS); if (y + hh > k * PS + PH - 20) y = (k + 1) * PS + 40; };
   h.tasks.forEach((t, i) => {
-    const label = 'Задача ' + (i + 1) + (t.num ? ' (№' + t.num + ' ЕГЭ)' : '');
+    const label = 'Задача ' + (i + 1) + (t.num ? ' (№' + t.num + ')' : '');
     const words = String(t.text || '').split(/\s+/).filter(Boolean), lines = [label];
     let ln = '';
     for (const w of words) { if ((ln + ' ' + w).trim().length > 58) { lines.push(ln); ln = w; } else ln = (ln + ' ' + w).trim(); }
@@ -428,26 +428,30 @@ function snapPost(req, res, sid) {
   });
 }
 let snapRunning = false;
-async function snapSend() { // с 21:00 по Москве: доски, которые не меняли уже 30 минут, отправляем один раз
+async function snapSend() {
+  // с 21:00 по Москве; все доски ученика уходят вместе — когда ни одну из них не меняли уже 30 минут
+  // (урок 21:00–22:00 на двух досках: обе придут около 22:30). Урок, закончившийся после полуночи, уходит ночью же.
   const hr = (new Date().getUTCHours() + 3) % 24;
-  if (snapRunning || hr < 21) return; snapRunning = true;
+  if (snapRunning) return; snapRunning = true;
   try {
     const today = mskDay();
     for (const sid of Object.keys(SN)) {
       const s = index.students.find(x => x.id === sid), m = SN[sid];
-      for (const pg of Object.keys(m)) {
-        const e = m[pg], f = path.join(SND, sid, pg + '.pdf');
-        if (!s || e.day !== today) { delete m[pg]; fs.unlink(f, () => {}); continue; } // вчерашнее и удалённое — убираем
-        if (e.sent >= e.t || Date.now() - e.t < 30 * 60e3) continue;
-        const L = TG.token && !(TG.noAuto || {})[s.owner] ? (TG.subs[sid] || []) : [];
-        let buf = null; try { buf = fs.readFileSync(f); } catch (er) {}
+      if (!s) { delete SN[sid]; fs.rm(path.join(SND, sid), { recursive: true, force: true }, () => {}); continue; }
+      const due = Object.keys(m).filter(pg => !(m[pg].sent >= m[pg].t));
+      for (const pg of Object.keys(m)) if (m[pg].day !== today && m[pg].sent >= m[pg].t) { delete m[pg]; fs.unlink(path.join(SND, sid, pg + '.pdf'), () => {}); } // вчерашнее отправленное — убираем
+      if (!due.length) { if (!Object.keys(m).length) delete SN[sid]; continue; }
+      const last = Math.max(...due.map(pg => m[pg].t)), old = due.some(pg => m[pg].day !== today);
+      if (Date.now() - last < 30 * 60e3 || (hr < 21 && !old)) continue;
+      const L = TG.token && !(TG.noAuto || {})[s.owner] ? (TG.subs[sid] || []) : [];
+      for (const pg of due.sort((a, b) => m[a].t - m[b].t)) {
+        const e = m[pg]; let buf = null; try { buf = fs.readFileSync(path.join(SND, sid, pg + '.pdf')); } catch (er) {}
         if (buf) for (const x of L) {
           const cap = (x.who === 'p' ? '📝 ' + s.name + ' — конспект урока ' : '📝 Конспект урока ') + dmy(e.t) + ': «' + e.title + '»';
           try { await tgDoc(x.chat, buf, (s.name + ' — ' + e.title + '.pdf').replace(/[\\/:*?"<>|]/g, '_'), cap); } catch (er) {}
         }
         e.sent = Date.now();
       }
-      if (!Object.keys(m).length) { delete SN[sid]; fs.rm(path.join(SND, sid), { recursive: true, force: true }, () => {}); }
     }
     saveSN();
   } finally { snapRunning = false; }

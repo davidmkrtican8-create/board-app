@@ -525,6 +525,14 @@ window.addEventListener('keydown',e=>{
  e.preventDefault();f.contentWindow.postMessage({t:'key',a:(e.code==='KeyY'||e.shiftKey)?'redo':'undo'},location.origin);
 },true);
 
+// быстрые клавиши доски (V стрелка, E ластик, P перо, H маркер, L указка, Delete, Esc), когда фокус в кабинете, а не в доске
+window.addEventListener('keydown',e=>{
+ if(e.metaKey||e.ctrlKey||e.altKey||!/^(Key[VEPBHL]|Delete|Escape)$/.test(e.code))return;
+ const x=document.activeElement;if(x&&(x.tagName==='TEXTAREA'||x.tagName==='INPUT'||x.tagName==='SELECT'||x.isContentEditable))return;
+ if(document.querySelector('.dlg'))return;
+ const f=$('fr');if(!(f.getAttribute('src')||'').startsWith('/b/'))return;
+ e.preventDefault();f.contentWindow.postMessage({t:'hotkey',code:e.code,key:e.key},location.origin);
+},true);
 // ⌘V, когда фокус в кабинете (например, после клика по ученику): картинку передаём в доску
 const isInp=x=>!!x&&(x.tagName==='TEXTAREA'||(x.tagName==='INPUT'&&/^(text|number|search|password|email|url|tel)$/i.test(x.type||'text')));
 const boardOpen=()=>($('fr').getAttribute('src')||'').startsWith('/b/');
@@ -623,7 +631,7 @@ window.hwAddFile=f=>{if(/heic|heif/i.test(f.type+' '+(f.name||''))){alert('Фо�
 function startDraft(){
  const sid=C().cur();if(!sid){alert('Сначала выберите ученика слева');return}
  if(draft&&draft.tasks.length&&draft.sid!==sid&&!confirm('Сейчас собирается домашка для «'+sName(draft.sid)+'». Начать заново для «'+sName(sid)+'»?'))return;
- if(!draft||draft.sid!==sid)draft={sid,tasks:[],title:'',due:''};
+ if(!draft||draft.sid!==sid)draft={sid,tasks:[],title:new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'}),due:''}; // название по умолчанию — сегодняшняя дата
  window.hwDraft=true;tray();if(window.hwTasksRedraw)window.hwTasksRedraw();
 }
 function stopDraft(){draft=null;window.hwDraft=false;$('hwtray').hidden=true;if(window.hwTasksRedraw)window.hwTasksRedraw()}
@@ -631,7 +639,8 @@ function tray(scrollEnd){
  const t=$('hwtray');t.hidden=false;t.innerHTML='';
  const ti=el('input',{value:draft.title,placeholder:'Название, например «Тригонометрия»',style:'flex:1;min-width:180px'});ti.oninput=()=>{draft.title=ti.value};
  const du=el('input',{type:'date',value:draft.due,title:'Сдать до'});du.oninput=()=>{draft.due=du.value};
- const fileIn=el('input',{type:'file',accept:'image/*',multiple:true,hidden:true});fileIn.onchange=()=>{[...fileIn.files].forEach(window.hwAddFile);fileIn.value=''};
+ const fileIn=el('input',{type:'file',accept:'image/*',multiple:true,hidden:true});
+ const pdfIn=el('input',{type:'file',accept:'.pdf,application/pdf',hidden:true});pdfIn.onchange=()=>{const f=pdfIn.files[0];pdfIn.value='';if(f)importPdf(f)};fileIn.onchange=()=>{[...fileIn.files].forEach(window.hwAddFile);fileIn.value=''};
  const go=el('button',{className:'pri',textContent:'Отправить ученику',disabled:!draft.tasks.length,onclick:sendDraft});
  go.style.cssText='background:var(--ac);color:#fff;border-color:var(--ac)';
  t.append(
@@ -640,6 +649,7 @@ function tray(scrollEnd){
    el('button',{textContent:'📚 Из сборника',title:'В панели «Задачи» у каждой задачи появится кнопка «+ ДЗ»; можно выделить область и нажать «В домашку»',onclick:()=>window.hwOpenTasks&&window.hwOpenTasks()}),
    el('button',{textContent:'📋 Вставить скриншот',onclick:pasteBtn}),
    el('button',{textContent:'🖼 Файл',onclick:()=>fileIn.click()}),fileIn,
+   el('button',{textContent:'📄 PDF с ответами',title:'Домашка из PDF-файла: задачи нарежутся сами, ответы из конца файла подставятся для автопроверки',onclick:()=>pdfIn.click()}),pdfIn,
    el('button',{textContent:'✎ Текстом',onclick:()=>{draft.tasks.push({src:null,text:'',num:0,ans:''});tray(true);const a=$('hwcards').lastChild;if(a)a.querySelector('textarea').focus()}}),
    el('span',{className:'hint',textContent:'Скриншот задачи с сайта: сделайте снимок экрана и нажмите ⌘V (Ctrl+V) здесь. Если у задачи короткий ответ — впишите его, он проверится сам.'})));
  const cs=el('div',{id:'hwcards'});
@@ -649,8 +659,8 @@ function tray(scrollEnd){
   c.append(el('b',{textContent:'Задача '+(i+1)}));
   if(k.src)c.append(el('img',{src:k.src}));
   const tx=el('textarea',{value:k.text,placeholder:k.src?'Подпись (необязательно)':'Условие задачи',rows:k.src?1:4,style:'font-size:13px;resize:vertical;width:100%;border:1px solid var(--bd);border-radius:6px;background:var(--panel);color:var(--tx)'});tx.oninput=()=>{k.text=tx.value};c.append(tx);
-  const sel=el('select',{title:'Номер задания ЕГЭ — для прогресса ученика'});sel.append(el('option',{value:0,textContent:'№ ЕГЭ — не указан'}));
-  for(let n=1;n<=19;n++)sel.append(el('option',{value:n,textContent:'№'+n+' ЕГЭ'}));sel.value=k.num;sel.onchange=()=>{k.num=+sel.value};c.append(sel);
+  const sel=el('select',{title:'Номер задания в экзамене — для прогресса ученика'});sel.append(el('option',{value:0,textContent:'№ задания — не указан'}));
+  for(let n=1;n<=19;n++)sel.append(el('option',{value:n,textContent:'№'+n}));sel.value=k.num;sel.onchange=()=>{k.num=+sel.value};c.append(sel);
   const an=el('input',{value:k.ans,placeholder:'Ответ (если короткий)',title:'Ученик впишет ответ, и он проверится сам. Несколько вариантов — через ;'});an.oninput=()=>{k.ans=an.value;k.auto=false;c.querySelector('.auto')&&c.querySelector('.auto').remove()};c.append(an);
   if(k.auto)c.append(el('span',{className:'auto',textContent:'✓ ответ из сборника',style:'font-size:11px;color:#2e7d32'}));
   c.append(el('button',{className:'x',textContent:'✕',title:'Убрать задачу',onclick:()=>{draft.tasks.splice(i,1);tray()}}));
@@ -662,11 +672,56 @@ async function pasteBtn(){
   alert('В буфере обмена нет картинки. Сделайте скриншот задачи (на Mac: ⌘⇧4 с Ctrl — сразу в буфер) и нажмите снова.')}
  catch(e){alert('Нажмите ⌘V (на Windows — Ctrl+V), пока открыта эта полоса.')}
 }
+// ---------- домашка из PDF: задачи нарезаются по «№1», «№2»…, ответы берутся со страницы «Ответы» в конце ----------
+let pdfLibP=null;
+const pdfLib=()=>pdfLibP||(pdfLibP=import('/pdfjs/pdf.min.mjs').then(m=>{m.GlobalWorkerOptions.workerSrc='/pdfjs/pdf.worker.min.mjs';return m}));
+const cleanAns=a=>String(a).replace(/\s+/g,'').replace(/[−–]/g,'-').replace(/[.;]+$/,'');
+async function cropPdf(doc,p,yTop,yBot){ // область страницы по высоте (в координатах PDF, снизу вверх) → картинка, пустые поля сверху и снизу обрезаются
+ const pg=await doc.getPage(p),base=pg.getViewport({scale:1}),sc=Math.min(2.2,1100/base.width),vp=pg.getViewport({scale:sc});
+ const full=el('canvas',{width:Math.round(vp.width),height:Math.round(vp.height)}),fx=full.getContext('2d',{willReadFrequently:true});
+ fx.fillStyle='#fff';fx.fillRect(0,0,full.width,full.height);await pg.render({canvasContext:fx,viewport:vp,intent:'print'}).promise; // «print» — рисуется и в фоновой вкладке
+ const x0=Math.round(full.width*.05),w=Math.round(full.width*.9);
+ let y0=Math.max(0,Math.round((base.height-yTop)*sc)-8),y1=Math.min(full.height,Math.round((base.height-yBot)*sc));
+ const d=fx.getImageData(x0,0,w,full.height).data,blank=y=>{for(let x=0;x<w;x+=2){const i=(y*w+x)*4;if(d[i]<235||d[i+1]<235||d[i+2]<235)return false}return true};
+ while(y1>y0+20&&blank(y1-1))y1--;while(y0<y1-20&&blank(y0))y0++;
+ y0=Math.max(0,y0-10);y1=Math.min(full.height,y1+12);
+ const c=el('canvas',{width:w,height:y1-y0});c.getContext('2d').drawImage(full,x0,y0,w,y1-y0,0,0,w,y1-y0);
+ let src=c.toDataURL('image/png');if(src.length>800000)src=c.toDataURL('image/jpeg',.88);return src;
+}
+async function importPdf(file){
+ if(!draft)return;const say=m=>{const t=document.querySelector('#hwtray .hint');if(t)t.textContent=m};
+ try{
+  say('Читаю PDF…');const lib=await pdfLib(),doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise,n=doc.numPages;
+  const items={};for(let p=1;p<=n;p++)items[p]=(await (await doc.getPage(p)).getTextContent()).items;
+  // страницы с ответами: с той, где заголовок «Ответы», до конца (только во второй половине файла)
+  let ansFrom=0;for(let p=n;p>Math.max(1,n/2);p--)if(items[p].some(i=>/^\s*Ответы\s*:?\s*$/i.test(i.str)||/^\s*Ответы\s*:/i.test(i.str)))ansFrom=p;
+  const ans={};
+  if(ansFrom){let txt='';for(let p=ansFrom;p<=n;p++){const pg=await doc.getPage(p),h=pg.getViewport({scale:1}).height;txt+=' '+items[p].filter(i=>i.transform[5]>45&&i.transform[5]<h-45).map(i=>i.str).join(' ')} // без колонтитулов (номер страницы)txt=txt.replace(/^[\s\S]*?Ответы\s*:?/i,' ');
+   let m,re=/№\s*(\d+)\s*[.)]\s*([\s\S]+?)(?=\s№\s*\d+\s*[.)]|$)/g;while((m=re.exec(txt)))ans[+m[1]]=cleanAns(m[2]);
+   if(!Object.keys(ans).length){re=/(?:^|\s)(\d+)\s*[.)]\s*(-?\s*[\d\s]+(?:[.,]\s*\d+)?)/g;while((m=re.exec(txt)))ans[+m[1]]=cleanAns(m[2])}}
+  const last=ansFrom?ansFrom-1:n;
+  // начала задач: метки task::N, иначе надписи «№N.» в тексте
+  const starts=[];
+  for(let k=1;k<=200;k++){let de=null;try{de=await doc.getDestination('task::'+k)}catch(e){}if(!Array.isArray(de))break;const p=(await doc.getPageIndex(de[0]))+1;if(p>last)break;starts.push({k,p,y:+de[3]||0})}
+  if(!starts.length)for(let p=1;p<=last;p++)items[p].forEach(i=>{const m=i.str.match(/^\s*№\s*(\d+)\s*\.?\s*$/);if(m&&i.transform[4]<150)starts.push({k:+m[1],p,y:i.transform[5]+16})});
+  let added=0,withAns=0;
+  if(starts.length){
+   for(let i=0;i<starts.length;i++){const s=starts[i],nx=starts[i+1],bot=nx&&nx.p===s.p?nx.y+4:30;
+    say('Нарезаю задачу '+(i+1)+' из '+starts.length+'…');
+    const src=await cropPdf(doc,s.p,s.y+4,bot),a=ans[s.k]&&/^-?\d+([.,]\d+)?$/.test(ans[s.k])?ans[s.k]:'';
+    await window.hwAdd(src,{ans:a});if(a)withAns++;added++}
+  }else{ // разметки нет — задания постранично
+   for(let p=1;p<=last;p++){say('Страница '+p+' из '+last+'…');const pg=await doc.getPage(p),h=pg.getViewport({scale:1}).height;await window.hwAdd(await cropPdf(doc,p,h-20,20),{});added++}
+  }
+  tray(true);
+  alert('Из PDF добавлено задач: '+added+'.'+(withAns?' Ответы для автопроверки найдены у '+withAns+'.':ansFrom?' Страницу с ответами нашёл, но разобрать ответы не получилось — впишите их вручную.':' Страницы «Ответы» в конце файла нет — впишите ответы вручную, если нужна автопроверка.')+' Проверьте ответы под задачами перед отправкой.');
+ }catch(e){alert('Не получилось прочитать PDF: '+(e.message||e));tray()}
+}
 async function sendDraft(){
  const d=draft;if(!d||!d.tasks.length)return;
  if(d.tasks.some(k=>!k.src&&!k.text.trim())){alert('Есть пустая задача без условия — заполните или уберите её');return}
  const due=d.due?new Date(d.due+'T23:59').getTime():0;
- const r=await api('/api/admin/hw',{method:'POST',body:JSON.stringify({t:'add',s:d.sid,title:d.title,due,tasks:d.tasks.map(k=>({img:k.src,w:k.w,h:k.h,text:k.text,num:k.num,ans:k.ans}))})});
+ const r=await api('/api/admin/hw',{method:'POST',body:JSON.stringify({t:'add',s:d.sid,title:d.title.trim()||new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'}),due,tasks:d.tasks.map(k=>({img:k.src,w:k.w,h:k.h,text:k.text,num:k.num,ans:k.ans}))})});
  const j=r.ok?await r.json():{error:'Не получилось отправить (слишком большие картинки?)'};
  if(j.error){alert(j.error);return}
  stopDraft();alert('Домашка отправлена! Ученик увидит её в своём кабинете: кнопка «📚 Домашка» на его доске.');
@@ -705,7 +760,7 @@ async function openOne(d,sid,id){
  if(h.st==='new')d.b.append(el('p',{className:'mut',textContent:'Ученик ещё не сдал. Ниже — что он успел сделать.'}));
  h.tasks.forEach((t,i)=>{
   const c=el('div',{className:'ct'});
-  c.append(el('div',{className:'r'},el('b',{textContent:'Задача '+(i+1)}),t.num?el('span',{className:'chip',textContent:'№'+t.num+' ЕГЭ'}):null));
+  c.append(el('div',{className:'r'},el('b',{textContent:'Задача '+(i+1)}),t.num?el('span',{className:'chip',textContent:'№'+t.num}):null));
   if(t.text)c.append(el('div',{textContent:t.text,style:'white-space:pre-wrap'}));
   if(t.img){const im=el('img',{src:imgU(sid,t.img),loading:'lazy'});im.onclick=()=>window.open(im.src);c.append(im)}
   const r=el('div',{className:'r'});
