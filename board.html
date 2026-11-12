@@ -51,6 +51,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none}
 #set[hidden]{display:none}
 #st{font-size:12px;color:var(--mut)}
 body.noside #side,body.focus #side,body.cabside #side{display:none}
+body.sideon #side{display:flex!important}
 body.focus #bar>*:not(.keep){display:none}
 body.focus #main{padding:4px;gap:4px}
 #edone,#newt,#vbadge,#zfit{position:absolute;z-index:3;background:var(--ac);color:#fff;border-color:var(--ac);box-shadow:0 2px 10px rgba(0,0,0,.3)}
@@ -1142,7 +1143,7 @@ window.addEventListener('message',e=>{
  if(d.t==='key'){if(!viewOnly)(d.a==='redo'?redoAct:undo)();return}
  if(d.t==='theme'&&['auto','light','dark'].includes(d.v)){S.theme=d.v;$('theme').value=d.v;saveS();applyTheme();return}
  if(d.t==='hotkey'&&/^(Key[VEPBHL]|Delete|Escape)$/.test(d.code)){document.dispatchEvent(new KeyboardEvent('keydown',{code:d.code,key:d.key||''}));return} // клавиша нажата, когда фокус в кабинете
- if(d.t==='side'){document.body.classList.toggle('cabside',!!d.hide);setTimeout(resize,30);return} // кабинет в режиме ⛶ / ⤢ прячет и список досок
+ if(d.t==='side'){document.body.classList.toggle('cabside',!!d.hide);document.body.classList.remove('sideon');setTimeout(resize,30);return} // кабинет в режиме ⛶ / ⤢ прячет и список досок
  if(d.t==='snapnow'){snapAll(true).finally(()=>e.source.postMessage({t:'snapdone'},location.origin));return}
  if(d.t==='pdfreq'){buildPDF(false).then(async r=>{const b=new Uint8Array(await r.blob.arrayBuffer());let s='';for(let i=0;i<b.length;i+=32768)s+=String.fromCharCode.apply(null,b.subarray(i,i+32768));
   e.source.postMessage({t:'pdfres',b64:btoa(s),fname:r.fname,title:r.title},location.origin)}).catch(()=>e.source.postMessage({t:'pdfres',err:1},location.origin));return} // конспект в Telegram из кабинета
@@ -1942,7 +1943,12 @@ document.addEventListener('touchmove',e=>{
 },{passive:false});
 // список досок и режим «фокус» (убирает панели; встроенный полный экран браузера ломает клавиатуру в Safari, поэтому без него)
 function setSide(h){document.body.classList.toggle('noside',h);localStorage.setItem('noside',h?'1':'0')}
-$('hp').onclick=()=>setSide(!document.body.classList.contains('noside'));
+// ◧ всегда работает: если список досок спрятан (в т.ч. режимом ⛶ или полным экраном) — показать, иначе спрятать
+let cabTmp=false; // список показали поверх режима ⛶ — при скрытии возвращаем режим, а не запоминаем «скрыт навсегда»
+$('hp').onclick=()=>{const B=document.body.classList;
+ if(getComputedStyle($('side')).display==='none'){if(B.contains('cabside')){B.remove('cabside');cabTmp=true}else setSide(false);if(getComputedStyle($('side')).display==='none'){B.add('sideon');cabTmp=true}}
+ else{B.remove('sideon');if(cabTmp){cabTmp=false;if(parent!==window&&parent.document.body.classList.contains('admfocus'))B.add('cabside')}else setSide(true)}
+ setTimeout(resize,30)};
 if(localStorage.getItem('noside')==='1')setSide(true);
 // планшет/телефон (палец вместо мыши): компактная панель; список досок по умолчанию скрыт (◧ — показать)
 const coarse=window.matchMedia?matchMedia('(pointer:coarse)'):null;
