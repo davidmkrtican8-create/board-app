@@ -125,9 +125,9 @@ body.focus #main{padding:4px;gap:4px}
 #callbox{position:absolute;right:12px;top:12px;z-index:6;background:var(--panel);border:1px solid var(--bd);border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.25);padding:6px;max-width:calc(100% - 24px);touch-action:none;--tw:160px}
 .crs{position:absolute;width:18px;height:18px;touch-action:none;z-index:3}.crs.se{right:-4px;bottom:-4px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 55%,var(--mut) 55%,var(--mut) 62%,transparent 62%,transparent 72%,var(--mut) 72%,var(--mut) 79%,transparent 79%)}.crs.sw{left:-4px;bottom:-4px;cursor:nesw-resize}.crs.ne{right:-4px;top:-4px;width:12px;height:12px;cursor:nesw-resize}.crs.nw{left:-4px;top:-4px;cursor:nwse-resize}#callbox.min .crs{display:none}
 #callhd{display:flex;align-items:center;gap:6px;cursor:move;font-size:12px;color:var(--mut);padding:0 2px 4px}#callhd span{flex:1}#callhd button{padding:0 8px;line-height:20px}
-#tiles{display:flex;flex-wrap:wrap;gap:6px;position:relative}#callbox.min #tiles{display:none}
+#tiles{display:flex;flex-direction:column;flex-wrap:nowrap;gap:6px;position:relative} /* окошки одно под другим — окно звонка ровно по ним, без пустого места */#callbox.min #tiles{display:none}
 .tile{position:relative;width:var(--tw);height:calc(var(--tw)*.75);border-radius:8px;overflow:hidden;background:#2b2638;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;text-align:center}
-.tile.me{position:absolute;right:6px;bottom:6px;z-index:2;width:max(64px,calc(var(--tw)*.3));height:max(48px,calc(var(--tw)*.225));border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.4)}.tile.me:only-child{position:relative;right:auto;bottom:auto;border:0;box-shadow:none;width:var(--tw);height:calc(var(--tw)*.75)}.tile video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.tile.me video{transform:scaleX(-1)}
+.tile.me{order:9} /* все окошки одинакового размера, своё — последним */.tile video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.tile.me video{transform:scaleX(-1)}
 .tile .nm{position:absolute;left:4px;bottom:4px;background:rgba(0,0,0,.55);padding:1px 6px;border-radius:6px;font-size:11px;z-index:1}
 .tile.talk{outline:3px solid #2e7d32}
 #hwb,#hwt{background:var(--ac);color:var(--panel);border:1px solid var(--ac);font-weight:700;white-space:nowrap}
@@ -1541,7 +1541,7 @@ $('callmin').onclick=()=>{$('callbox').classList.toggle('min');$('callmin').text
  // размер видео: тянуть за уголок, кнопка ⤢ или двойной щелчок по видео; размер запоминается
  const fit=()=>{const w=wrap.getBoundingClientRect(),r=box.getBoundingClientRect();
   if(r.right>w.right-4||r.bottom>w.bottom-4){box.style.left=Math.max(0,Math.min(r.left-w.left,w.width-box.offsetWidth-4))+'px';box.style.top=Math.max(0,Math.min(r.top-w.top,w.height-box.offsetHeight-4))+'px';box.style.right='auto'}};
- const setTw=(v,save)=>{const w=wrap.getBoundingClientRect();v=Math.round(Math.max(100,Math.min(v,w.width-40,(w.height-60)/.75)));box.style.setProperty('--tw',v+'px');if(save)try{localStorage.setItem('callTw',v)}catch(e){};return v};
+ const setTw=(v,save)=>{const w=wrap.getBoundingClientRect(),n=Math.max(1,$('tiles').children.length);v=Math.round(Math.max(100,Math.min(v,w.width-40,(w.height-60-6*(n-1))/n/.75)));box.style.setProperty('--tw',v+'px');if(save)try{localStorage.setItem('callTw',v)}catch(e){};return v};
  let tw0=160;try{tw0=+localStorage.getItem('callTw')||160}catch(e){}
  box.style.setProperty('--tw',Math.max(100,Math.min(640,tw0))+'px'); // до показа окна размеры доски могут быть ещё нулевые — не ограничиваем по ним
  let rz=null; // тянуть можно за любой уголок: противоположный уголок стоит на месте
@@ -1559,6 +1559,10 @@ $('callmin').onclick=()=>{$('callbox').classList.toggle('min');$('callmin').text
   if(cur<380){setTw(Math.min(640,w.width*.6),true);box.style.left=Math.max(0,w.width-box.offsetWidth-12)+'px';box.style.top='12px';box.style.right='auto'}else setTw(160,true);
   box.classList.remove('min');$('callmin').textContent='–';fit()};
  $('callbig').onclick=big;$('tiles').addEventListener('dblclick',big);
+ // кто-то вошёл или вышел из звонка, окно доски изменилось — подгоняем размер окошек, чтобы ряд помещался
+ const refit=()=>{if(box.hidden)return;setTw(parseFloat(getComputedStyle(box).getPropertyValue('--tw'))||160,false);fit()};
+ new MutationObserver(()=>setTimeout(refit,0)).observe($('tiles'),{childList:true});new MutationObserver(()=>setTimeout(refit,0)).observe(box,{attributes:true,attributeFilter:['hidden']});
+ addEventListener('resize',()=>setTimeout(refit,50));
 })();
 window.addEventListener('pagehide',()=>{if(call.on)navigator.sendBeacon&&navigator.sendBeacon('/api/'+room+'/op',JSON.stringify({t:'rtc',kind:'bye',from:me}))});
 setInterval(()=>{if(call.on)callUI()},2000);
