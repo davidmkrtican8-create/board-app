@@ -615,7 +615,7 @@ function hwTeacher(req, res, u, me) { // /api/admin/hw…
         let img = null;
         if (t.imgName && mine.has(t.imgName)) img = t.imgName; else if (t.img) img = hwImg(sid, t.img, 880000);
         if (img) keep.add(img);
-        tasks.push({ img, w: num(t.w, 1, 1e5, 1000), h: num(t.h, 1, 1e5, 600), text: String(t.text || '').slice(0, 2000), num: Math.round(num(t.num, 0, 19, 0)), ans: String(t.ans || '').trim().slice(0, 80), auto: !!t.auto });
+        tasks.push({ img, w: num(t.w, 1, 1e5, 1000), h: num(t.h, 1, 1e5, 600), text: String(t.text || '').slice(0, 2000), num: Math.round(num(t.num, 0, 19, 0)), ans: String(t.ans || '').trim().slice(0, 80), auto: !!t.auto, key: String(t.key || '').slice(0, 120) });
       }
       old.tasks.forEach(t => { if (t.img && !keep.has(t.img)) hwRm(sid, t.img); });
       H.draft = { title: String(j.title || '').slice(0, 80), due: String(j.due || '').slice(0, 10), tasks, at: Date.now() };

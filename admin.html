@@ -131,7 +131,7 @@ body.nosidebar #side{display:none}
     <div class="tr"><select id="tbook"></select><button id="tadd">+ Сборник</button><button id="tdel" title="Убрать сборник из списка">Убрать</button><input type="file" id="tfile" accept=".pdf,application/pdf" multiple hidden><button id="tclose" style="margin-left:auto">✕</button></div>
     <div class="tr"><button id="tback" title="Назад">↩</button><button id="tprev">←</button><input id="tnum" type="number" min="1"><span id="tcnt"></span><button id="tnext">→</button><select id="tol"><option value="">Оглавление…</option></select></div>
     <div class="tr"><input id="tq" placeholder="Номер задачи, например 4.19" style="flex:1;min-width:120px"><button id="tfind">Найти</button><button id="tpage">Страница целиком → на доску</button></div>
-    <div class="tr" style="padding-top:0"><select id="tgap" title="Сколько свободного места оставлять под решением между задачами"><option value="120">Место под решение: мало</option><option value="350">Место под решение: среднее</option><option value="600">Место под решение: много</option></select><span id="tmsg" style="font-size:12px;color:var(--mut)"></span></div>
+    <div class="tr" style="padding-top:0"><select id="tgap" title="Сколько свободного места оставлять под решением между задачами"><option value="120">Место под решение: мало</option><option value="350">Место под решение: среднее</option><option value="600">Место под решение: много</option></select><label id="tanal" title="Когда отправляете задачу из сборника на доску, её аналог (случайный, ещё не задававшийся этому ученику) сам добавляется в черновик домашки. В конце урока: «Домашка» → «Продолжить черновик» → «Отправить»." style="display:inline-flex;gap:5px;align-items:center;font-size:13px;white-space:nowrap;cursor:pointer"><input type="checkbox" id="tanalc"> 🪄 Аналог в домашку</label><span id="tmsg" style="font-size:12px;color:var(--mut)"></span></div>
     <div id="tview"><div id="tbox"><canvas id="tcv"></canvas><div id="tov"></div></div></div>
    </div>
   </div>
@@ -337,6 +337,7 @@ async function cardInfo(fy0,fy1){
   if(tx)out.num=+tx.str.match(/(\d+)\./)[1];
   else if(li>=0&&!prac(L[li]))out.num=L.slice(0,li).filter(l=>!prac(l)).length+(hasPr?6:1);}
  if(!(out.num>=1&&out.num<=19))delete out.num;
+ if(ext)out.ext=true;
  // ответ: текст справа от номера на странице ответов (только простое число на одной строке)
  if(!ext){
   const tc=await (await pdf.getPage(t.page)).getTextContent();
@@ -371,7 +372,7 @@ async function render(markY){
   const b=document.createElement('button');b.className='plus';b.textContent='+';b.title='Отправить эту задачу на доску';
   b.style.cssText='top:'+fy0*100+'%;left:1%';
   b.onmouseenter=()=>c.classList.add('hot');b.onmouseleave=()=>c.classList.remove('hot');
-  b.onclick=()=>send(fx0-.005,fy0,fx1+.005,fy1,b);
+  b.onclick=async()=>{await send(fx0-.005,fy0,fx1+.005,fy1,b);autoAnalog(fy0,fy1)};
   ov.append(c,b);
   if(window.hwDraft){const z=document.createElement('button');z.className='plus hwplus';z.textContent='+ ДЗ';z.title='Добавить эту задачу в домашку';z.style.cssText='top:calc('+fy0*100+'% + 34px);left:1%';
    z.onclick=async()=>{z.textContent='…';try{const [src,info]=await Promise.all([crop(fx0-.005,fy0,fx1+.005,fy1),cardInfo(fy0,fy1).catch(()=>null)]);window.hwAdd(src,info);z.textContent='✓'}catch(e){z.textContent='+ ДЗ'}};ov.append(z)}
@@ -388,11 +389,11 @@ async function render(markY){
  if(markY!=null){const y=vp.convertToViewportPoint(0,markY)[1],m=document.createElement('div');m.className='mk';m.style.top=y+'px';ov.appendChild(m);sc.scrollTop=Math.max(0,y-70);setTimeout(()=>m.remove(),5000)}
  else sc.scrollTop=0;
 }
-async function crop(fx0,fy0,fx1,fy1){
- const page=await pdf.getPage(pageNo),base=page.getViewport({scale:1});
+async function crop(fx0,fy0,fx1,fy1,pn){
+ const page=await pdf.getPage(pn||pageNo),base=page.getViewport({scale:1});
  const sc=Math.max(1,Math.min(4,1100/((fx1-fx0)*base.width))),vp=page.getViewport({scale:sc});
  const full=document.createElement('canvas');full.width=Math.round(vp.width);full.height=Math.round(vp.height);
- await page.render({canvasContext:full.getContext('2d'),viewport:vp}).promise;
+ await page.render({canvasContext:full.getContext('2d'),viewport:vp,intent:'print'}).promise; // «print» — рисуется и в фоновой вкладке
  const x=Math.round(fx0*full.width),y=Math.round(fy0*full.height),w=Math.round((fx1-fx0)*full.width),h=Math.round((fy1-fy0)*full.height);
  const o=document.createElement('canvas');o.width=w;o.height=h;const c=o.getContext('2d');
  c.fillStyle='#fff';c.fillRect(0,0,w,h);c.drawImage(full,x,y,w,h,0,0,w,h);
@@ -409,6 +410,58 @@ async function send(fx0,fy0,fx1,fy1,btn){
   if(btn){const o=btn.textContent;btn.textContent='✓';setTimeout(()=>{btn.textContent=o},1500)}
  }catch(e){msg('Не получилось: '+(e.message||e),4000)}
 }
+// ---------- аналог в домашку ----------
+// В сборниках MathStart у задачи-прототипа есть ссылка «Аналоги», у каждого аналога — «Прототип» и «Ответ».
+// Идём по этим ссылкам: так находим все аналоги задачи (одинаково для базы, профиля и ОГЭ, даже если текст в PDF не читается).
+const P2={};
+async function dpos(dest){if(typeof dest==='string'){try{dest=await pdf.getDestination(dest)}catch(e){return null}}if(!Array.isArray(dest))return null;let p;try{p=(await pdf.getPageIndex(dest[0]))+1}catch(e){return null}return{p,x:+dest[2]||0,y:typeof dest[3]==='number'?dest[3]:null}}
+async function hdrRows(p){ // шапки карточек на странице по ссылкам: левая — «Аналоги»/«Прототип», правая — «Ответ»
+ const an=(await (await pdf.getPage(p)).getAnnotations()).filter(a=>a.subtype==='Link'&&a.dest&&a.rect[1]>75&&a.rect[3]<770);
+ const rows=[];for(const a of an.sort((x,y)=>y.rect[1]-x.rect[1])){let r=rows.find(r=>Math.abs(r.y-a.rect[1])<6);if(!r){r={y:a.rect[1],top:a.rect[3],links:[]};rows.push(r)}r.links.push(a)}
+ return rows.map(r=>{r.links.sort((a,b)=>a.rect[0]-b.rect[0]);return{y:r.y,top:r.top,left:r.links.length>1?r.links[0].dest:null,right:r.links[r.links.length-1].dest}})}
+const near=(a,b)=>a&&b&&a.p===b.p&&(a.y==null||b.y==null||Math.abs(a.y-b.y)<40);
+async function analogsOf(p,me){
+ const meP={p,y:me.top},L=await dpos(me.left);if(!L)return null;let proto,start,self=null;
+ if(L.p>p){proto=meP;start=L} // прототипы в начале сборника, аналоги — дальше
+ else{const rL=(await hdrRows(L.p)).filter(r=>r.left).sort((a,b)=>Math.abs(a.top-(L.y??a.top))-Math.abs(b.top-(L.y??b.top)))[0];if(!rL)return null;
+  proto={p:L.p,y:rL.top};start=await dpos(rL.left);self=meP;if(!start)return null}
+ const ck=book+'|'+proto.p+':'+Math.round(proto.y);if(P2[ck])return Object.assign({},P2[ck],{self});
+ const list=[];let started=false;
+ for(let pg=start.p,g=0;g<30&&pg<=pdf.numPages;g++,pg++){let stop=false;
+  for(const r of (await hdrRows(pg)).sort((a,b)=>b.y-a.y)){if(!started&&pg===start.p&&start.y!=null&&r.top>start.y+15)continue;started=true;
+   const t=r.left&&await dpos(r.left);if(near(t,proto))list.push({p:pg,top:r.top,ans:r.right});else if(list.length){stop=true;break}}
+  if(stop)break}
+ return(P2[ck]={proto,list,ck,self})}
+async function ansAt(dest){const t=await dpos(dest);if(!t)return '';const tc=await (await pdf.getPage(t.p)).getTextContent();
+ const it=tc.items.filter(i=>i.str.trim()&&i.transform[4]>t.x+30&&i.transform[4]<t.x+160&&i.transform[5]<=t.y+2&&i.transform[5]>=t.y-20).sort((a,b)=>a.transform[4]-b.transform[4]);
+ const ys=it.map(i=>i.transform[5]),a=it.map(i=>i.str).join('').trim().replace(/\.$/,'').replace(/[↑−–]/g,'-').replace(/\s+/g,'');
+ return ys.length&&Math.max(...ys)-Math.min(...ys)<2.5&&/^-?\d+([.,]\d+)?$/.test(a)?a:''}
+async function cardAt(p,topY){ // карточка на странице p, у которой шапка на высоте topY → картинка
+ const page=await pdf.getPage(p),base=page.getViewport({scale:1}),dvp=page.getViewport({scale:500/base.width}),oc=document.createElement('canvas');
+ oc.width=Math.round(dvp.width);oc.height=Math.round(dvp.height);await page.render({canvasContext:oc.getContext('2d',{willReadFrequently:true}),viewport:dvp,intent:'print'}).promise;
+ const fy=1-topY/base.height,cs=detect(oc).map(([s,e])=>[Math.max(0,(s-2)/oc.height),Math.min(1,(e+2)/oc.height)]);
+ const c=cs.find(([a,b])=>fy>=a-.03&&fy<=b)||cs.sort((x,y)=>Math.abs(x[0]-fy)-Math.abs(y[0]-fy))[0];if(!c)return null;
+ return crop(.09,c[0],.91,c[1],p)}
+const usedKey=sid=>'anaUsed:'+book+':'+sid;
+async function autoAnalog(fy0,fy1){
+ if(!$('tanalc').checked||!pdf)return;const sid=window.hwCtx&&window.hwCtx.cur();if(!sid)return;
+ try{
+  const pg=await pdf.getPage(pageNo),H=pg.getViewport({scale:1}).height,top=H*(1-fy0),bot=H*(1-fy1);
+  const me=(await hdrRows(pageNo)).find(r=>r.y<=top+4&&r.y>=bot-4&&r.left);
+  if(!me){msg('Аналогов у этой задачи в сборнике нет — в домашку ничего не добавлено',4500);return}
+  const A=await analogsOf(pageNo,me);if(!A||!A.list.length){msg('Аналогов у этой задачи в сборнике нет — в домашку ничего не добавлено',4500);return}
+  let used=[];try{used=JSON.parse(localStorage.getItem(usedKey(sid))||'[]')}catch(e){}
+  const id=a=>a.p+':'+Math.round(a.top),notSelf=A.list.filter(a=>!(A.self&&a.p===A.self.p&&Math.abs(a.top-A.self.y)<6));
+  let pool=notSelf.filter(a=>!used.includes(id(a)));if(!pool.length)pool=notSelf;if(!pool.length){msg('Других аналогов у этой задачи нет',4000);return}
+  const a=pool[Math.floor(Math.random()*pool.length)];
+  const [src,info,ans]=await Promise.all([cardAt(a.p,a.top),cardInfo(fy0,fy1).catch(()=>null),ansAt(a.ans)]);if(!src)return;
+  const r=await window.hwAutoAdd(sid,src,{num:info&&info.num,ans:info&&info.ext?'':ans},A.ck+'#'+id(a));
+  if(r.dup){msg('Аналог этой задачи уже есть в домашке',3500);return}
+  used.push(id(a));try{localStorage.setItem(usedKey(sid),JSON.stringify(used.slice(-400)))}catch(e){}
+  msg('🪄 Аналог добавлен в черновик домашки ('+r.n+' зад.)'+(ans&&!(info&&info.ext)?'':' — без ответа, проверите сами'),5000);
+ }catch(e){msg('Аналог не добавился: '+(e.message||e),5000)}
+}
+$('tanalc').checked=localStorage.getItem('autoAna')!=='0';$('tanalc').onchange=()=>localStorage.setItem('autoAna',$('tanalc').checked?'1':'0');
 async function openBook(name){
  msg('Открываю сборник…');
  try{
@@ -636,9 +689,9 @@ window.hwAdd=async(src,info)=>{if(!draft)return;try{const r=await fit(src);info=
 let saveT=0,saving=Promise.resolve();
 function dirty(){clearTimeout(saveT);saveT=setTimeout(()=>saveDraft(),1200);mark('Сохраняю черновик…')}
 function mark(t){const m=document.querySelector('#hwtray .dst');if(m)m.textContent=t}
-function saveDraft(){clearTimeout(saveT);const d=draft;if(!d)return saving;
+function saveDraft(dd){clearTimeout(saveT);const d=dd||draft;if(!d)return saving;
  saving=saving.then(async()=>{const tk=d.tasks.slice();
-  const r=await api('/api/admin/hw',{method:'POST',body:JSON.stringify({t:'draft',s:d.sid,title:d.title,due:d.due,tasks:tk.map(k=>k.imgName?{imgName:k.imgName,w:k.w,h:k.h,text:k.text,num:k.num,ans:k.ans,auto:k.auto}:{img:k.src,w:k.w,h:k.h,text:k.text,num:k.num,ans:k.ans,auto:k.auto})})}).catch(()=>null);
+  const r=await api('/api/admin/hw',{method:'POST',body:JSON.stringify({t:'draft',s:d.sid,title:d.title,due:d.due,tasks:tk.map(k=>Object.assign(k.imgName?{imgName:k.imgName}:{img:k.src},{w:k.w,h:k.h,text:k.text,num:k.num,ans:k.ans,auto:k.auto,key:k.key||''}))})}).catch(()=>null);
   const j=r&&r.ok?await r.json().catch(()=>null):null;
   if(!j||j.error){if(draft===d)mark('⚠️ Черновик не сохранился — проверьте интернет');return}
   tk.forEach((k,i)=>{if(j.tasks[i]&&j.tasks[i].img)k.imgName=j.tasks[i].img});
@@ -646,9 +699,19 @@ function saveDraft(){clearTimeout(saveT);const d=draft;if(!d)return saving;
  return saving}
 async function loadDraft(sid){
  try{const r=await api('/api/admin/hw-draft?s='+sid);const j=r.ok?await r.json():null;if(!j||!j.tasks)return null;
-  return{sid,title:j.title||'',due:j.due||'',at:j.at,tasks:j.tasks.map(t=>({src:t.img?'/hwimg/'+sid+'/'+t.img:null,imgName:t.img||null,w:t.w,h:t.h,text:t.text||'',num:t.num||0,ans:t.ans||'',auto:!!t.auto}))}}catch(e){return null}
+  return{sid,title:j.title||'',due:j.due||'',at:j.at,tasks:j.tasks.map(t=>({src:t.img?'/hwimg/'+sid+'/'+t.img:null,imgName:t.img||null,w:t.w,h:t.h,text:t.text||'',num:t.num||0,ans:t.ans||'',auto:!!t.auto,key:t.key||''}))}}catch(e){return null}
 }
 window.hwDraftOf=loadDraft;
+// аналог задачи со сборника — сразу в черновик домашки ученика (полоса домашки при этом не открывается)
+let autoQ=Promise.resolve();
+window.hwAutoAdd=(sid,src,info,key)=>(autoQ=autoQ.then(()=>autoAdd(sid,src,info,key),()=>autoAdd(sid,src,info,key)));
+async function autoAdd(sid,src,info,key){
+ const r=await fit(src);const t=Object.assign(r,{text:'',num:info.num||0,ans:info.ans||'',auto:!!info.ans,key});
+ let d=draft&&draft.sid===sid?draft:null,mine=!!d;
+ if(!d)d=(await loadDraft(sid))||{sid,tasks:[],title:new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'}),due:''};
+ const pk=key.split('#')[0];if(d.tasks.some(k=>(k.key||'').split('#')[0]===pk))return{dup:true,n:d.tasks.length};
+ d.tasks.push(t);if(mine){tray(true);dirty()}else await saveDraft(d);
+ return{n:d.tasks.length}}
 window.hwAddFile=f=>{if(/heic|heif/i.test(f.type+' '+(f.name||''))){alert('Фото в формате HEIC браузер не открывает. Сделайте скриншот или сохраните как JPG.');return}
  const r=new FileReader();r.onload=()=>window.hwAdd(r.result);r.readAsDataURL(f)};
 async function startDraft(){
