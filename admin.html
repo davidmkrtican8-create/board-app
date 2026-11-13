@@ -946,7 +946,7 @@ $('tgs').onclick=async()=>{
   go.disabled=true;err.textContent='';go.textContent='Готовлю…';let p=null;
   if(pdf.checked){try{p=await askPdf()}catch(e){err.textContent='Не получилось сделать PDF доски';go.disabled=false;go.textContent='Отправить';return}}
   go.textContent='Отправляю…';
-  const j=await post({t:'send',s:sid,text:ta.value,pdf:p&&p.b64,fname:p&&p.fname});
+  const j=await post({t:'send',s:sid,text:ta.value,pdf:p&&p.b64,fname:p&&p.fname,page:p&&p.page});
   go.disabled=false;go.textContent='Отправить';if(j.error){err.textContent=j.error;return}
   d.close();alert('Конспект отправлен ('+j.sent+')')}});
  d.b.append(el('p',{className:'mut',textContent:'Получат: '+who}),ta,el('label',{style:'display:flex;gap:8px;align-items:center'},pdf,el('span',{textContent:'Приложить открытую доску (PDF)'})),err,

@@ -494,7 +494,7 @@ function snapPost(req, res, sid) {
     fs.mkdirSync(path.join(SND, sid), { recursive: true });
     fs.writeFileSync(path.join(SND, sid, pg + '.pdf'), buf);
     const m = (SN[sid] = SN[sid] || {}), old = m[pg] || {};
-    m[pg] = { t: Date.now(), day: mskDay(), title: String(j.title || 'Доска').slice(0, 80), sent: old.day === mskDay() ? old.sent || 0 : 0 };
+    m[pg] = { t: Date.now(), day: mskDay(), title: String(j.title || 'Доска').slice(0, 80), sent: old.day === mskDay() ? old.sent || 0 : 0, manual: old.day === mskDay() ? old.manual : undefined };
     saveSN(); res.writeHead(204); res.end();
   });
 }
@@ -509,8 +509,9 @@ async function snapSend() {
     for (const sid of Object.keys(SN)) {
       const s = index.students.find(x => x.id === sid), m = SN[sid];
       if (!s) { delete SN[sid]; fs.rm(path.join(SND, sid), { recursive: true, force: true }, () => {}); continue; }
-      const due = Object.keys(m).filter(pg => !(m[pg].sent >= m[pg].t));
-      for (const pg of Object.keys(m)) if (m[pg].day !== today && m[pg].sent >= m[pg].t) { delete m[pg]; fs.unlink(path.join(SND, sid, pg + '.pdf'), () => {}); } // вчерашнее отправленное — убираем
+      const done = e => e.sent >= e.t || e.manual === e.day; // уже отправлено (в том числе вручную кнопкой «📨 Конспект»)
+      const due = Object.keys(m).filter(pg => !done(m[pg]));
+      for (const pg of Object.keys(m)) if (m[pg].day !== today && done(m[pg])) { delete m[pg]; fs.unlink(path.join(SND, sid, pg + '.pdf'), () => {}); } // вчерашнее отправленное — убираем
       if (!due.length) { if (!Object.keys(m).length) delete SN[sid]; continue; }
       const last = Math.max(...due.map(pg => m[pg].t)), old = due.some(pg => m[pg].day !== today);
       if (Date.now() - last < 30 * 60e3 || (hr < 21 && !old)) continue;
@@ -567,6 +568,10 @@ async function tgPost(req, res, j, me, isOwner, own) {
           if (text) { const r = await tgRetry(() => tgCall('sendMessage', { chat_id: x.chat, text, disable_web_page_preview: true }, 12000)); if (!r) { tgSay(x.chat, text); } }
           if (pdf) { const r = await tgRetry(() => tgDoc(x.chat, pdf, fname, '')); if (r && r.ok) n++; } else n++;
         } catch (e) {}
+      }
+      if (n && pdf && ID.test(String(j.page || ''))) { // эту доску уже отправили вручную — вечером повторно не шлём
+        const m = (SN[s.id] = SN[s.id] || {}), pg = String(j.page), today = mskDay();
+        m[pg] = Object.assign(m[pg] && m[pg].day === today ? m[pg] : { t: 0, day: today, title: 'Доска', sent: 0 }, { manual: today }); saveSN();
       }
       return json(res, n ? { sent: n } : { error: 'Не получилось отправить. Попробуйте ещё раз.' });
     }

@@ -31,19 +31,42 @@ button{cursor:pointer}
 button.pri{background:var(--ac);color:#fff;border-color:var(--ac)}
 #main{flex:1;min-width:0;display:flex;flex-direction:column;padding:10px;gap:8px;position:relative}
 #bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-#more{display:none}
 /* планшет (iPad): крупные кнопки под палец, редкие — под «⋯», у кнопок только значки */
-body.compact #more{display:inline-block}
-body.compact #bar .opt{display:none;order:10}body.compact #title{max-width:220px}body.compact.moreopen #bar .opt{display:revert}body.compact.moreopen #more{background:color-mix(in srgb,var(--ac) 16%,transparent);border-color:var(--ac)}
+body.compact #title{max-width:160px}
 body.compact .lbl{display:none}
 body.compact #bar{gap:5px}
-body.compact #bar>button,body.compact #bar>select{min-height:42px;min-width:42px;padding:6px 8px;font-size:17px}
-body.compact .tb.pe{width:52px}
-body.compact #undo,body.compact #redo{font-size:22px;min-width:46px}
-body.compact .sw{width:32px;height:32px}
-body.compact #wd{width:64px}body.compact #wdv{display:none}
 body.compact #main{padding:6px;gap:6px}
 #title{flex:1;min-width:120px;font-weight:600}
+/* панель: один ряд значков, подписи и клавиши — во всплывающей подсказке */
+#bar{gap:6px 6px;flex-wrap:wrap;align-items:center}
+#bar #title{flex:0 1 220px;min-width:90px;border-color:transparent;background:transparent;padding:6px 6px;font-size:15px}#bar #title:hover,#bar #title:focus{border-color:var(--bd);background:var(--panel)}
+#bar .tg,#bar .rg{display:flex;align-items:center;gap:2px;background:var(--panel);border:1px solid var(--bd);border-radius:14px;padding:4px;box-shadow:0 2px 10px rgba(60,40,140,.06);flex-wrap:wrap}
+#bar .rg{order:1;margin-left:auto}#bar .br{order:2;flex-basis:100%;height:0}#bar .tg{order:3;margin:0 auto}#bar .rg{border-color:transparent;background:transparent;box-shadow:none;padding:0;gap:6px}
+#bar .ib,#bar .chev{width:36px;height:36px;padding:0;border:0;background:transparent;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;color:var(--tx);position:relative}
+#bar .chev{width:16px;margin-left:-3px;color:var(--mut)}#bar .chev svg{width:14px;height:14px}
+#bar .ib:hover,#bar .chev:hover{background:color-mix(in srgb,var(--ac) 9%,transparent)}
+#bar .ib svg{width:21px;height:21px;stroke-width:1.8}
+#bar .tb.on,#bar .ib.on{background:var(--ac);color:#fff;border:0}
+#bar [hidden]{display:none!important}
+/* полный экран: одна строка — инструменты по центру, звонок справа (название доски прячем) */
+body.cabside #bar #title,body.cabside #bar #st,body.focus #bar #title,body.focus #bar #st,body.cabside #bar .br,body.focus #bar .br{display:none!important}
+body.cabside #bar .rg,body.focus #bar .rg{order:4;margin-left:0}body.cabside #bar .tg,body.focus #bar .tg{margin:0 auto}
+#bar .sep{width:1px;height:22px;background:var(--bd);margin:0 5px}
+#bar .rg .ib{background:var(--panel);border:1px solid var(--bd)}
+#thl .hm{position:absolute;left:9px;right:9px;bottom:6px;height:3px;border-radius:2px}
+#tlaser svg{color:#e53935}#tlaser.on svg{color:#fff}
+#callb{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:10px;background:#2e7d32;border-color:#2e7d32;color:#fff;font-weight:600}#callb svg{width:18px;height:18px}
+#bar .sw{width:20px;height:20px;margin:0 2px;border-width:2px}#bar .sw.pal{font-size:12px}
+#wdw #wd{width:60px}#wdw #wdv{display:none}
+#more.on{background:color-mix(in srgb,var(--ac) 16%,transparent)}
+#mmenu{position:absolute;z-index:11;background:var(--panel);border:1px solid var(--bd);border-radius:12px;box-shadow:0 10px 30px rgba(40,30,90,.18);padding:6px;width:270px;font-size:14px}
+#mmenu[hidden]{display:none}#mmenu hr{border:0;border-top:1px solid var(--bd);margin:5px 4px}
+#mmenu .mi,#mmenu .mz{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer}#mmenu .mi:hover{background:color-mix(in srgb,var(--ac) 9%,transparent)}
+#mmenu .mz{cursor:default}#mmenu small{margin-left:auto;color:var(--mut)}#mmenu .zz{margin-left:auto;display:flex;gap:4px}#mmenu .zz button{width:32px;height:30px;padding:0}
+#mmenu .mic{display:inline-flex;color:var(--mut)}#mmenu .mic svg{width:18px;height:18px}#mmenu .red{color:#d32f2f}#mmenu .red .mic{color:#d32f2f}
+#tip{position:absolute;z-index:20;pointer-events:none;background:#201c2b;color:#fff;font-size:12px;padding:5px 9px;border-radius:7px;white-space:nowrap;max-width:320px;overflow:hidden;text-overflow:ellipsis}
+#tip kbd{background:rgba(255,255,255,.18);border-radius:4px;padding:0 5px;margin-left:6px;font:inherit}#tip[hidden]{display:none}
+body.compact #bar .ib{width:42px;height:42px}body.compact #bar .chev{height:42px;width:18px}body.compact #bar .sw{width:26px;height:26px}body.compact #callb{height:42px}
 .sw{width:26px;height:26px;border-radius:50%;padding:0;border:2px solid var(--bd)}.sw.on{outline:2px solid var(--ac)}
 #wrap{flex:1;min-height:0;position:relative;overflow:hidden;border:1px solid var(--bd);border-radius:10px;background:var(--sur)}
 canvas{display:block;width:100%;height:100%;touch-action:none}
@@ -68,7 +91,7 @@ body.focus #main{padding:4px;gap:4px}
 .mr{display:flex;gap:8px;justify-content:flex-end}
 .af{display:grid;grid-template-columns:1fr 1fr;gap:8px}.af label{display:flex;flex-direction:column;gap:3px;font-size:13px}.af label.c{flex-direction:row;align-items:center}.af input[type=number]{width:100%}
 .tb.on{background:color-mix(in srgb,var(--ac) 16%,var(--panel));border-color:var(--ac)}
-.tb.pe{width:112px;white-space:nowrap;font-weight:600;border-radius:8px 0 0 8px;margin-right:-6px}.tb.pe.er{background:var(--ac);color:#fff;border-color:var(--ac)}
+
 #ersb{border-radius:0 8px 8px 0;padding:6px 7px;align-self:stretch}
 #ersp[hidden],#hlp[hidden],#palp[hidden]{display:none}
 #palp{position:absolute;z-index:10;background:var(--panel);border:1px solid var(--bd);border-radius:12px;padding:10px;box-shadow:0 6px 24px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:8px}
@@ -133,29 +156,51 @@ body.focus #main{padding:4px;gap:4px}
 <div id="side"><div id="who"></div><div id="pl"></div><button id="add">+ Доска</button><button id="cp">Копировать ссылку</button><button id="hwb" hidden>🎓 Личный кабинет<span class="hwn" hidden></span></button></div>
 <div id="main">
  <div id="bar">
-  <button id="hp" title="Скрыть или показать список досок">◧</button>
+  <button id="hp" class="ib" title="Список досок">◧</button>
   <input id="title" class="opt" placeholder="Название доски">
-  <button id="pe" class="keep tb pe" title="Переключить перо ⇄ ластик (E — ластик, P — перо)"></button>
-  <button id="ersb" class="keep tb" title="Какой ластик: размер или «стирает объект целиком»">▾</button>
-  <button id="thl" class="keep tb" title="Маркер: выделить или подчеркнуть (клавиша H). Ровная полоса — если вести прямо">🖍&nbsp;Маркер&nbsp;▾</button>
-  <button id="ttext" class="keep tb" title="Печатать текст">T<span class="lbl">&nbsp;Текст</span></button>
-  <button id="tshape" class="keep tb" title="Линии, фигуры, объёмные тела, координатная плоскость">△&nbsp;Фигуры&nbsp;▾</button>
-  <button id="tmv" class="tb" title="Обычная стрелка: двигать фигуры, текст и картинки (клавиша V)">⤧<span class="lbl">&nbsp;Двигать</span></button>
-  <button id="thand" class="tb" title="Двигать доску (или пробел + мышь)">✋<span class="lbl">&nbsp;Рука</span></button>
-  <button id="tlaser" class="keep tb" title="Указка: красный след исчезает через секунду (клавиша L)">🔴<span class="lbl">&nbsp;Указка</span></button>
-  <button id="leadb" class="keep tb" hidden title="Ученик будет видеть то же место доски, что и вы">👁<span class="lbl">&nbsp;За&nbsp;мной</span></button>
-  <span id="cols" class="keep"></span>
-  <span id="wdw" class="keep" title="Толщина пера"><input type="range" id="wd" min="1" max="10" step="1"><span id="wdv"></span></span>
-  <button id="undo" class="keep" title="Отменить (Ctrl+Z)">↶</button><button id="redo" class="keep" title="Вернуть (Ctrl+Shift+Z)">↷</button>
-  <button id="callb" class="keep tb" title="Голосовой звонок прямо на доске">📞<span class="lbl">&nbsp;Звонок</span></button><button id="micb" class="keep tb" hidden title="Микрофон вкл/выкл">🎤</button><button id="camb" class="keep tb" hidden title="Камера вкл/выкл">📷</button>
-  <button id="more" class="keep" title="Ещё: масштаб, файл, настройки, весь экран">⋯</button>
-  <button id="zo" class="opt" title="Уменьшить">−</button><button id="zi" class="opt" title="Увеличить">+</button><button id="fit" class="opt">По ширине</button>
-  <select id="fm" class="opt"><option value="">Файл…</option><option value="img">Вставить картинку…</option><option value="pdf1">Скачать PDF: эта доска</option><option value="pdfa">Скачать PDF: все доски</option><option value="clr">Очистить доску…</option><option value="delp">Удалить эту доску…</option></select>
-  <button id="gear" class="opt" title="Настройки">⚙</button>
-  <button id="fs2" class="keep opt" title="Фокус: убрать панели">⛶</button><button id="hwt" class="keep" hidden title="Личный кабинет: домашка, прогресс, все доски">🎓<span class="lbl"> Личный кабинет</span><span class="hwn" hidden></span></button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button>
-  <span id="st" class="opt">Подключение…</span>
+  <span id="st">Подключение…</span>
+  <i class="br keep"></i>
+  <span class="tg keep">
+   <button id="tpen" class="keep tb ib" title="Перо (P)"></button>
+   <button id="pe" class="keep tb ib" title="Ластик (E)"></button><button id="ersb" class="keep tb chev" title="Размер ластика или «стирает объект целиком»"></button>
+   <button id="thl" class="keep tb ib" title="Маркер (H): выделить или подчеркнуть"></button>
+   <button id="ttext" class="keep tb ib" title="Текст"></button>
+   <button id="tshape" class="keep tb ib" title="Фигуры, 3D-тела, графики"></button>
+   <i class="sep"></i>
+   <button id="tmv" class="tb ib" title="Стрелка: двигать фигуры, текст и картинки (V)"></button>
+   <button id="thand" class="tb ib" title="Рука: двигать лист (или пробел + мышь)"></button>
+   <button id="tlaser" class="keep tb ib" title="Указка: след исчезает через секунду (L)"></button>
+   <button id="leadb" class="keep tb ib" hidden title="«За мной»: ученик видит то же место доски, что и вы"></button>
+   <i class="sep"></i>
+   <span id="cols" class="keep"></span>
+   <span id="wdw" class="keep" title="Толщина пера"><input type="range" id="wd" min="1" max="10" step="1"><span id="wdv"></span></span>
+   <i class="sep"></i>
+   <button id="undo" class="keep ib" title="Отменить (⌘Z)"></button><button id="redo" class="keep ib" title="Вернуть (⌘⇧Z)"></button>
+   <button id="more" class="keep ib" title="Ещё: картинка, PDF, масштаб, настройки"></button>
+  </span>
+  <span class="rg keep">
+   <button id="hwt" class="keep" hidden title="Личный кабинет: домашка, прогресс, все доски">🎓<span class="lbl"> Кабинет</span><span class="hwn" hidden></span></button>
+   <button id="micb" class="keep tb ib" hidden title="Микрофон вкл/выкл"></button><button id="camb" class="keep tb ib" hidden title="Камера вкл/выкл"></button>
+   <button id="callb" class="keep" title="Звонок прямо на доске"></button>
+   <button id="fsb" class="keep ib" title="Во весь экран (Esc — выйти)"></button>
+  </span>
   <input type="file" id="fi" accept="image/*" hidden>
  </div>
+ <div id="mmenu" hidden>
+  <div class="mi" data-fm="img"><span class="mic" data-i="photo-plus"></span>Вставить картинку<small>⌘V</small></div>
+  <div class="mi" data-fm="pdf1"><span class="mic" data-i="file-type-pdf"></span>Скачать PDF этой доски</div>
+  <div class="mi" data-fm="pdfa"><span class="mic" data-i="files"></span>Скачать PDF всех досок</div>
+  <hr>
+  <div class="mz"><span class="mic" data-i="zoom-in"></span>Масштаб<span class="zz"><button id="zo" title="Уменьшить">−</button><button id="zi" title="Увеличить">+</button></span></div>
+  <div class="mi" data-click="fit"><span class="mic" data-i="arrows-horizontal"></span>По ширине<button id="fit" hidden>По ширине</button></div>
+  <div class="mi" data-click="fs2"><span class="mic" data-i="layout-off"></span>Убрать лишние панели<button id="fs2" hidden title="Фокус: убрать панели">⛶</button></div>
+  <div class="mi" data-click="gear"><span class="mic" data-i="settings"></span>Настройки<button id="gear" hidden title="Настройки">⚙</button></div>
+  <hr class="tonly">
+  <div class="mi red" data-fm="clr"><span class="mic" data-i="eraser-off"></span>Очистить доску…</div>
+  <div class="mi red" data-fm="delp"><span class="mic" data-i="trash"></span>Удалить эту доску…</div>
+  <select id="fm" hidden><option value="">Файл…</option><option value="img">Вставить картинку…</option><option value="pdf1">Скачать PDF: эта доска</option><option value="pdfa">Скачать PDF: все доски</option><option value="clr">Очистить доску…</option><option value="delp">Удалить эту доску…</option></select>
+ </div>
+ <div id="tip" hidden></div>
  <div id="shp" hidden></div>
  <div id="ersp" hidden></div>
  <div id="hlp" hidden></div>
@@ -1146,7 +1191,7 @@ window.addEventListener('message',e=>{
  if(d.t==='side'){document.body.classList.toggle('cabside',!!d.hide);document.body.classList.remove('sideon');setTimeout(resize,30);return} // кабинет в режиме ⛶ / ⤢ прячет и список досок
  if(d.t==='snapnow'){snapAll(true).finally(()=>e.source.postMessage({t:'snapdone'},location.origin));return}
  if(d.t==='pdfreq'){buildPDF(false).then(async r=>{const b=new Uint8Array(await r.blob.arrayBuffer());let s='';for(let i=0;i<b.length;i+=32768)s+=String.fromCharCode.apply(null,b.subarray(i,i+32768));
-  e.source.postMessage({t:'pdfres',b64:btoa(s),fname:r.fname,title:r.title},location.origin)}).catch(()=>e.source.postMessage({t:'pdfres',err:1},location.origin));return} // конспект в Telegram из кабинета
+  e.source.postMessage({t:'pdfres',b64:btoa(s),fname:r.fname,title:r.title,page:page},location.origin)}).catch(()=>e.source.postMessage({t:'pdfres',err:1},location.origin));return} // конспект в Telegram из кабинета
  if(d.t==='pasteimg'&&typeof d.src==='string'&&/^data:image\//.test(d.src)){addImageSrc(d.src,!!d.heic);return} // ⌘V, нажатый в кабинете
  if(d.t!=='task'||typeof d.src!=='string'||!/^data:image\/(png|jpeg);base64,/.test(d.src))return;
  if(imgFull())return;
@@ -1318,7 +1363,7 @@ const sig=(to,kind,data)=>send({t:'rtc',kind:kind,to:to,data:data});
 function callUI(){
  const b=$('callb'),n=call.others.size;
  b.classList.toggle('on',call.on);b.classList.toggle('ring',!call.on&&n>0);
- b.innerHTML=call.on?'⏹<span class="lbl">&nbsp;Завершить</span>':n?'📞<span class="lbl">&nbsp;Присоединиться</span>':'📞<span class="lbl">&nbsp;Звонок</span>';
+ b.innerHTML=ic(call.on?'phone-off':'phone')+'<span class="lbl">'+(call.on?'Завершить':n?'Присоединиться':'Звонок')+'</span>';$('micb').innerHTML=ic(call.mic?'microphone':'microphone-off');$('camb').innerHTML=ic(call.cam?'video':'video-off');
  b.title=call.on?'Завершить звонок':n?([...call.others.values()].join(', ')+' на звонке — нажмите, чтобы присоединиться'):'Голосовой звонок прямо на доске';
  $('micb').hidden=$('camb').hidden=!call.on;$('micb').classList.toggle('off',!call.mic);$('camb').classList.toggle('off',!call.cam);
  $('callbox').hidden=!call.on;
@@ -1796,6 +1841,13 @@ $('sreset').onclick=()=>{const sk=(strokes[page]||{})[editStroke];if(sk&&sk.k===
 $('add').onclick=()=>{const id='p'+newId(),d=new Date().toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'});let t=d,n=2;while(pages.some(p=>p.title===t))t=d+' ('+(n++)+')';send({t:'addPage',id:id,title:t});openPage(id)};
 $('title').onchange=()=>send({t:'title',id:page,title:$('title').value.trim()||'Без названия'});
 // ---------- панель инструментов ----------
+// значки (Tabler Icons, MIT) — встроены, чтобы не зависеть от внешних сайтов
+const ICP={"arrow-back-up":"<path d=\"M9 14l-4 -4l4 -4\" /><path d=\"M5 10h11a4 4 0 1 1 0 8h-1\" />","arrow-forward-up":"<path d=\"M15 14l4 -4l-4 -4\" /><path d=\"M19 10h-11a4 4 0 1 0 0 8h1\" />","arrows-horizontal":"<path d=\"M7 8l-4 4l4 4\" /><path d=\"M17 8l4 4l-4 4\" /><path d=\"M3 12l18 0\" />","chevron-down":"<path d=\"M6 9l6 6l6 -6\" />","dots":"<path d=\"M5 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0\" /><path d=\"M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0\" /><path d=\"M19 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0\" />","eraser-off":"<path d=\"M3 3l18 18\" /><path d=\"M19 20h-10.5l-4.21 -4.3a1 1 0 0 1 0 -1.41l5 -4.993m2.009 -2.01l3 -3a1 1 0 0 1 1.41 0l5 5a1 1 0 0 1 0 1.41c-1.417 1.431 -2.406 2.432 -2.97 3m-2.02 2.043l-4.211 4.256\" /><path d=\"M18 13.3l-6.3 -6.3\" />","eraser":"<path d=\"M19 20h-10.5l-4.21 -4.3a1 1 0 0 1 0 -1.41l10 -10a1 1 0 0 1 1.41 0l5 5a1 1 0 0 1 0 1.41l-9.2 9.3\" /><path d=\"M18 13.3l-6.3 -6.3\" />","eye":"<path d=\"M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0\" /><path d=\"M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6\" />","file-type-pdf":"<path d=\"M14 3v4a1 1 0 0 0 1 1h4\" /><path d=\"M5 12v-7a2 2 0 0 1 2 -2h7l5 5v4\" /><path d=\"M5 18h1.5a1.5 1.5 0 0 0 0 -3h-1.5v6\" /><path d=\"M17 18h2\" /><path d=\"M20 15h-3v6\" /><path d=\"M11 15v6h1a2 2 0 0 0 2 -2v-2a2 2 0 0 0 -2 -2h-1z\" />","files":"<path d=\"M15 3v4a1 1 0 0 0 1 1h4\" /><path d=\"M18 17h-7a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h4l5 5v7a2 2 0 0 1 -2 2z\" /><path d=\"M16 17v2a2 2 0 0 1 -2 2h-7a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h2\" />","focus-2":"<circle cx=\"12\" cy=\"12\" r=\".5\" fill=\"currentColor\" /><path d=\"M12 12m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0\" /><path d=\"M12 3l0 2\" /><path d=\"M3 12l2 0\" /><path d=\"M12 19l0 2\" /><path d=\"M19 12l2 0\" />","hand-stop":"<path d=\"M8 13v-7.5a1.5 1.5 0 0 1 3 0v6.5\" /><path d=\"M11 5.5v-2a1.5 1.5 0 1 1 3 0v8.5\" /><path d=\"M14 5.5a1.5 1.5 0 0 1 3 0v6.5\" /><path d=\"M17 7.5a1.5 1.5 0 0 1 3 0v8.5a6 6 0 0 1 -6 6h-2h.208a6 6 0 0 1 -5.012 -2.7a69.74 69.74 0 0 1 -.196 -.3c-.312 -.479 -1.407 -2.388 -3.286 -5.728a1.5 1.5 0 0 1 .536 -2.022a1.867 1.867 0 0 1 2.28 .28l1.47 1.47\" />","highlight":"<path d=\"M3 19h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4\" /><path d=\"M12.5 5.5l4 4\" /><path d=\"M4.5 13.5l4 4\" /><path d=\"M21 15v4h-8l4 -4z\" />","layout-off":"<path d=\"M8 4a2 2 0 0 1 2 2m-1.162 2.816a1.993 1.993 0 0 1 -.838 .184h-2a2 2 0 0 1 -2 -2v-1c0 -.549 .221 -1.046 .58 -1.407\" /><path d=\"M4 13m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z\" /><path d=\"M14 10v-4a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v10m-.595 3.423a2 2 0 0 1 -1.405 .577h-2a2 2 0 0 1 -2 -2v-4\" /><path d=\"M3 3l18 18\" />","layout-sidebar":"<path d=\"M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z\" /><path d=\"M9 4l0 16\" />","maximize":"<path d=\"M4 8v-2a2 2 0 0 1 2 -2h2\" /><path d=\"M4 16v2a2 2 0 0 0 2 2h2\" /><path d=\"M16 4h2a2 2 0 0 1 2 2v2\" /><path d=\"M16 20h2a2 2 0 0 0 2 -2v-2\" />","microphone-off":"<path d=\"M3 3l18 18\" /><path d=\"M9 5a3 3 0 0 1 6 0v5a3 3 0 0 1 -.13 .874m-2 2a3 3 0 0 1 -3.87 -2.872v-1\" /><path d=\"M5 10a7 7 0 0 0 10.846 5.85m2 -2a6.967 6.967 0 0 0 1.152 -3.85\" /><path d=\"M8 21l8 0\" /><path d=\"M12 17l0 4\" />","microphone":"<path d=\"M9 2m0 3a3 3 0 0 1 3 -3h0a3 3 0 0 1 3 3v5a3 3 0 0 1 -3 3h0a3 3 0 0 1 -3 -3z\" /><path d=\"M5 10a7 7 0 0 0 14 0\" /><path d=\"M8 21l8 0\" /><path d=\"M12 17l0 4\" />","minimize":"<path d=\"M15 19v-2a2 2 0 0 1 2 -2h2\" /><path d=\"M15 5v2a2 2 0 0 0 2 2h2\" /><path d=\"M5 15h2a2 2 0 0 1 2 2v2\" /><path d=\"M5 9h2a2 2 0 0 0 2 -2v-2\" />","palette":"<path d=\"M12 21a9 9 0 0 1 0 -18c4.97 0 9 3.582 9 8c0 1.06 -.474 2.078 -1.318 2.828c-.844 .75 -1.989 1.172 -3.182 1.172h-2.5a2 2 0 0 0 -1 3.75a1.3 1.3 0 0 1 -1 2.25\" /><path d=\"M8.5 10.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0\" /><path d=\"M12.5 7.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0\" /><path d=\"M16.5 10.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0\" />","pencil":"<path d=\"M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4\" /><path d=\"M13.5 6.5l4 4\" />","phone-off":"<path d=\"M3 21l18 -18\" /><path d=\"M5.831 14.161a15.946 15.946 0 0 1 -2.831 -8.161a2 2 0 0 1 2 -2h4l2 5l-2.5 1.5c.108 .22 .223 .435 .345 .645m1.751 2.277c.843 .84 1.822 1.544 2.904 2.078l1.5 -2.5l5 2v4a2 2 0 0 1 -2 2a15.963 15.963 0 0 1 -10.344 -4.657\" />","phone":"<path d=\"M5 4h4l2 5l-2.5 1.5a11 11 0 0 0 5 5l1.5 -2.5l5 2v4a2 2 0 0 1 -2 2a16 16 0 0 1 -15 -15a2 2 0 0 1 2 -2\" />","photo-plus":"<path d=\"M15 8h.01\" /><path d=\"M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5\" /><path d=\"M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4\" /><path d=\"M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54\" /><path d=\"M16 19h6\" /><path d=\"M19 16v6\" />","point":"<path d=\"M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0\" />","pointer":"<path d=\"M7.904 17.563a1.2 1.2 0 0 0 2.228 .308l2.09 -3.093l4.907 4.907a1.067 1.067 0 0 0 1.509 0l1.047 -1.047a1.067 1.067 0 0 0 0 -1.509l-4.907 -4.907l3.113 -2.09a1.2 1.2 0 0 0 -.309 -2.228l-13.582 -3.904l3.904 13.563z\" />","school":"<path d=\"M22 9l-10 -4l-10 4l10 4l10 -4v6\" /><path d=\"M6 10.6v5.4a6 3 0 0 0 12 0v-5.4\" />","settings":"<path d=\"M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z\" /><path d=\"M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0\" />","trash":"<path d=\"M4 7l16 0\" /><path d=\"M10 11l0 6\" /><path d=\"M14 11l0 6\" /><path d=\"M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12\" /><path d=\"M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3\" />","triangle-square-circle":"<path d=\"M12 3l-4 7h8z\" /><path d=\"M17 17m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0\" /><path d=\"M4 14m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z\" />","typography":"<path d=\"M4 20l3 0\" /><path d=\"M14 20l7 0\" /><path d=\"M6.9 15l6.9 0\" /><path d=\"M10.2 6.3l5.8 13.7\" /><path d=\"M5 20l6 -16l2 0l7 16\" />","video-off":"<path d=\"M3 3l18 18\" /><path d=\"M15 11v-1l4.553 -2.276a1 1 0 0 1 1.447 .894v6.764a1 1 0 0 1 -.675 .946\" /><path d=\"M10 6h3a2 2 0 0 1 2 2v3m0 4v1a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-8a2 2 0 0 1 2 -2h1\" />","video":"<path d=\"M15 10l4.553 -2.276a1 1 0 0 1 1.447 .894v6.764a1 1 0 0 1 -1.447 .894l-4.553 -2.276v-4z\" /><path d=\"M3 6m0 2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z\" />","zoom-in":"<path d=\"M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0\" /><path d=\"M7 10l6 0\" /><path d=\"M10 7l0 6\" /><path d=\"M21 21l-6 -6\" />","zoom-out":"<path d=\"M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0\" /><path d=\"M7 10l6 0\" /><path d=\"M21 21l-6 -6\" />"};
+ICP.laser='<circle cx="12" cy="12" r="4.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="8.5" stroke-opacity=".45"/>';
+const ic=n=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICP[n]||'')+'</svg>';
+[['hp','layout-sidebar'],['tpen','pencil'],['pe','eraser'],['ersb','chevron-down'],['ttext','typography'],['tshape','triangle-square-circle'],['tmv','pointer'],['thand','hand-stop'],['tlaser','laser'],['leadb','eye'],['undo','arrow-back-up'],['redo','arrow-forward-up'],['more','dots'],['fsb','maximize'],['micb','microphone'],['camb','video']].forEach(([id,n])=>{$(id).innerHTML=ic(n)});
+document.querySelectorAll('#mmenu .mic').forEach(e=>{e.innerHTML=ic(e.dataset.i)});
+$('callb').innerHTML=ic('phone')+'<span class="lbl">Звонок</span>';
 function setTool(v){
  if(v==='axes'){insertAxes();return}
  if(v==='plot'){insertPlot();return}
@@ -1804,12 +1856,10 @@ function setTool(v){
 function togglePE(){setTool(tool()==='pen'?ersTool():'pen')} // перо ⇄ ластик одной кнопкой
 function updTools(){
  const t=tool(),er=isEr(t),pe=$('pe');
- const cmp=document.body.classList.contains('compact');
- pe.textContent=t==='pen'?(cmp?'🧽':'🧽 Ластик'):(cmp?'✏️':'✏️ Перо');pe.classList.toggle('er',er);
- pe.title=(t==='pen'?'Сейчас перо. Нажмите — ластик':er?'Сейчас ластик. Нажмите — перо':'Взять перо')+' (E — ластик, P — перо)';
- $('ttext').classList.toggle('on',t==='text');$('thl').classList.toggle('on',t==='hl');$('thl').innerHTML='<i style="background:'+hlC()+'"></i>'+(cmp?'▾':'Маркер&nbsp;▾');$('tmv').classList.toggle('on',t==='mv');$('tlaser').classList.toggle('on',t==='laser');$('thand').classList.toggle('on',t==='hand');
+ $('tpen').classList.toggle('on',t==='pen');pe.classList.toggle('on',er);
+ $('ttext').classList.toggle('on',t==='text');$('thl').classList.toggle('on',t==='hl');$('thl').innerHTML=ic('highlight')+'<i class="hm" style="background:'+hlC()+'"></i>';$('tmv').classList.toggle('on',t==='mv');$('tlaser').classList.toggle('on',t==='laser');$('thand').classList.toggle('on',t==='hand');
  const it=SHAPE_MENU.flatMap(g=>g[1]).find(x=>x[0]===t);
- $('tshape').classList.toggle('on',!!it);$('tshape').textContent=cmp?'△ ▾':(it?it[1].replace(/­/g,''):'△ Фигуры')+' ▾';
+ $('tshape').classList.toggle('on',!!it);$('tshape').title=it?'Фигура: '+it[1].replace(/­/g,''):'Фигуры, 3D-тела, графики';
  document.querySelectorAll('#shp .it').forEach(b=>b.classList.toggle('on',b.dataset.v===t));
 }
 const SHAPE_MENU=[
@@ -1842,6 +1892,7 @@ function buildShapeMenu(){
   m.appendChild(g)});
 }
 $('pe').onclick=()=>{if(!viewOnly)togglePE()};
+$('tpen').onclick=()=>{if(!viewOnly)setTool('pen')};
 // выбор ластика во всплывающем меню: панель не прыгает при переключении перо ⇄ ластик
 const ERS=[['12','Маленький',6],['25','Средний',10],['50','Большой',16],['90','Огромный',24],['obj','Стирает объект целиком',0]];
 $('ersb').onclick=()=>{const m=$('ersp');if(!m.hidden){m.hidden=true;return}
@@ -1966,7 +2017,27 @@ const coarse=window.matchMedia?matchMedia('(pointer:coarse)'):null;
 function applyCompact(){document.body.classList.toggle('compact',!!(coarse&&coarse.matches));updTools();setTimeout(resize,30)}
 if(coarse){applyCompact();if(coarse.addEventListener)coarse.addEventListener('change',applyCompact);
  if(coarse.matches&&localStorage.getItem('noside')===null)document.body.classList.add('noside')}
-$('more').onclick=()=>{document.body.classList.toggle('moreopen');setTimeout(resize,30)};
+// меню «⋯»: редкие действия; пункты «Файл…» берутся из списка #fm (ученик не видит «Очистить» и «Удалить»)
+function mmenuPos(){const m=$('mmenu'),b=$('more');m.style.top=(b.getBoundingClientRect().bottom-$('main').getBoundingClientRect().top+6)+'px';
+ m.style.left=Math.max(8,Math.min(b.getBoundingClientRect().left-$('main').getBoundingClientRect().left-m.offsetWidth+40,$('main').clientWidth-m.offsetWidth-8))+'px'}
+$('more').onclick=()=>{const m=$('mmenu');if(!m.hidden){m.hidden=true;$('more').classList.remove('on');return}
+ m.querySelectorAll('[data-fm]').forEach(e=>{e.hidden=!$('fm').querySelector('[value='+e.dataset.fm+']')});m.querySelector('hr.tonly').hidden=!$('fm').querySelector('[value=clr]');m.querySelector('[data-click=fs2]').hidden=isTeacher;
+ m.hidden=false;$('more').classList.add('on');mmenuPos()};
+$('mmenu').addEventListener('click',e=>{const it=e.target.closest('.mi');if(!it||e.target.closest('.zz'))return;
+ $('mmenu').hidden=true;$('more').classList.remove('on');
+ if(it.dataset.fm){$('fm').value=it.dataset.fm;$('fm').dispatchEvent(new Event('change'))}else if(it.dataset.click)$(it.dataset.click).click()});
+document.addEventListener('pointerdown',e=>{const m=$('mmenu');if(!m.hidden&&!m.contains(e.target)&&!$('more').contains(e.target)){m.hidden=true;$('more').classList.remove('on')}},true);
+// подсказка при наведении мышью: название и клавиша, без задержки
+(function(){const tip=$('tip');let cur=null;
+ const show=b=>{const t=b.dataset.tt||b.title;if(!t)return;b.dataset.tt=t;b.removeAttribute('title');
+  const m=t.match(/^(.*?)\s*\(([^()]*)\)\s*(.*)$/),k=m&&/^([A-Za-zА-Я⌘⇧]{1,4}|Esc.*)$/.test(m[2])?m[2]:'';
+  tip.innerHTML='';tip.append(k?(m[1]+(m[3]?' '+m[3]:'')):t);if(k){const kb=document.createElement('kbd');kb.textContent=k;tip.append(kb)}
+  tip.hidden=false;const r=b.getBoundingClientRect(),M=$('main').getBoundingClientRect();
+  tip.style.top=(r.bottom-M.top+6)+'px';tip.style.left=Math.max(4,Math.min(r.left-M.left+r.width/2-tip.offsetWidth/2,M.width-tip.offsetWidth-4))+'px'};
+ const hide=()=>{if(cur){if(cur.dataset.tt&&!cur.title)cur.title=cur.dataset.tt;delete cur.dataset.tt}cur=null;tip.hidden=true};
+ $('bar').addEventListener('pointerover',e=>{if(e.pointerType!=='mouse')return;const b=e.target.closest('button');if(b===cur)return;hide();if(b&&$('bar').contains(b)){cur=b;show(b)}});
+ $('bar').addEventListener('pointerleave',hide);$('bar').addEventListener('pointerdown',hide);
+})();
 $('fs2').onclick=()=>{document.body.classList.toggle('focus');setTimeout(resize,30)};
 if(isTeacher)$('fs2').hidden=true; // в кабинете преподавателя эта кнопка есть сверху
 // настоящий полный экран: панели браузера исчезают, вместе с ним включается «фокус»; выход — Esc или ещё раз ⤢
@@ -1975,7 +2046,7 @@ $('fsb').onclick=()=>{
  if(fsEl()){(document.exitFullscreen||document.webkitExitFullscreen).call(document);return}
  if(de.requestFullscreen)de.requestFullscreen().catch(()=>{});else de.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
 };
-const onFs=()=>{document.body.classList.toggle('focus',!!fsEl());$('fsb').textContent=fsEl()?'⤡':'⤢';setTimeout(resize,60)};
+const onFs=()=>{document.body.classList.toggle('focus',!!fsEl());$('fsb').innerHTML=ic(fsEl()?'minimize':'maximize');setTimeout(resize,60)};
 document.addEventListener('fullscreenchange',onFs);document.addEventListener('webkitfullscreenchange',onFs);
 if(isTeacher||!(de.requestFullscreen||de.webkitRequestFullscreen))$('fsb').hidden=true; // iPhone не умеет — там «На экран Домой»
 // приложение «на главный экран» (полноэкранный режим на телефоне)
