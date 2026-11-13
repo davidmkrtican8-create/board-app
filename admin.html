@@ -748,37 +748,64 @@ async function cropPdf(doc,p,yTop,yBot){ // область страницы по
 }
 // одна задача со страницы: метка «№N» (anchor) стоит не обязательно у самого верха задачи — текст и рисунок могут начинаться выше.
 // Поэтому границы ищем по пустой полосе между задачами: вверх от своей метки и вверх от метки следующей задачи.
-async function cropTask(doc,p,anchor,prev,next){
+async function cropTask(doc,p,anchor,prev,next,list){
  const P=await pagePix(doc,p),G=Math.round(7*P.sc);
- const gapAbove=(from,lim)=>{let run=0;for(let y=from;y>=lim;y--){if(P.blank(y)){if(++run>=G)return y+run}else run=0}return -1};
+ // ищем вверх от метки пустую полосу: сначала «нормальную» (≥7 pt), а если задачи стоят вплотную — самую широкую в пределах 45 pt
+ const gapAbove=(from,lim)=>{let run=0,best=-1,bestLen=0;const near=from-Math.round(45*P.sc);
+  for(let y=from;y>=lim;y--){if(P.blank(y)){run++;if(run>=G)return y+run;if(y>=near&&run>bestLen&&run>=2){bestLen=run;best=y+run}}else run=0}
+  return best};
  const aPx=P.px(anchor),lim=prev!=null?P.px(prev)+2:0;
  let y0=gapAbove(aPx,lim);if(y0<0)y0=Math.max(lim,aPx-Math.round(8*P.sc));
  let y1;if(next!=null){const nPx=P.px(next);const t=gapAbove(nPx,aPx+1);y1=t>0?t-1:nPx}else y1=P.px(30);
+ if(list){let run=0;const g=Math.round(5*P.sc);for(let y=aPx+Math.round(4*P.sc);y<y1;y++){if(P.blank(y)){if(++run>=g){y1=y-run+1;break}}else run=0}}
  while(y1>y0+20&&P.blank(y1-1))y1--;while(y0<y1-20&&P.blank(y0))y0++;
  const pad=Math.round(3*P.sc);return cut(P,Math.max(lim,y0-pad),Math.min(P.full.height,y1+pad));
+}
+// Разбор PDF: где начинается каждая задача и какие у неё ответы. Понимает три вида файлов:
+// 1) MathStart: метки task::N (самый точный); 2) надписи «№N.» в начале задачи; 3) обычный нумерованный список «1.», «2.» …
+// Ответы: страница «Ответы: №1. 25 №2. …», список «1) 25 2) 7» или таблица с колонками «№ | Ответ».
+async function analyzePdf(doc){
+ const n=doc.numPages,items={},H={};
+ for(let p=1;p<=n;p++){const pg=await doc.getPage(p);items[p]=(await pg.getTextContent()).items.filter(i=>i.str.trim());H[p]=pg.getViewport({scale:1}).height}
+ const X=i=>i.transform[4],Y=i=>i.transform[5];
+ // страницы с ответами: с той, где заголовок «Ответы», до конца (только во второй половине файла)
+ let ansFrom=0;for(let p=n;p>Math.max(1,n/2);p--)if(items[p].some(i=>/^\s*Ответы\s*:?\s*$/i.test(i.str)||/^\s*Ответы\s*:/i.test(i.str)))ansFrom=p;
+ const ans={};let ansAt=null; // ansAt — где начинается таблица ответов (задачи ищем только выше)
+ if(ansFrom){let txt='';for(let p=ansFrom;p<=n;p++)txt+=' '+items[p].filter(i=>Y(i)>45&&Y(i)<H[p]-45).map(i=>i.str).join(' '); // без колонтитулов (номер страницы)
+  txt=txt.replace(/^[\s\S]*?Ответы\s*:?/i,' ');
+  let m,re=/№\s*(\d+)\s*[.)]\s*([\s\S]+?)(?=\s№\s*\d+\s*[.)]|$)/g;while((m=re.exec(txt)))ans[+m[1]]=cleanAns(m[2]);
+  if(!Object.keys(ans).length){re=/(?:^|\s)(\d+)\s*[.)]\s*(-?\s*[\d\s]+(?:[.,]\s*\d+)?)/g;while((m=re.exec(txt)))ans[+m[1]]=cleanAns(m[2])}}
+ if(!Object.keys(ans).length){ // таблица «№ | Ответ | …»
+  for(let p=1;p<=n&&!ansAt;p++)for(const h of items[p]){if(!/^\s*Ответы?\s*$/i.test(h.str))continue;
+   const row=items[p].filter(i=>Math.abs(Y(i)-Y(h))<3),no=row.find(i=>/^\s*№\s*$/.test(i.str)&&X(i)<X(h));
+   if(no){const nextX=Math.min(...row.filter(i=>X(i)>X(h)+5).map(X),1e9);ansAt={p,y:Y(h)+2,numX:X(no),ansX:X(h),nextX};break}}
+  if(ansAt){const {numX,ansX,nextX}=ansAt;
+   for(let p=ansAt.p;p<=n;p++){const rows={};
+    items[p].forEach(i=>{if(p===ansAt.p&&Y(i)>=ansAt.y)return;const k=Math.round(Y(i)/3);(rows[k]=rows[k]||[]).push(i)});
+    for(const k in rows){const r=rows[k].sort((a,b)=>X(a)-X(b)),num=r.find(i=>X(i)>=numX-6&&X(i)<ansX-3&&/^\s*\d{1,3}\s*$/.test(i.str));
+     if(!num)continue;const a=r.filter(i=>X(i)>=ansX-4&&X(i)<nextX-4).map(i=>i.str).join(' ');if(a.trim())ans[+num.str]=cleanAns(a)}}
+   if(Object.keys(ans).length)ansFrom=ansAt.p}}
+ const last=ansFrom?(ansAt?ansAt.p:ansFrom-1):n,before=(p,y)=>!ansAt||p<ansAt.p||(p===ansAt.p&&y>ansAt.y+2);
+ const starts=[];let list=false;
+ for(let k=1;k<=300;k++){let de=null;try{de=await doc.getDestination('task::'+k)}catch(e){}if(!Array.isArray(de))break;let p=0;try{p=(await doc.getPageIndex(de[0]))+1}catch(e){break}if(p>last)break;starts.push({k,p,y:+de[3]||0})}
+ if(!starts.length)for(let p=1;p<=last;p++)items[p].forEach(i=>{const m=i.str.match(/^\s*№\s*(\d+)\s*\.?\s*$/);if(m&&X(i)<150&&before(p,Y(i)))starts.push({k:+m[1],p,y:Y(i)+16})});
+ if(!starts.length){ // нумерованный список: «1.» / «1)» в начале строки, все номера на одной вертикали
+  const c=[];for(let p=1;p<=last;p++)items[p].forEach(i=>{const m=i.str.match(/^\s*(\d{1,3})\s*[.)](?:\s|$)/);if(m&&before(p,Y(i)))c.push({k:+m[1],p,y:Y(i),x:X(i),h:i.height||10})});
+  const byX={};c.forEach(o=>{const g=Math.round(o.x/4);(byX[g]=byX[g]||[]).push(o)});
+  const best=Object.values(byX).sort((a,b)=>b.length-a.length)[0]||[];
+  if(best.length>=2){let prev=0;best.sort((a,b)=>a.p-b.p||b.y-a.y).forEach(o=>{if(o.k>prev){starts.push({k:o.k,p:o.p,y:o.y+o.h*0.9+2});prev=o.k}});list=true}}
+ return {starts,ans,ansFrom,last,list};
 }
 async function importPdf(file){
  if(!draft)return;const say=m=>{const t=document.querySelector('#hwtray .hint');if(t)t.textContent=m};
  try{
   say('Читаю PDF…');const lib=await pdfLib(),doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise,n=doc.numPages;
-  const items={};for(let p=1;p<=n;p++)items[p]=(await (await doc.getPage(p)).getTextContent()).items;
-  // страницы с ответами: с той, где заголовок «Ответы», до конца (только во второй половине файла)
-  let ansFrom=0;for(let p=n;p>Math.max(1,n/2);p--)if(items[p].some(i=>/^\s*Ответы\s*:?\s*$/i.test(i.str)||/^\s*Ответы\s*:/i.test(i.str)))ansFrom=p;
-  const ans={};
-  if(ansFrom){let txt='';for(let p=ansFrom;p<=n;p++){const pg=await doc.getPage(p),h=pg.getViewport({scale:1}).height;txt+=' '+items[p].filter(i=>i.transform[5]>45&&i.transform[5]<h-45).map(i=>i.str).join(' ')} // без колонтитулов (номер страницы)
-   txt=txt.replace(/^[\s\S]*?Ответы\s*:?/i,' ');
-   let m,re=/№\s*(\d+)\s*[.)]\s*([\s\S]+?)(?=\s№\s*\d+\s*[.)]|$)/g;while((m=re.exec(txt)))ans[+m[1]]=cleanAns(m[2]);
-   if(!Object.keys(ans).length){re=/(?:^|\s)(\d+)\s*[.)]\s*(-?\s*[\d\s]+(?:[.,]\s*\d+)?)/g;while((m=re.exec(txt)))ans[+m[1]]=cleanAns(m[2])}}
-  const last=ansFrom?ansFrom-1:n;
-  // начала задач: метки task::N, иначе надписи «№N.» в тексте
-  const starts=[];
-  for(let k=1;k<=200;k++){let de=null;try{de=await doc.getDestination('task::'+k)}catch(e){}if(!Array.isArray(de))break;const p=(await doc.getPageIndex(de[0]))+1;if(p>last)break;starts.push({k,p,y:+de[3]||0})}
-  if(!starts.length)for(let p=1;p<=last;p++)items[p].forEach(i=>{const m=i.str.match(/^\s*№\s*(\d+)\s*\.?\s*$/);if(m&&i.transform[4]<150)starts.push({k:+m[1],p,y:i.transform[5]+16})});
+  const {starts,ans,ansFrom,last,list}=await analyzePdf(doc);
   let added=0,withAns=0;const noAns=[];
   if(starts.length){
    for(let i=0;i<starts.length;i++){const s=starts[i],nx=starts[i+1],pv=starts[i-1];
     say('Нарезаю задачу '+(i+1)+' из '+starts.length+'…');
-    const src=await cropTask(doc,s.p,s.y,pv&&pv.p===s.p?pv.y:null,nx&&nx.p===s.p?nx.y:null),a=okAns(ans[s.k])?ans[s.k]:'';
+    const src=await cropTask(doc,s.p,s.y,pv&&pv.p===s.p?pv.y:null,nx&&nx.p===s.p?nx.y:null,list),a=okAns(ans[s.k])?ans[s.k]:'';
     await window.hwAdd(src,{ans:a});if(a)withAns++;else if(ansFrom)noAns.push('№'+s.k+(ans[s.k]?' («'+ans[s.k]+'»)':''));added++}
   }else{ // разметки нет — задания постранично
    for(let p=1;p<=last;p++){say('Страница '+p+' из '+last+'…');const pg=await doc.getPage(p),h=pg.getViewport({scale:1}).height;await window.hwAdd(await cropPdf(doc,p,h-20,20),{});added++}
