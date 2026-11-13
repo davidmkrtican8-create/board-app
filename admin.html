@@ -728,15 +728,19 @@ async function pasteBtn(){
 let pdfLibP=null;
 const pdfLib=()=>pdfLibP||(pdfLibP=import('/pdfjs/pdf.min.mjs').then(m=>{m.GlobalWorkerOptions.workerSrc='/pdfjs/pdf.worker.min.mjs';return m}));
 const cleanAns=a=>String(a).replace(/\s+/g,'').replace(/[−–]/g,'-').replace(/[.;]+$/,'');
-async function cropPdf(doc,p,yTop,yBot){ // область страницы по высоте (в координатах PDF, снизу вверх) → картинка, пустые поля сверху и снизу обрезаются
+async function cropPdf(doc,p,yTop,yBot,cutTail){ // область страницы по высоте (в координатах PDF, снизу вверх) → картинка, пустые поля сверху и снизу обрезаются
  const pg=await doc.getPage(p),base=pg.getViewport({scale:1}),sc=Math.min(2.2,1100/base.width),vp=pg.getViewport({scale:sc});
  const full=el('canvas',{width:Math.round(vp.width),height:Math.round(vp.height)}),fx=full.getContext('2d',{willReadFrequently:true});
  fx.fillStyle='#fff';fx.fillRect(0,0,full.width,full.height);await pg.render({canvasContext:fx,viewport:vp,intent:'print'}).promise; // «print» — рисуется и в фоновой вкладке
  const x0=Math.round(full.width*.05),w=Math.round(full.width*.9);
  let y0=Math.max(0,Math.round((base.height-yTop)*sc)-8),y1=Math.min(full.height,Math.round((base.height-yBot)*sc));
  const d=fx.getImageData(x0,0,w,full.height).data,blank=y=>{for(let x=0;x<w;x+=2){const i=(y*w+x)*4;if(d[i]<235||d[i+1]<235||d[i+2]<235)return false}return true};
+ // нижняя граница прошла по началу следующей задачи (верх рамки «№2» и т.п.) — отрезаем этот кусочек вместе с промежутком над ним
+ let cap=full.height;
+ if(cutTail&&!blank(y1-1)){let y=y1-1;while(y>y0&&!blank(y))y--;const res=y1-1-y;let g=0;while(y>y0&&blank(y)){y--;g++}
+  if(res<=30*sc&&g>=3*sc&&y>y0+20){cap=y+g;y1=y+1}}
  while(y1>y0+20&&blank(y1-1))y1--;while(y0<y1-20&&blank(y0))y0++;
- y0=Math.max(0,y0-10);y1=Math.min(full.height,y1+12);
+ y0=Math.max(0,y0-10);y1=Math.min(full.height,cap,y1+12);
  const c=el('canvas',{width:w,height:y1-y0});c.getContext('2d').drawImage(full,x0,y0,w,y1-y0,0,0,w,y1-y0);
  let src=c.toDataURL('image/png');if(src.length>800000)src=c.toDataURL('image/jpeg',.88);return src;
 }
@@ -761,7 +765,7 @@ async function importPdf(file){
   if(starts.length){
    for(let i=0;i<starts.length;i++){const s=starts[i],nx=starts[i+1],bot=nx&&nx.p===s.p?nx.y+4:30;
     say('Нарезаю задачу '+(i+1)+' из '+starts.length+'…');
-    const src=await cropPdf(doc,s.p,s.y+4,bot),a=ans[s.k]&&/^-?\d+([.,]\d+)?$/.test(ans[s.k])?ans[s.k]:'';
+    const src=await cropPdf(doc,s.p,s.y+4,bot,!!(nx&&nx.p===s.p)),a=ans[s.k]&&/^-?\d+([.,]\d+)?$/.test(ans[s.k])?ans[s.k]:'';
     await window.hwAdd(src,{ans:a});if(a)withAns++;added++}
   }else{ // разметки нет — задания постранично
    for(let p=1;p<=last;p++){say('Страница '+p+' из '+last+'…');const pg=await doc.getPage(p),h=pg.getViewport({scale:1}).height;await window.hwAdd(await cropPdf(doc,p,h-20,20),{});added++}
