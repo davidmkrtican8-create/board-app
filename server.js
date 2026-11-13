@@ -554,6 +554,11 @@ function hwTeacher(req, res, u, me) { // /api/admin/hw…
     if (j.on) delete REPOFF[me.id]; else REPOFF[me.id] = 1;
     fs.writeFileSync(REPF, JSON.stringify(REPOFF)); json(res, { on: repOn(me.id) });
   });
+  if (req.method === 'GET' && u.pathname === '/api/admin/hw-draft') { // черновик домашки (собирается во время урока, отправляется позже)
+    const sid = String(u.searchParams.get('s') || '');
+    if (!own(sid)) { res.writeHead(404); return res.end(); }
+    return json(res, hwOf(sid).draft || null);
+  }
   if (req.method === 'GET' && u.pathname === '/api/admin/hw') {
     const sid = String(u.searchParams.get('s') || '');
     if (!own(sid)) { res.writeHead(404); return res.end(); }
@@ -562,16 +567,33 @@ function hwTeacher(req, res, u, me) { // /api/admin/hw…
   if (req.method === 'POST' && u.pathname === '/api/admin/hw') return body(req, res, 60e6, j => {
     const sid = String(j.s || ''); if (!own(sid)) { res.writeHead(404); return res.end(); }
     const H = hwOf(sid), h = H.list.find(x => x.id === j.id);
+    if (j.t === 'draft' || j.t === 'draft-del') { // сохранить / удалить черновик; картинки уже сохранённых задач не пересылаются заново
+      const old = H.draft || { tasks: [] }, keep = new Set();
+      if (j.t === 'draft-del') { old.tasks.forEach(t => hwRm(sid, t.img)); H.draft = null; hwSave(sid); return json(res, null); }
+      if (!Array.isArray(j.tasks) || j.tasks.length > 40) return json(res, { error: 'Не больше 40 задач' });
+      const mine = new Set(old.tasks.map(t => t.img).filter(Boolean)), tasks = [];
+      for (const t of j.tasks) {
+        let img = null;
+        if (t.imgName && mine.has(t.imgName)) img = t.imgName; else if (t.img) img = hwImg(sid, t.img, 880000);
+        if (img) keep.add(img);
+        tasks.push({ img, w: num(t.w, 1, 1e5, 1000), h: num(t.h, 1, 1e5, 600), text: String(t.text || '').slice(0, 2000), num: Math.round(num(t.num, 0, 19, 0)), ans: String(t.ans || '').trim().slice(0, 80), auto: !!t.auto });
+      }
+      old.tasks.forEach(t => { if (t.img && !keep.has(t.img)) hwRm(sid, t.img); });
+      H.draft = { title: String(j.title || '').slice(0, 80), due: String(j.due || '').slice(0, 10), tasks, at: Date.now() };
+      hwSave(sid); return json(res, H.draft);
+    }
     if (j.t === 'add') {
       if (!Array.isArray(j.tasks) || !j.tasks.length || j.tasks.length > 40) return json(res, { error: 'Добавьте от 1 до 40 задач' });
       if (H.list.length >= 300) return json(res, { error: 'Слишком много домашек у ученика: удалите старые' });
       const tasks = [];
       for (const t of j.tasks) {
-        const text = String(t.text || '').trim().slice(0, 2000), img = t.img ? hwImg(sid, t.img, 880000) : null;
+        const dimg = t.imgName && H.draft && H.draft.tasks.some(x => x.img === t.imgName) ? t.imgName : null;
+        const text = String(t.text || '').trim().slice(0, 2000), img = dimg || (t.img ? hwImg(sid, t.img, 880000) : null);
         if (!img && !text) continue;
         tasks.push({ id: crypto.randomBytes(4).toString('hex'), img, w: num(t.w, 1, 1e5, 1000), h: num(t.h, 1, 1e5, 600), text, num: Math.round(num(t.num, 0, 19, 0)), ans: String(t.ans || '').trim().slice(0, 80) });
       }
       if (!tasks.length) return json(res, { error: 'В задачах нет ни картинки, ни текста' });
+      if (H.draft) { const used = new Set(tasks.map(t => t.img)); H.draft.tasks.forEach(t => { if (t.img && !used.has(t.img)) hwRm(sid, t.img); }); H.draft = null; } // черновик отправлен
       const nid = crypto.randomBytes(5).toString('hex'), want = Array.isArray(j.rep) && repOn(me.id) ? j.rep.map(String) : [];
       for (const x of repDue(H)) if (want.includes(x.id)) { // задачи на повторение — в конец домашки
         tasks.push({ id: crypto.randomBytes(4).toString('hex'), img: x.img ? hwCopy(sid, x.img) : null, w: x.w, h: x.h, text: x.text, num: x.num, ans: x.ans, rep: x.id });
@@ -665,7 +687,7 @@ function admin(req, res, u) {
   const isOwner = me.id === 'owner';
   if (req.method === 'GET' && u.pathname === '/api/admin/me') return json(res, who(me));
   if (req.method === 'GET' && u.pathname === '/api/admin/students') return json(res, mine());
-  if (u.pathname === '/api/admin/hw' || u.pathname === '/api/admin/hw-pending' || u.pathname === '/api/admin/hw-rep') return hwTeacher(req, res, u, me);
+  if (u.pathname === '/api/admin/hw' || u.pathname === '/api/admin/hw-pending' || u.pathname === '/api/admin/hw-rep' || u.pathname === '/api/admin/hw-draft') return hwTeacher(req, res, u, me);
   if (u.pathname === '/api/admin/tg' || u.pathname === '/api/admin/tg-student') return tgAdmin(req, res, u, me);
   if (req.method === 'GET' && u.pathname === '/api/admin/backup') {
     const all = {}; mine().forEach(s => { const r = room(s.id); if (r) all[s.id] = r.s; });

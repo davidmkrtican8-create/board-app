@@ -124,7 +124,7 @@ body.nosidebar #side{display:none}
   <div class="foot"><button id="tch" hidden title="Пригласить репетиторов и управлять их аккаунтами">Репетиторы</button><button id="tgb" title="Telegram-бот: уведомления и конспекты">Telegram</button><button id="cpw" title="Сменить свой пароль">Пароль</button><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden><button id="lo" title="Выйти из кабинета на этом устройстве">Выйти</button><button id="rb" title="Вернуть учеников и доски из копии, которую кабинет сам сохраняет в вашем браузере">Восстановить из автокопии</button><div id="bkst" style="font-size:12px;color:var(--mut);width:100%"></div></div>
  </div>
  <div id="main">
-  <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk" class="keep">Задачи</button><button id="hwk" title="Домашние задания ученика">📚 Домашка<span id="hwkn"></span></button><button id="tgs" title="Отправить конспект урока ученику и родителям в Telegram">📨 Конспект</button><button id="lnk">Ссылка ученика</button><button id="ren">Переименовать</button><button id="del">Удалить</button><button id="fs" class="keep" title="Фокус: убрать панели">⛶</button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button><button id="th" class="keep" title="Светлая / тёмная тема">◐</button></div>
+  <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk" class="keep">Задачи</button><button id="hwk" class="keep" title="Домашние задания ученика">📚 Домашка<span id="hwkn"></span></button><button id="tgs" title="Отправить конспект урока ученику и родителям в Telegram">📨 Конспект</button><button id="lnk">Ссылка ученика</button><button id="ren">Переименовать</button><button id="del">Удалить</button><button id="fs" class="keep" title="Фокус: убрать панели">⛶</button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button><button id="th" class="keep" title="Светлая / тёмная тема">◐</button></div>
   <div id="work">
    <iframe id="fr" allow="microphone; camera; autoplay; clipboard-write"></iframe>
    <div id="tasks" hidden>
@@ -631,13 +631,31 @@ function fit(src){return new Promise((res,rej)=>{const im=new Image();im.onload=
  rej()};im.onerror=rej;im.src=src})}
 
 // ---------- сбор новой домашки (полоса под доской) ----------
-window.hwAdd=async(src,info)=>{if(!draft)return;try{const r=await fit(src);info=info||{};draft.tasks.push(Object.assign(r,{text:'',num:info.num||0,ans:info.ans||'',auto:!!info.ans}));tray(true)}catch(e){alert('Не получилось открыть картинку')}};
+window.hwAdd=async(src,info)=>{if(!draft)return;try{const r=await fit(src);info=info||{};draft.tasks.push(Object.assign(r,{text:'',num:info.num||0,ans:info.ans||'',auto:!!info.ans}));tray(true);dirty()}catch(e){alert('Не получилось открыть картинку')}};
+// черновик хранится на сервере: можно собирать домашку во время урока и отправить позже (хоть с другого устройства)
+let saveT=0,saving=Promise.resolve();
+function dirty(){clearTimeout(saveT);saveT=setTimeout(()=>saveDraft(),1200);mark('Сохраняю черновик…')}
+function mark(t){const m=document.querySelector('#hwtray .dst');if(m)m.textContent=t}
+function saveDraft(){clearTimeout(saveT);const d=draft;if(!d)return saving;
+ saving=saving.then(async()=>{const tk=d.tasks.slice();
+  const r=await api('/api/admin/hw',{method:'POST',body:JSON.stringify({t:'draft',s:d.sid,title:d.title,due:d.due,tasks:tk.map(k=>k.imgName?{imgName:k.imgName,w:k.w,h:k.h,text:k.text,num:k.num,ans:k.ans,auto:k.auto}:{img:k.src,w:k.w,h:k.h,text:k.text,num:k.num,ans:k.ans,auto:k.auto})})}).catch(()=>null);
+  const j=r&&r.ok?await r.json().catch(()=>null):null;
+  if(!j||j.error){if(draft===d)mark('⚠️ Черновик не сохранился — проверьте интернет');return}
+  tk.forEach((k,i)=>{if(j.tasks[i]&&j.tasks[i].img)k.imgName=j.tasks[i].img});
+  if(draft===d)mark('✓ Черновик сохранён '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}))});
+ return saving}
+async function loadDraft(sid){
+ try{const r=await api('/api/admin/hw-draft?s='+sid);const j=r.ok?await r.json():null;if(!j||!j.tasks)return null;
+  return{sid,title:j.title||'',due:j.due||'',at:j.at,tasks:j.tasks.map(t=>({src:t.img?'/hwimg/'+sid+'/'+t.img:null,imgName:t.img||null,w:t.w,h:t.h,text:t.text||'',num:t.num||0,ans:t.ans||'',auto:!!t.auto}))}}catch(e){return null}
+}
+window.hwDraftOf=loadDraft;
 window.hwAddFile=f=>{if(/heic|heif/i.test(f.type+' '+(f.name||''))){alert('Фото в формате HEIC браузер не открывает. Сделайте скриншот или сохраните как JPG.');return}
  const r=new FileReader();r.onload=()=>window.hwAdd(r.result);r.readAsDataURL(f)};
-function startDraft(){
+async function startDraft(){
  const sid=C().cur();if(!sid){alert('Сначала выберите ученика слева');return}
- if(draft&&draft.tasks.length&&draft.sid!==sid&&!confirm('Сейчас собирается домашка для «'+sName(draft.sid)+'». Начать заново для «'+sName(sid)+'»?'))return;
- if(!draft||draft.sid!==sid)draft={sid,tasks:[],title:new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'}),due:''}; // название по умолчанию — сегодняшняя дата
+ if(draft&&draft.sid!==sid){if(draft.tasks.length)await saveDraft();draft=null} // черновик другого ученика уже сохранён на сервере
+ if(!draft){draft=await loadDraft(sid);if(draft&&!draft.tasks.length)draft=null}
+ if(!draft)draft={sid,tasks:[],title:new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'}),due:''}; // название по умолчанию — сегодняшняя дата
  window.hwDraft=true;tray();if(window.hwTasksRedraw)window.hwTasksRedraw();
  loadRep(sid);
 }
@@ -664,22 +682,26 @@ function repRow(){
  return row;
 }
 function stopDraft(){draft=null;window.hwDraft=false;$('hwtray').hidden=true;if(window.hwTasksRedraw)window.hwTasksRedraw()}
+async function hideDraft(){if(draft&&draft.tasks.length){await saveDraft();alert('Черновик сохранён. Продолжить или отправить: кнопка «Домашка» → «Продолжить черновик».')}else if(draft)api('/api/admin/hw',{method:'POST',body:JSON.stringify({t:'draft-del',s:draft.sid})});stopDraft()}
 function tray(scrollEnd){
  const t=$('hwtray');t.hidden=false;t.innerHTML='';
- const ti=el('input',{value:draft.title,placeholder:'Название, например «Тригонометрия»',style:'flex:1;min-width:180px'});ti.oninput=()=>{draft.title=ti.value};
- const du=el('input',{type:'date',value:draft.due,title:'Сдать до'});du.oninput=()=>{draft.due=du.value};
+ const ti=el('input',{value:draft.title,placeholder:'Название, например «Тригонометрия»',style:'flex:1;min-width:180px'});ti.oninput=()=>{draft.title=ti.value;dirty()};
+ const du=el('input',{type:'date',value:draft.due,title:'Сдать до'});du.oninput=()=>{draft.due=du.value;dirty()};
  const fileIn=el('input',{type:'file',accept:'image/*',multiple:true,hidden:true});
  const pdfIn=el('input',{type:'file',accept:'.pdf,application/pdf',hidden:true});pdfIn.onchange=()=>{const f=pdfIn.files[0];pdfIn.value='';if(f)importPdf(f)};fileIn.onchange=()=>{[...fileIn.files].forEach(window.hwAddFile);fileIn.value=''};
  const go=el('button',{className:'pri',textContent:'Отправить ученику',disabled:!draft.tasks.length,onclick:sendDraft});
  go.style.cssText='background:var(--ac);color:#fff;border-color:var(--ac)';
  t.append(
-  el('div',{className:'r'},el('b',{textContent:'Новая домашка: '+sName(draft.sid)}),ti,el('span',{textContent:'сдать до'}),du,go,el('button',{textContent:'Отмена',onclick:()=>{if(!draft.tasks.length||confirm('Отменить эту домашку? Собранные задачи пропадут.'))stopDraft()}})),
+  el('div',{className:'r'},el('b',{textContent:'Новая домашка: '+sName(draft.sid)}),ti,el('span',{textContent:'сдать до'}),du,go,
+   el('button',{textContent:'Свернуть',title:'Черновик останется: продолжите позже через «Домашка»',onclick:hideDraft}),
+   el('button',{textContent:'🗑',title:'Удалить черновик',onclick:async()=>{if(draft.tasks.length&&!confirm('Удалить черновик? Собранные задачи пропадут.'))return;const sid=draft.sid;stopDraft();await saving;api('/api/admin/hw',{method:'POST',body:JSON.stringify({t:'draft-del',s:sid})})}}),
+   el('span',{className:'hint dst',textContent:draft.tasks.length?'✓ Черновик сохранён':''})),
   el('div',{className:'r'},
    el('button',{textContent:'📚 Из сборника',title:'В панели «Задачи» у каждой задачи появится кнопка «+ ДЗ»; можно выделить область и нажать «В домашку»',onclick:()=>window.hwOpenTasks&&window.hwOpenTasks()}),
    el('button',{textContent:'📋 Вставить скриншот',onclick:pasteBtn}),
    el('button',{textContent:'🖼 Файл',onclick:()=>fileIn.click()}),fileIn,
    el('button',{textContent:'📄 PDF с ответами',title:'Домашка из PDF-файла: задачи нарежутся сами, ответы из конца файла подставятся для автопроверки',onclick:()=>pdfIn.click()}),pdfIn,
-   el('button',{textContent:'✎ Текстом',onclick:()=>{draft.tasks.push({src:null,text:'',num:0,ans:''});tray(true);const a=$('hwcards').lastChild;if(a)a.querySelector('textarea').focus()}}),
+   el('button',{textContent:'✎ Текстом',onclick:()=>{draft.tasks.push({src:null,text:'',num:0,ans:''});tray(true);dirty();const a=$('hwcards').lastChild;if(a)a.querySelector('textarea').focus()}}),
    el('span',{className:'hint',textContent:'Скриншот задачи с сайта: сделайте снимок экрана и нажмите ⌘V (Ctrl+V) здесь. Если у задачи короткий ответ — впишите его, он проверится сам.'})),
   repRow()||'');
  const cs=el('div',{id:'hwcards'});
@@ -688,12 +710,12 @@ function tray(scrollEnd){
   const c=el('div',{className:'hc'});
   c.append(el('b',{textContent:'Задача '+(i+1)}));
   if(k.src)c.append(el('img',{src:k.src}));
-  const tx=el('textarea',{value:k.text,placeholder:k.src?'Подпись (необязательно)':'Условие задачи',rows:k.src?1:4,style:'font-size:13px;resize:vertical;width:100%;border:1px solid var(--bd);border-radius:6px;background:var(--panel);color:var(--tx)'});tx.oninput=()=>{k.text=tx.value};c.append(tx);
+  const tx=el('textarea',{value:k.text,placeholder:k.src?'Подпись (необязательно)':'Условие задачи',rows:k.src?1:4,style:'font-size:13px;resize:vertical;width:100%;border:1px solid var(--bd);border-radius:6px;background:var(--panel);color:var(--tx)'});tx.oninput=()=>{k.text=tx.value;dirty()};c.append(tx);
   const sel=el('select',{title:'Номер задания в экзамене — для прогресса ученика'});sel.append(el('option',{value:0,textContent:'№ задания — не указан'}));
-  for(let n=1;n<=19;n++)sel.append(el('option',{value:n,textContent:'№'+n}));sel.value=k.num;sel.onchange=()=>{k.num=+sel.value};c.append(sel);
-  const an=el('input',{value:k.ans,placeholder:'Ответ (если короткий)',title:'Ученик впишет ответ, и он проверится сам. Несколько вариантов — через ;'});an.oninput=()=>{k.ans=an.value;k.auto=false;c.querySelector('.auto')&&c.querySelector('.auto').remove()};c.append(an);
+  for(let n=1;n<=19;n++)sel.append(el('option',{value:n,textContent:'№'+n}));sel.value=k.num;sel.onchange=()=>{k.num=+sel.value;dirty()};c.append(sel);
+  const an=el('input',{value:k.ans,placeholder:'Ответ (если короткий)',title:'Ученик впишет ответ, и он проверится сам. Несколько вариантов — через ;'});an.oninput=()=>{k.ans=an.value;k.auto=false;dirty();c.querySelector('.auto')&&c.querySelector('.auto').remove()};c.append(an);
   if(k.auto)c.append(el('span',{className:'auto',textContent:'✓ ответ из сборника',style:'font-size:11px;color:#2e7d32'}));
-  c.append(el('button',{className:'x',textContent:'✕',title:'Убрать задачу',onclick:()=>{draft.tasks.splice(i,1);tray()}}));
+  c.append(el('button',{className:'x',textContent:'✕',title:'Убрать задачу',onclick:()=>{draft.tasks.splice(i,1);tray();dirty()}}));
   cs.append(c)});
  t.append(cs);if(scrollEnd)cs.scrollLeft=1e6;
 }
@@ -749,10 +771,10 @@ async function importPdf(file){
  }catch(e){alert('Не получилось прочитать PDF: '+(e.message||e));tray()}
 }
 async function sendDraft(){
- const d=draft;if(!d||!d.tasks.length)return;
+ clearTimeout(saveT);await saving;const d=draft;if(!d||!d.tasks.length)return;
  if(d.tasks.some(k=>!k.src&&!k.text.trim())){alert('Есть пустая задача без условия — заполните или уберите её');return}
  const due=d.due?new Date(d.due+'T23:59').getTime():0;
- const r=await api('/api/admin/hw',{method:'POST',body:JSON.stringify({t:'add',s:d.sid,title:d.title.trim()||new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'}),due,tasks:d.tasks.map(k=>({img:k.src,w:k.w,h:k.h,text:k.text,num:k.num,ans:k.ans})),rep:d.repInfo&&d.repInfo.on?d.rep:[]})});
+ const r=await api('/api/admin/hw',{method:'POST',body:JSON.stringify({t:'add',s:d.sid,title:d.title.trim()||new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'}),due,tasks:d.tasks.map(k=>k.imgName?{imgName:k.imgName,w:k.w,h:k.h,text:k.text,num:k.num,ans:k.ans}:{img:k.src,w:k.w,h:k.h,text:k.text,num:k.num,ans:k.ans}),rep:d.repInfo&&d.repInfo.on?d.rep:[]})});
  const j=r.ok?await r.json():{error:'Не получилось отправить (слишком большие картинки?)'};
  if(j.error){alert(j.error);return}
  stopDraft();alert('Домашка отправлена! Ученик увидит её в своём кабинете: кнопка «📚 Домашка» на его доске.');
@@ -773,6 +795,9 @@ async function openList(d,sid){
    el('span',{className:'mut grow',textContent:'Кабинет ученика: '+link}),el('button',{textContent:'Копировать',onclick:e=>{const b=e.target;(navigator.clipboard?navigator.clipboard.writeText(link):Promise.reject()).then(()=>{b.textContent='Скопировано'},()=>prompt('Ссылка:',link))}}),
    el('button',{textContent:'Закрыть',onclick:d.close})));
  {const tr=el('div',{className:'row'});d.b.append(tr);if(window.hwTgRow)window.hwTgRow(tr,sid)}
+ {const dr=await loadDraft(sid);if(dr&&dr.tasks.length)d.b.append(el('div',{className:'hwi',style:'border-style:dashed'},
+  el('div',{className:'grow'},el('b',{textContent:'📝 Черновик: '+(dr.title||'без названия')}),el('div',{className:'mut',textContent:dr.tasks.length+' зад. · сохранён '+new Date(dr.at).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+' · ученик его не видит'})),
+  el('button',{className:'pri',textContent:'Продолжить черновик',onclick:()=>{d.close();startDraft()}})))}
  if(!L.length)d.b.append(el('p',{className:'mut',textContent:'Домашек пока нет. Нажмите «+ Задать домашку».'}));
  L.forEach(h=>{
   const ms=h.tasks.map(t=>h.marks[t.id]!==undefined?h.marks[t.id]:h.auto[t.id]).filter(v=>v!==undefined);
