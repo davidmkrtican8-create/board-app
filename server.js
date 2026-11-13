@@ -592,7 +592,16 @@ function hwTeacher(req, res, u, me) { // /api/admin/hw…
       const sc = ms.length ? ': верно ' + ok + ' из ' + ms.length : '', sn = own(sid).name;
       tgStudent(sid, w => w === 's' ? '✔️ Домашка «' + h.title + '» проверена' + sc + '.' + (h.comment ? '\n💬 ' + h.comment : '') + '\n' + TG.site + '/s/' + sid + '?hw=' + h.id
         : '✔️ ' + sn + ': домашка «' + h.title + '» проверена' + sc + '.' + (h.comment ? '\n💬 ' + h.comment : ''));
-    } else if (j.t === 'return') { h.st = 'new'; h.comment = String(j.comment || h.comment || '').slice(0, 2000); }
+    } else if (j.t === 'return') {
+      h.st = 'new'; h.comment = String(j.comment || h.comment || '').slice(0, 2000);
+      if (j.due !== undefined) { const d = +j.due; h.due = Number.isFinite(d) && d > 0 ? d : null; h.rem = 0; }
+      const sn = own(sid).name, dd = h.due ? ' Сдать до ' + dmy(h.due) + '.' : '';
+      tgStudent(sid, w => w === 's' ? '↩️ Домашку «' + h.title + '» вернули на доработку.' + dd + (h.comment ? '\n💬 ' + h.comment : '') + '\nИсправь и сдай снова: ' + TG.site + '/s/' + sid + '?hw=' + h.id
+        : '↩️ ' + sn + ': домашку «' + h.title + '» вернули на доработку.' + dd + (h.comment ? '\n💬 ' + h.comment : ''));
+    } else if (j.t === 'due') { // перенести срок сдачи
+      const d = +j.due; h.due = Number.isFinite(d) && d > 0 ? d : null; h.rem = 0;
+      if (h.st === 'new') tgStudent(sid, w => w === 's' ? '📅 Срок домашки «' + h.title + '» ' + (h.due ? 'перенесён: сдать до ' + dmy(h.due) + '.' : 'снят: сдай, когда будет готово.') + '\n' + TG.site + '/s/' + sid + '?hw=' + h.id : null);
+    }
     else if (j.t === 'del') {
       h.tasks.forEach(t => hwRm(sid, t.img)); h.photos.forEach(p => hwRm(sid, p));
       (H.mis || []).forEach(x => { if (x.out === h.id) x.out = null; }); // задача на повторение вернётся в следующую домашку
