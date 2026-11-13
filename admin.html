@@ -727,7 +727,8 @@ async function pasteBtn(){
 // ---------- домашка из PDF: задачи нарезаются по «№1», «№2»…, ответы берутся со страницы «Ответы» в конце ----------
 let pdfLibP=null;
 const pdfLib=()=>pdfLibP||(pdfLibP=import('/pdfjs/pdf.min.mjs').then(m=>{m.GlobalWorkerOptions.workerSrc='/pdfjs/pdf.worker.min.mjs';return m}));
-const cleanAns=a=>String(a).replace(/\s+/g,'').replace(/[−–]/g,'-').replace(/[.;]+$/,'');
+const cleanAns=a=>String(a).replace(/\s+/g,'').replace(/[−–↑]/g,'-').replace(/[<>⟨⟩«»]/g,'').replace(/[.;]+$/,''); // «<14>» → 14, минус бывает «↑»
+const NUM='-?\\d+(?:[.,]\\d+)?(?:/\\d+)?',okAns=a=>!!a&&new RegExp('^'+NUM+'(?:;'+NUM+')*$').test(a); // число, дробь или несколько вариантов через ;
 let pageCache=null; // последняя отрисованная страница: несколько задач с одной страницы не рисуем заново
 async function pagePix(doc,p){
  if(pageCache&&pageCache.doc===doc&&pageCache.p===p)return pageCache;
@@ -773,17 +774,17 @@ async function importPdf(file){
   const starts=[];
   for(let k=1;k<=200;k++){let de=null;try{de=await doc.getDestination('task::'+k)}catch(e){}if(!Array.isArray(de))break;const p=(await doc.getPageIndex(de[0]))+1;if(p>last)break;starts.push({k,p,y:+de[3]||0})}
   if(!starts.length)for(let p=1;p<=last;p++)items[p].forEach(i=>{const m=i.str.match(/^\s*№\s*(\d+)\s*\.?\s*$/);if(m&&i.transform[4]<150)starts.push({k:+m[1],p,y:i.transform[5]+16})});
-  let added=0,withAns=0;
+  let added=0,withAns=0;const noAns=[];
   if(starts.length){
    for(let i=0;i<starts.length;i++){const s=starts[i],nx=starts[i+1],pv=starts[i-1];
     say('Нарезаю задачу '+(i+1)+' из '+starts.length+'…');
-    const src=await cropTask(doc,s.p,s.y,pv&&pv.p===s.p?pv.y:null,nx&&nx.p===s.p?nx.y:null),a=ans[s.k]&&/^-?\d+([.,]\d+)?$/.test(ans[s.k])?ans[s.k]:'';
-    await window.hwAdd(src,{ans:a});if(a)withAns++;added++}
+    const src=await cropTask(doc,s.p,s.y,pv&&pv.p===s.p?pv.y:null,nx&&nx.p===s.p?nx.y:null),a=okAns(ans[s.k])?ans[s.k]:'';
+    await window.hwAdd(src,{ans:a});if(a)withAns++;else if(ansFrom)noAns.push('№'+s.k+(ans[s.k]?' («'+ans[s.k]+'»)':''));added++}
   }else{ // разметки нет — задания постранично
    for(let p=1;p<=last;p++){say('Страница '+p+' из '+last+'…');const pg=await doc.getPage(p),h=pg.getViewport({scale:1}).height;await window.hwAdd(await cropPdf(doc,p,h-20,20),{});added++}
   }
   tray(true);
-  alert('Из PDF добавлено задач: '+added+'.'+(withAns?' Ответы для автопроверки найдены у '+withAns+'.':ansFrom?' Страницу с ответами нашёл, но разобрать ответы не получилось — впишите их вручную.':' Страницы «Ответы» в конце файла нет — впишите ответы вручную, если нужна автопроверка.')+' Проверьте ответы под задачами перед отправкой.');
+  alert('Из PDF добавлено задач: '+added+'.'+(withAns?' Ответы для автопроверки найдены у '+withAns+'.'+(noAns.length?' Без ответа: '+noAns.join(', ')+' — впишите ответ под задачей, иначе ученик будет решать её развёрнуто.':''):ansFrom?' Страницу с ответами нашёл, но разобрать ответы не получилось — впишите их вручную.':' Страницы «Ответы» в конце файла нет — впишите ответы вручную, если нужна автопроверка.')+' Проверьте ответы под задачами перед отправкой.');
  }catch(e){alert('Не получилось прочитать PDF: '+(e.message||e));tray()}
 }
 async function sendDraft(){

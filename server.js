@@ -381,7 +381,38 @@ function tgDoc(chat, buf, fname, caption) { // отправить файл (PDF 
     rq.on('timeout', () => rq.destroy(new Error('timeout'))); rq.on('error', bad); rq.end(body);
   });
 }
-const tgSay = (chat, text) => TG.token ? tgCall('sendMessage', { chat_id: chat, text, disable_web_page_preview: true }).then(r => { if (r && !r.ok && r.error_code === 403) tgDrop(chat); return r; }).catch(() => null) : Promise.resolve(null);
+// Связь сервера (Москва) с Telegram то и дело обрывается. Поэтому сообщения идут через очередь (она хранится в _tg.json):
+// бот повторяет отправку, пока сообщение не дойдёт (до двух суток), — уведомление не пропадёт.
+let tgBusy = false;
+function tgSay(chat, text) {
+  if (!TG.token || !text) return Promise.resolve(null);
+  TG.out = TG.out || []; TG.out.push({ chat, text, t0: Date.now(), n: 0, next: 0 }); saveTG();
+  setImmediate(tgFlush); return Promise.resolve({ ok: true, queued: true });
+}
+async function tgFlush() {
+  if (tgBusy || !TG.token || !(TG.out || []).length) return; tgBusy = true;
+  try {
+    let ch = false;
+    for (const m of TG.out.slice()) {
+      if (m.next > Date.now()) continue;
+      let r = null; try { r = await tgCall('sendMessage', { chat_id: m.chat, text: m.text, disable_web_page_preview: true }, 12000); } catch (e) {}
+      if (r && (r.ok || r.error_code === 400 || r.error_code === 403)) { // доставлено, или такого чата нет / бот заблокирован — больше не пытаемся
+        if (r.error_code === 403) tgDrop(m.chat);
+        TG.out = TG.out.filter(x => x !== m); ch = true;
+      } else {
+        m.n++; m.next = Date.now() + Math.min(15 * 60e3, 20e3 * 2 ** Math.min(m.n, 6)); ch = true;
+        if (Date.now() - m.t0 > 48 * 3600e3) { TG.out = TG.out.filter(x => x !== m); console.log('tg: не доставлено за 2 суток', m.chat); }
+      }
+    }
+    if (ch) saveTG();
+  } finally { tgBusy = false; }
+}
+setInterval(() => tgFlush().catch(() => {}), 15000);
+// отправить сразу, с повторами (для конспекта по кнопке — преподаватель ждёт ответа)
+async function tgRetry(fn, tries) {
+  for (let i = 0; i < (tries || 4); i++) { try { const r = await fn(); if (r && (r.ok || r.error_code === 400 || r.error_code === 403)) return r; } catch (e) {} await new Promise(ok => setTimeout(ok, 1500 * (i + 1))); }
+  return null;
+}
 function tgDrop(chat) { // человек заблокировал бота — больше не пишем
   for (const k in TG.subs) TG.subs[k] = TG.subs[k].filter(x => x.chat !== chat);
   for (const k in TG.tsubs) TG.tsubs[k] = TG.tsubs[k].filter(x => x !== chat);
@@ -486,11 +517,14 @@ async function snapSend() {
       const L = TG.token && !(TG.noAuto || {})[s.owner] ? (TG.subs[sid] || []) : [];
       for (const pg of due.sort((a, b) => m[a].t - m[b].t)) {
         const e = m[pg]; let buf = null; try { buf = fs.readFileSync(path.join(SND, sid, pg + '.pdf')); } catch (er) {}
+        let miss = 0; e.got = e.got || []; e.tries = (e.tries || 0) + 1;
         if (buf) for (const x of L) {
+          if (e.got.includes(x.chat)) continue;
           const cap = (x.who === 'p' ? '📝 ' + s.name + ' — конспект урока ' : '📝 Конспект урока ') + dmy(e.t) + ': «' + e.title + '»';
-          try { await tgDoc(x.chat, buf, (s.name + ' — ' + e.title + '.pdf').replace(/[\\/:*?"<>|]/g, '_'), cap); } catch (er) {}
+          const r = await tgRetry(() => tgDoc(x.chat, buf, (s.name + ' — ' + e.title + '.pdf').replace(/[\\/:*?"<>|]/g, '_'), cap), 3);
+          if (r) e.got.push(x.chat); else miss++;
         }
-        e.sent = Date.now();
+        if (!miss || e.tries >= 12) e.sent = Date.now(); // не дошло — попробуем снова через 10 минут (но не больше 2 часов)
       }
     }
     saveSN();
@@ -530,8 +564,8 @@ async function tgPost(req, res, j, me, isOwner, own) {
       let n = 0;
       for (const x of L) {
         try {
-          if (text) await tgSay(x.chat, text);
-          if (pdf) { const r = await tgDoc(x.chat, pdf, fname, ''); if (r && r.ok) n++; } else n++;
+          if (text) { const r = await tgRetry(() => tgCall('sendMessage', { chat_id: x.chat, text, disable_web_page_preview: true }, 12000)); if (!r) { tgSay(x.chat, text); } }
+          if (pdf) { const r = await tgRetry(() => tgDoc(x.chat, pdf, fname, '')); if (r && r.ok) n++; } else n++;
         } catch (e) {}
       }
       return json(res, n ? { sent: n } : { error: 'Не получилось отправить. Попробуйте ещё раз.' });
