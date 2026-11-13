@@ -48,6 +48,7 @@ body.compact #main{padding:6px;gap:6px}
 #bar .ib svg{width:21px;height:21px;stroke-width:1.8}
 #bar .tb.on,#bar .ib.on{background:var(--ac);color:#fff;border:0}
 #bar [hidden]{display:none!important}
+#bar .ib[data-k]::after{content:attr(data-k);position:absolute;right:3px;bottom:2px;font-size:10px;font-weight:600;line-height:1;opacity:.55}#bar .ib.on[data-k]::after{opacity:.85}
 /* полный экран: одна строка — инструменты по центру, звонок справа (название доски прячем) */
 body.cabside #bar #title,body.cabside #bar #st,body.focus #bar #title,body.focus #bar #st,body.cabside #bar .br,body.focus #bar .br{display:none!important}
 body.cabside #bar .rg,body.focus #bar .rg{order:4;margin-left:0}body.cabside #bar .tg,body.focus #bar .tg{margin:0 auto}
@@ -161,15 +162,15 @@ body.focus #main{padding:4px;gap:4px}
   <span id="st">Подключение…</span>
   <i class="br keep"></i>
   <span class="tg keep">
-   <button id="tpen" class="keep tb ib" title="Перо (P)"></button>
-   <button id="pe" class="keep tb ib" title="Ластик (E)"></button><button id="ersb" class="keep tb chev" title="Размер ластика или «стирает объект целиком»"></button>
-   <button id="thl" class="keep tb ib" title="Маркер (H): выделить или подчеркнуть"></button>
+   <button id="tpen" data-k="P" class="keep tb ib" title="Перо (P)"></button>
+   <button id="pe" data-k="E" class="keep tb ib" title="Ластик (E)"></button><button id="ersb" class="keep tb chev" title="Размер ластика или «стирает объект целиком»"></button>
+   <button id="thl" data-k="H" class="keep tb ib" title="Маркер (H): выделить или подчеркнуть"></button>
    <button id="ttext" class="keep tb ib" title="Текст"></button>
    <button id="tshape" class="keep tb ib" title="Фигуры, 3D-тела, графики"></button>
    <i class="sep"></i>
-   <button id="tmv" class="tb ib" title="Стрелка: двигать фигуры, текст и картинки (V)"></button>
+   <button id="tmv" data-k="V" class="tb ib" title="Стрелка: двигать фигуры, текст и картинки (V)"></button>
    <button id="thand" class="tb ib" title="Рука: двигать лист (или пробел + мышь)"></button>
-   <button id="tlaser" class="keep tb ib" title="Указка: след исчезает через секунду (L)"></button>
+   <button id="tlaser" data-k="L" class="keep tb ib" title="Указка: след исчезает через секунду (L)"></button>
    <button id="leadb" class="keep tb ib" hidden title="«За мной»: ученик видит то же место доски, что и вы"></button>
    <i class="sep"></i>
    <span id="cols" class="keep"></span>
