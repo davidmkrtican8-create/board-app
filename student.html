@@ -134,15 +134,7 @@ function stats(){
   if(t.num){const b=by[t.num]=by[t.num]||{ok:0,all:0};b.all++;b.ok+=m}})});
  $('s1').textContent=done;$('s2').textContent=all?Math.round(ok/all*100)+'%':'–';$('s3').textContent=D.pages.length;
  const p=$('prog');p.innerHTML='';
- const ks=Object.keys(by).map(Number).sort((a,b)=>a-b);
- if(ks.length){const bx=el('div',{className:'box'});
-  ks.forEach(k=>{const b=by[k],v=Math.round(b.ok/b.all*100),c=v>=75?'var(--ok)':v>=45?'#e0a526':'var(--bad)';
-   const i=el('i');i.style.width=Math.max(3,v)+'%';i.style.background=c;
-   bx.append(el('div',{className:'bar'},el('span',{className:'n',textContent:'№'+k}),el('div',{className:'tr'},i),el('span',{className:'v',textContent:v+'% · '+b.ok+'/'+b.all})))});
-  const weak=ks.filter(k=>by[k].all>=2).sort((a,b)=>by[a].ok/by[a].all-by[b].ok/by[b].all)[0];
-  if(weak&&by[weak].ok/by[weak].all<.6)bx.append(el('div',{className:'hint',textContent:'💡 Пока сложнее всего даётся №'+weak+'. Преподаватель это видит и даст ещё таких задач.'}));
-  p.append(bx)}
- else p.append(el('div',{className:'empty',textContent:'Здесь появятся проценты по каждому номеру, когда преподаватель проверит первые задачи'}));
+ // статистику по номерам заданий не показываем (так решил преподаватель)
  const R=D.rep||{};
  if(R.fixed||R.left){const tot=R.fixed+R.left,pc=Math.round(R.fixed/tot*100),ring=el('div',{className:'ring'},el('i',{textContent:R.fixed+'/'+tot}));
   ring.style.background='conic-gradient(var(--ok) 0 '+pc+'%,var(--track) '+pc+'% 100%)';
