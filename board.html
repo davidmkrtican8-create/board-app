@@ -1942,7 +1942,6 @@ if(!isTeacher){const mine=ME||room;['hwb','hwt'].forEach(i=>{$(i).hidden=false;$
  // кнопки групп: со своей доски — в группу, с доски группы — обратно на свою
  let grpDone=false;const groupsUI=j=>{if(grpDone)return;grpDone=true;const side=$('side'),at=$('hwb').nextSibling;
   const add=(txt,href,tt)=>{const b=document.createElement('button');b.className='grpb';b.textContent=txt;b.title=tt;b.onclick=()=>{location.href=href};side.insertBefore(b,at)};
-  if(ME)add('← Моя доска','/b/'+ME,'Ваша личная доска');
   (j.groups||[]).filter(g=>g.id!==room).forEach(g=>add('👥 '+g.name,'/b/'+g.id+'?u='+mine,'Общая доска группы'))};
  // на кнопке — сколько домашек ещё не сдано
  const hwCount=()=>fetch('/api/'+mine+'/hw').then(r=>{if(r.status===404){['hwb','hwt'].forEach(i=>{$(i).hidden=true});return null}return r.ok?r.json():null}).then(j=>{if(!j)return;groupsUI(j);const n=(j.list||[]).filter(h=>h.st==='new').length;

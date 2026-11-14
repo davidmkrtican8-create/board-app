@@ -166,7 +166,7 @@ function chip(h){
 function home(){
  $('hw').hidden=true;$('home').hidden=false;open=null;
  $('hi').textContent='Привет, '+String(D.name).split(/\s+/)[0]+'!';$('ava').textContent=(String(D.name).trim()[0]||'?').toUpperCase();$('tch').textContent=D.teacher?'Преподаватель: '+D.teacher:'';document.title=D.name+' — кабинет';
- $('toBoard').href='/b/'+sid;
+ $('toBoard').href=(D.groups||[]).length?'/b/'+D.groups[0].id+'?u='+sid:'/b/'+sid; // ученик из группы — на доску группы
  const gp=$('grps');gp.innerHTML='';(D.groups||[]).forEach(g=>gp.append(el('a',{className:'grp',href:'/b/'+g.id+'?u='+sid},el('div',{textContent:'👥',style:'font-size:26px'}),el('div',null,el('b',{textContent:g.name}),el('span',{textContent:'Общая доска группы'})),el('span',{className:'go',textContent:'›'}))));
  const l=$('list');l.innerHTML='';
  if(!D.list.length)l.append(el('div',{className:'empty',textContent:'Домашних заданий пока нет 🎉'}));
@@ -182,7 +182,7 @@ function home(){
  });
  const nn=D.list.filter(h=>h.st==='new').length;$('hwc').textContent=nn?nn+' '+plural(nn,'ждёт','ждут','ждут')+' решения':'';
  const bs=$('boards');bs.innerHTML='';
- D.pages.slice().reverse().forEach(p=>bs.append(el('a',{href:'/b/'+sid+'#p='+p.id,textContent:p.title||'Доска'})));
+ D.pages.slice().reverse().forEach(p=>bs.append(el('a',{href:'/b/'+sid+'?own=1#p='+p.id,textContent:p.title||'Доска'})));
  stats();tgCard();
 }
 function tgCard(){
@@ -221,9 +221,9 @@ function show(id){
  w.append(el('h2',{textContent:'Решение'}));
  const acts=el('div',{className:'actions'});
  acts.append(el('button',{className:edit?'pri':'',textContent:h.board?'Открыть доску с решением':'Решать на доске',onclick:async()=>{
-  if(h.board){location.href='/b/'+sid+'#p='+h.board;return}
+  if(h.board){location.href='/b/'+sid+'?own=1#p='+h.board;return}
   toast('Готовлю доску…');await flush();const j=await call({t:'board',id:h.id});if(!j)return;
-  const n=j.list.find(x=>x.id===h.id);if(n&&n.board)location.href='/b/'+sid+'#p='+n.board}}));
+  const n=j.list.find(x=>x.id===h.id);if(n&&n.board)location.href='/b/'+sid+'?own=1#p='+n.board}}));
  if(edit)acts.append(el('button',{textContent:'📷 Добавить фото тетради',onclick:()=>$('pf').click()}));
  w.append(acts);
  const ph=el('div',{className:'photos'});

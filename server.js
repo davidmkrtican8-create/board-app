@@ -925,6 +925,12 @@ http.createServer((req, res) => {
       res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="15"><body style="font:16px system-ui;max-width:420px;margin:12vh auto;padding:0 18px"><h2>Доска пока недоступна</h2><p>Сайт только что проснулся или обновился. Попросите преподавателя открыть свой кабинет: он вернёт доски. Эта страница обновится сама через несколько секунд.</p>');
     }
+    // ученик из группы по своей ссылке попадает сразу на общую доску группы (своя доска ему не нужна).
+    // Не перенаправляем: кабинет преподавателя (доска во фрейме) и ссылки «?own» (доска с решением домашки)
+    const gs = groupsOf(b[1]);
+    if (gs.length && !u.searchParams.has('own') && !u.searchParams.has('u') && req.headers['sec-fetch-dest'] !== 'iframe') {
+      res.writeHead(302, { Location: '/b/' + gs[0].id + '?u=' + b[1], 'Cache-Control': 'no-store' }); return res.end();
+    }
     return PAGE('board.html')(req, res);
   }
   res.writeHead(404); res.end('Not found');
