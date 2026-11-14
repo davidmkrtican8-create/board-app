@@ -65,6 +65,7 @@ button,input{font:inherit;color:var(--tx);background:var(--panel);border:1px sol
 .dlg .pri,#lf .pri{background:var(--ac);color:#fff;border-color:var(--ac)}.dlg .err{color:#d32f2f;min-height:18px}
 .dlg code{font-size:12px;word-break:break-all;background:color-mix(in srgb,var(--ac) 10%,transparent);padding:4px 6px;border-radius:6px}
 body.nosidebar #side{display:none}
+.st.sub{padding-left:30px}.st.sub .dot{width:6px;height:16px}.st .gm{cursor:pointer}
 .st .gi{font-size:15px;line-height:1}.st .gm{font-size:11px;color:var(--mut);margin-left:auto}.lh{font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;padding:10px 8px 2px}
 #side .top{flex-wrap:wrap;gap:6px}
 .memlist{display:flex;flex-direction:column;gap:4px;max-height:50vh;overflow:auto;margin:8px 0}.memlist label{display:flex;gap:8px;align-items:center;padding:6px 8px;border:1px solid var(--bd);border-radius:8px;cursor:pointer}
@@ -164,16 +165,24 @@ async function load(){
  const last=localStorage.getItem('last:'+me.login);
  if(!cur&&students.length)pick(students.some(s=>s.id===last)?last:students[0].id);
 }
+const gOpen=new Set(); // какие группы раскрыты в списке
 function render(){const l=$('list');l.innerHTML='';
  if(!students.length){const d=document.createElement('div');d.className='st';d.style.color='var(--mut)';d.textContent='Пока нет учеников. Нажмите «+ Ученик».';l.appendChild(d)}
- const isG=s=>s.type==='group',list=students.filter(s=>!isG(s)).concat(students.filter(isG));let gh=false;
- list.forEach(s=>{if(isG(s)&&!gh){gh=true;const h=document.createElement('div');h.className='lh';h.textContent='Группы';l.appendChild(h)}
-  const d=document.createElement('div');d.className='st'+(s.id===cur?' on':'');
+ // ученики из групп не дублируются в общем списке — они видны под своей группой, когда её раскрыть
+ const isG=s=>s.type==='group',groups=students.filter(isG),inG=new Set(groups.flatMap(g=>g.members||[]));
+ const row=(s,sub)=>{const d=document.createElement('div');d.className='st'+(s.id===cur?' on':'')+(sub?' sub':'');
   const dot=document.createElement('span');if(isG(s)){dot.className='gi';dot.textContent='👥'}else{dot.className='dot';dot.style.background=s.color}
   const t=document.createElement('span');t.textContent=s.name;d.append(dot,t);
-  if(isG(s)){const m=document.createElement('span');m.className='gm';m.textContent=(s.members||[]).length+' уч.';d.append(m)}
-  const pn=(window.hwPend||{})[s.id];if(pn){const b=document.createElement('span');b.className='badge';b.textContent=pn;b.title='Домашек ждут проверки: '+pn;d.append(b)}
-  d.onclick=()=>pick(s.id);l.appendChild(d)});if(window.hwOnPick)window.hwOnPick()}
+  const pn=(window.hwPend||{})[s.id];
+  if(isG(s)){const open=gOpen.has(s.id),m=document.createElement('span');m.className='gm';m.textContent=(s.members||[]).length+' уч. '+(open?'▾':'▸');m.title=open?'Свернуть':'Показать учеников группы';
+   m.onclick=e=>{e.stopPropagation();open?gOpen.delete(s.id):gOpen.add(s.id);render()};d.append(m)}
+  if(pn){const b=document.createElement('span');b.className='badge';b.textContent=pn;b.title='Домашек ждут проверки: '+pn;if(isG(s))b.style.marginLeft='6px';d.append(b)}
+  d.onclick=()=>{if(isG(s))gOpen.add(s.id);pick(s.id)};l.appendChild(d)};
+ students.filter(s=>!isG(s)&&!inG.has(s.id)).forEach(s=>row(s));
+ if(groups.length){const h=document.createElement('div');h.className='lh';h.textContent='Группы';l.appendChild(h)}
+ groups.forEach(g=>{if((g.members||[]).includes(cur))gOpen.add(g.id);row(g);
+  if(gOpen.has(g.id))(g.members||[]).map(id=>students.find(x=>x.id===id)).filter(Boolean).forEach(s=>row(s,true))});
+ if(window.hwOnPick)window.hwOnPick()}
 function pick(id,hash){cur=id;if(me)localStorage.setItem('last:'+me.login,id);const s=students.filter(x=>x.id===id)[0];
  if(!s){cur=null;$('nm').textContent='Выберите ученика';$('fr').src='about:blank';render();return}
  $('nm').textContent=(s.type==='group'?'👥 ':'')+s.name;render();$('mem').hidden=s.type!=='group';$('lnk').hidden=s.type==='group';
