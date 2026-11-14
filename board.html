@@ -238,9 +238,7 @@ const isTeacher=window.self!==window.top;let initDone=false;
 const ME=(new URLSearchParams(location.search).get('u')||'').replace(/[^a-z0-9]/g,'').slice(0,32); // ученик на доске группы: его id (кабинет и подпись — его)
 addEventListener('hashchange',()=>{const hp=(location.hash.match(/^#p=([\w-]+)$/)||[])[1];if(hp&&pages.some(p=>p.id===hp))openPage(hp)});
 let pages=[],strokes={},images={},page=null,live={},color='#1a1a1a',bg='grid',cur=null,lastEmit=0,mine=[],redo=[];
-let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,lastP=[0,0],editImg=null,editStroke=null,jump=null,fingerPan=false,fpSet=false;
-// листает ли палец: явный выбор на кнопке «Палец: …» главнее всего; без выбора — листает, если на этом iPad уже был Apple Pencil
-const touchPans=()=>fpSet?fingerPan:(fingerPan||(S.palm&&penSeen));
+let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,lastP=[0,0],editImg=null,editStroke=null,jump=null,fingerPan=false;
 let rectC=null,rq=0,pendErase=[],pendPage=null,eraseT=0,peersTxt='';
 let curPid=null,curPen=false,curT0=0,curX=0,curY=0,curTr=0,viewOnly=false,dark=false,penSeen=(()=>{try{return localStorage.getItem('penSeen')==='1'}catch(e){return false}})(),myName=null,ptr=null,curTool='pen',lastCur=0,lastCurP=[-9,-9];
 const views={},imgEl={},ptrs=new Map(),cursors={};
@@ -976,14 +974,14 @@ cv.addEventListener('pointerdown',e=>{
  if(e.pointerType==='mouse'&&e.button===2)return;
  if(tbox&&e.target===cv)closeText();
  try{cv.setPointerCapture(e.pointerId)}catch(_){}
- if(e.pointerType==='pen'){if(!penSeen){penSeen=true;try{localStorage.setItem('penSeen','1')}catch(_){}if(window.fpT)window.fpT()} // запоминаем: на этом планшете есть стилус
+ if(e.pointerType==='pen'){if(!penSeen){penSeen=true;try{localStorage.setItem('penSeen','1')}catch(_){}} // запоминаем: на этом планшете есть стилус
   if(pan&&pan.touch){pan=null;ptrs.clear();gest=null}} // ладонь начала двигать доску, а потом коснулось перо — доску больше не двигаем
  if(e.pointerType==='touch'){
   if(cur&&curPen)return; // пока пишет стилус, касания ладони и пальцев не считаем
-  const fingerScroll=touchPans()||tool()==='hand'||viewOnly||space; // палец здесь только листает
+  const fingerScroll=fingerPan||penSeen||tool()==='hand'||viewOnly||space; // палец здесь только листает
   if(S.palm&&!fingerScroll&&Math.max(e.width||0,e.height||0)>60)return; // широкое касание, когда палец рисует, — это ладонь (когда палец листает, не отбрасываем: у некоторых iPad пальцы «широкие»)
   // простой стилус (без Bluetooth) iPad видит как палец. Ладонь лежит НИЖЕ кончика стилуса — из нескольких касаний рисует верхнее
-  const tDraw=S.palm&&!touchPans()&&tool()!=='hand'&&!viewOnly&&!space,now=performance.now();
+  const tDraw=S.palm&&!fingerPan&&!penSeen&&tool()!=='hand'&&!viewOnly&&!space,now=performance.now();
   const twoF=cur&&ptrs.size===1&&Math.abs(e.clientY-curY)<55&&Math.abs(e.clientX-curX)<260&&now-curT0<450&&curTr<90; // второй палец лёг рядом на той же высоте вскоре после первого — это прокрутка двумя пальцами (ладонь лежит ниже)
   if(tDraw&&!twoF&&cur&&curPid!==null&&curPid!==e.pointerId&&!(now-curT0<120&&curTr<15&&ptrs.size===1)){ // уже рисует одно касание, пришло второе (жест двумя пальцами — только если оба почти одновременно и первое ещё не рисовало)
    if(e.clientY<curY-25&&(now-curT0<600||curTr<40)){ptrs.clear();if(cur.pts)clearLive();cur=null;curPid=null;redraw()} // новое выше, а «рисовала» неподвижная ладонь — убираем её след, рисует новое
@@ -996,7 +994,7 @@ cv.addEventListener('pointerdown',e=>{
  }
  if(!page)return;
  const t=tool();
- const panMode=e.button===1||space||t==='hand'||viewOnly||(e.pointerType==='touch'&&touchPans());
+ const panMode=e.button===1||space||t==='hand'||viewOnly||(e.pointerType==='touch'&&(fingerPan||(S.palm&&penSeen)));
  if(panMode){pan={id:e.pointerId,touch:e.pointerType==='touch',x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};cv.style.cursor='grabbing';return}
  curPid=e.pointerId;curPen=e.pointerType==='pen';curT0=performance.now();curX=e.clientX;curY=e.clientY;curTr=0; // рисует только это касание; другие (ладонь) линию не трогают
  const p=pos(e);lastP=p;
@@ -1985,10 +1983,9 @@ $('zfit').onclick=()=>{fit()};
 if(window.visualViewport)window.visualViewport.addEventListener('resize',chkZoom);
 $('newt').onclick=()=>{if(!jump)return;view.y=jump.y-40;$('newt').hidden=true;jump=null;redraw()};
 if(!isTeacher)['clr','delp'].forEach(v=>{const o=$('fm').querySelector('[value='+v+']');if(o)o.remove()}); // ученик не видит «Очистить» и «Удалить»
-if(navigator.maxTouchPoints>0){$('fp').hidden=false;const fpT=window.fpT=()=>{$('fp').textContent='Палец и простой стилус: '+(touchPans()?'листают':'рисуют')};
- try{const v=localStorage.getItem('fingerPan');fpSet=v==='0'||v==='1';fingerPan=v==='1'}catch(_){}fpT(); // выбор запоминается на этом устройстве
- // простой стилус (не Apple Pencil) iPad видит как палец: чтобы им писать, выберите «рисуют»
- $('fp').onclick=()=>{fingerPan=!touchPans();fpSet=true;try{localStorage.setItem('fingerPan',fingerPan?'1':'0')}catch(_){}fpT()}}
+if(navigator.maxTouchPoints>0){$('fp').hidden=false;const fpT=()=>{$('fp').textContent='Палец: '+(fingerPan?'листает':'рисует')};
+ try{fingerPan=localStorage.getItem('fingerPan')==='1'}catch(_){}fpT(); // выбор запоминается на этом устройстве
+ $('fp').onclick=()=>{fingerPan=!fingerPan;try{localStorage.setItem('fingerPan',fingerPan?'1':'0')}catch(_){}fpT()}}
 // настройки
 $('gear').onclick=()=>{$('set').hidden=!$('set').hidden};
 document.addEventListener('pointerdown',e=>{
