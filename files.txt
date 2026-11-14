@@ -10,3 +10,5 @@ pdf.min.mjs
 pdf.worker.min.mjs
 server.js
 student.html
+airport.html
+three.module.js

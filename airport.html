@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Огни аэродрома 3D</title>
+<style>
+:root{--bg:#05070b;--panel:rgba(14,18,26,.9);--fg:#e6ebf2;--muted:#8d98aa;--acc:#4da3ff;--line:rgba(255,255,255,.12)}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:13px/1.4 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+canvas{display:block;touch-action:none}
+#panel{position:absolute;top:12px;left:12px;width:310px;max-height:calc(100% - 24px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;box-sizing:border-box;backdrop-filter:blur(8px)}
+#panel.hidden{display:none}
+h1{font-size:16px;margin:0 0 2px}
+.sub{color:var(--muted);font-size:12px;margin-bottom:10px}
+h2{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:14px 0 6px;font-weight:600}
+.seg{display:flex;gap:4px;background:rgba(255,255,255,.05);border-radius:8px;padding:3px}
+.seg button{flex:1;border:0;background:transparent;color:var(--fg);padding:7px 4px;border-radius:6px;cursor:pointer;font:inherit;font-weight:600}
+.seg button.on{background:var(--acc);color:#fff}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.btns button,.wide{border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--fg);padding:7px 6px;border-radius:7px;cursor:pointer;font:inherit}
+.btns button:hover,.wide:hover{background:rgba(255,255,255,.1)}
+.wide{width:100%;margin-top:4px}
+.wide.on{background:#1f7a3f;border-color:#2fae5c}
+.layer{display:flex;align-items:center;gap:7px;padding:2px 0;cursor:pointer}
+.layer input{margin:0}
+.sw{width:10px;height:10px;border-radius:50%;flex:none;box-shadow:0 0 6px currentColor}
+.layer .n{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
+ul{margin:4px 0 0;padding-left:16px}
+li{margin:2px 0}
+.min{background:rgba(77,163,255,.12);border:1px solid rgba(77,163,255,.3);border-radius:7px;padding:6px 8px;margin-top:6px}
+.note{color:var(--muted);font-size:11px;margin-top:10px}
+#hud{position:absolute;right:12px;top:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-variant-numeric:tabular-nums;min-width:200px}
+#hud div{display:flex;justify-content:space-between;gap:14px}
+#hud span{color:var(--muted)}
+#papiTxt{margin-top:6px;font-weight:600}
+#dh{margin-top:6px;color:#ffcc33;font-weight:700;display:none}
+#help{position:absolute;right:12px;bottom:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;color:var(--muted);font-size:12px;max-width:330px}
+kbd{background:rgba(255,255,255,.1);border-radius:4px;padding:0 5px;color:var(--fg);font:inherit}
+#toggle{position:absolute;left:12px;bottom:12px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:8px;padding:8px 12px;cursor:pointer;font:inherit}
+@media (max-width:700px){#panel{width:calc(100% - 24px);max-height:55%}#help{display:none}#hud{top:auto;bottom:56px;min-width:0;font-size:11px}}
+</style>
+</head>
+<body>
+<div id="panel">
+  <h1>Светосигнальное оборудование</h1>
+  <div class="sub">3D-модель огней приближения и ВПП</div>
+
+  <h2>Схема огней приближения</h2>
+  <div class="seg" id="schemeSeg">
+    <button data-v="alpa" class="on">ALPA-ATA</button>
+    <button data-v="calvert">Кальверт</button>
+  </div>
+
+  <h2>Категория захода</h2>
+  <div class="seg" id="catSeg">
+    <button data-v="1" class="on">CAT I</button>
+    <button data-v="2">CAT II</button>
+    <button data-v="3">CAT III</button>
+  </div>
+  <div class="min" id="minima"></div>
+
+  <h2>Что входит в схему</h2>
+  <div id="desc"></div>
+
+  <h2>Слои огней</h2>
+  <div id="layers"></div>
+
+  <h2>Виды</h2>
+  <div class="btns">
+    <button data-view="glide2k">Глиссада, 3 км</button>
+    <button data-view="glide500">Глиссада, 600 м</button>
+    <button data-view="top">Сверху</button>
+    <button data-view="side">Сбоку</button>
+    <button data-view="threshold">Над порогом</button>
+    <button data-view="back">С ВПП назад</button>
+  </div>
+  <button class="wide" id="autoBtn">▶ Автоматический заход на посадку</button>
+  <button class="wide" id="fogBtn">Туман по минимуму категории (RVR)</button>
+  <button class="wide" id="dayBtn">День / ночь</button>
+  <button class="wide" id="lblBtn">Подписи расстояний</button>
+
+  <div class="note">Геометрия приближена к нормам ИКАО (Приложение 14) и FAA. Модель учебная: размеры отдельных элементов упрощены. ВПП 3000 × 45 м, посадка с запада на восток, PAPI слева.</div>
+</div>
+<button id="toggle">☰ Панель</button>
+
+<div id="hud">
+  <div><span>До порога</span><b id="hDist">—</b></div>
+  <div><span>Высота</span><b id="hAlt">—</b></div>
+  <div><span>Угол к точке касания</span><b id="hAng">—</b></div>
+  <div><span>Скорость полёта</span><b id="hSpd">—</b></div>
+  <div id="papiTxt">PAPI: —</div>
+  <div id="dh">ВЫСОТА ПРИНЯТИЯ РЕШЕНИЯ</div>
+</div>
+
+<div id="help">
+  <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> — полёт &nbsp; <kbd>E</kbd>/<kbd>Space</kbd> вверх, <kbd>Q</kbd>/<kbd>C</kbd> вниз<br>
+  Мышь (зажать и тянуть) — обзор, <kbd>←↑↓→</kbd> тоже<br>
+  <kbd>Shift</kbd> — ускорение ×5, колесо — скорость
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+// ---------- constants ----------
+const RW_L = 3000, RW_W = 45, AIM = 300, GS = 3 * Math.PI / 180;
+const C = {
+  white:[1,.95,.82], appr:[1,.92,.74], green:[.15,1,.4], red:[1,.13,.06],
+  yellow:[1,.76,.12], blue:[.25,.45,1], flash:[.85,.92,1]
+};
+const LAYERS = [
+  {id:'appr',  name:'Огни приближения (белые)', c:C.appr},
+  {id:'side',  name:'Боковые ряды (красные)',   c:C.red},
+  {id:'flash', name:'Бегущий огонь (импульсные)', c:C.flash},
+  {id:'thr',   name:'Входные огни (зелёные)',   c:C.green},
+  {id:'edge',  name:'Кромочные огни ВПП',       c:C.white},
+  {id:'cl',    name:'Осевые огни ВПП',          c:C.white},
+  {id:'tdz',   name:'Огни зоны приземления',    c:C.white},
+  {id:'end',   name:'Ограничительные (красные)',c:C.red},
+  {id:'papi',  name:'PAPI (глиссадные)',        c:C.red},
+  {id:'taxi',  name:'Огни рулёжной дорожки',    c:C.blue},
+  {id:'stop',  name:'Стоп-линия и защита ВПП',  c:C.yellow},
+];
+const SIZES = {appr:1.7, side:1.6, flash:3.2, thr:1.5, edge:1.3, cl:0.9, tdz:0.9, end:1.5, papi:2.4, taxi:0.8, stop:1.2};
+const MINIMA = {
+  1:{txt:'<b>CAT I</b>: ВПР ≥ 60 м, RVR ≥ 550 м', rvr:550, dh:60},
+  2:{txt:'<b>CAT II</b>: ВПР 30–60 м, RVR ≥ 300 м', rvr:300, dh:30},
+  3:{txt:'<b>CAT III</b>: ВПР &lt; 30 м или без ВПР; RVR ≥ 175 м (IIIA), ≥ 50 м (IIIB), без ограничений (IIIC). В тумане показан IIIA.', rvr:175, dh:15},
+};
+
+const state = {scheme:'alpa', cat:1, layers:Object.fromEntries(LAYERS.map(l=>[l.id,true])), fog:false, day:false, labels:true};
+
+// ---------- renderer / scene ----------
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.5, 40000);
+camera.rotation.order = 'YXZ';
+
+// ---------- ground & pavement ----------
+const mats = {
+  ground: new THREE.MeshBasicMaterial({color:0x0a0f0a}),
+  runway: new THREE.MeshBasicMaterial({color:0x17181b}),
+  shoulder: new THREE.MeshBasicMaterial({color:0x101113}),
+  taxi: new THREE.MeshBasicMaterial({color:0x141518}),
+  mark: new THREE.MeshBasicMaterial({color:0x4a4a4a}),
+  markY: new THREE.MeshBasicMaterial({color:0x4a4220}),
+  papiBox: new THREE.MeshBasicMaterial({color:0x222222}),
+};
+function rect(x0,x1,z0,z1,y,mat){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(x1-x0, z1-z0), mat);
+  m.rotation.x = -Math.PI/2; m.position.set((x0+x1)/2, y, (z0+z1)/2); scene.add(m); return m;
+}
+rect(-12000,15000,-12000,12000,0,mats.ground);
+rect(-60,RW_L+60,-RW_W/2-7.5,RW_W/2+7.5,0.01,mats.shoulder);
+rect(0,RW_L,-RW_W/2,RW_W/2,0.02,mats.runway);
+// threshold piano keys (both ends)
+for (const [x0,dir] of [[6,1],[RW_L-6,-1]]) {
+  for (let i=0;i<6;i++){ const z=3+i*3.2; for (const s of [-1,1]) rect(Math.min(x0,x0+dir*30),Math.max(x0,x0+dir*30),s*z-0.9,s*z+0.9,0.03,mats.mark); }
+}
+// centreline dashes
+for (let x=60;x<RW_L-60;x+=50) rect(x,x+30,-0.45,0.45,0.03,mats.mark);
+// aiming point & TDZ markings
+for (const s of [-1,1]) {
+  rect(AIM-22,AIM+23,s*9,s*18,0.03,mats.mark);
+  rect(RW_L-AIM-23,RW_L-AIM+22,s*9,s*18,0.03,mats.mark);
+  for (const x of [150,450,600,750,900]) for (const k of [0,1,2].slice(0, x<=450?3:x<=750?2:1))
+    rect(x,x+22.5,s*(9+k*3),s*(9+k*3+1.8),0.03,mats.mark);
+}
+// edge stripes
+for (const s of [-1,1]) rect(0,RW_L,s*RW_W/2-(s>0?0.9:0),s*RW_W/2+(s<0?0.9:0),0.03,mats.mark);
+// taxiways
+const TX = 1800, TZ = 180, TW = 23;
+rect(TX-TW/2,TX+TW/2,RW_W/2,TZ,0.015,mats.taxi);
+rect(200,RW_L-200,TZ-TW/2,TZ+TW/2,0.015,mats.taxi);
+rect(TX-TW/2,TX+TW/2,89,90.6,0.03,mats.markY);
+// PAPI boxes
+const PAPI_X = AIM, PAPI_Z = [-37.5,-46.5,-55.5,-64.5], PAPI_ANG = [3.5,3.1667,2.8333,2.5];
+for (const z of PAPI_Z){ const b=new THREE.Mesh(new THREE.BoxGeometry(1.2,0.9,2),mats.papiBox); b.position.set(PAPI_X,0.45,z); scene.add(b); }
+
+// stars
+{
+  const n=1500, p=new Float32Array(n*3);
+  for(let i=0;i<n;i++){ const th=Math.random()*Math.PI*2, ph=Math.random()*Math.PI*0.45+0.03, r=20000;
+    p[i*3]=Math.cos(th)*Math.cos(ph)*r+1500; p[i*3+1]=Math.sin(ph)*r; p[i*3+2]=Math.sin(th)*Math.cos(ph)*r; }
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(p,3));
+  var stars=new THREE.Points(g,new THREE.PointsMaterial({color:0x9aa6c0,size:1.4,sizeAttenuation:false}));
+  scene.add(stars);
+}
+
+// ---------- labels ----------
+const labelGroup = new THREE.Group(); scene.add(labelGroup);
+function label(text,x,y,z,w=40){
+  const cv=document.createElement('canvas'); cv.width=512; cv.height=96;
+  const g=cv.getContext('2d'); g.font='600 52px system-ui,-apple-system,sans-serif'; g.fillStyle='rgba(220,230,245,.9)';
+  g.textAlign='center'; g.textBaseline='middle'; g.fillText(text,256,48);
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true,depthWrite:false}));
+  s.scale.set(w,w*96/512,1); s.position.set(x,y,z); labelGroup.add(s);
+}
+for (let d=150; d<=900; d+=150) label(`${d} м`, -d, 4, -48, 34);
+label('Порог ВПП', 0, 5, -70, 40);
+label('PAPI', PAPI_X, 5, -51, 24);
+label('900 м до конца', RW_L-900, 4, -45, 40);
+label('300 м до конца', RW_L-300, 4, -45, 40);
+label('Стоп-линия', TX+30, 4, 90, 32);
+label('ВПП 3000 × 45 м', 1500, 6, -60, 50);
+
+// ---------- light builder ----------
+let L = [];
+function add(g,x,z,c,f=null,y=0.5){ L.push({g,x,y,z,c,f}); }
+function row(g,x,zs,c){ for(const z of zs) add(g,x,z,c); }
+const range = (a,b,s) => { const r=[]; for(let v=a; v<=b+1e-6; v+=s) r.push(+v.toFixed(3)); return r; };
+const barrette5 = [-2,-1,0,1,2];
+const sideRow = [9,10.5,12];
+
+function buildApproach(scheme,cat){
+  const precise = cat>=2;
+  if (scheme==='alpa'){
+    // centreline barrettes, 5 lights, every 30 m, 900 m
+    for (let d=30; d<=900; d+=30) row('appr',-d,barrette5,C.appr);
+    // 300 m crossbar 30 m wide
+    row('appr',-300,[...range(4.5,15,1.5),...range(4.5,15,1.5).map(v=>-v)],C.appr);
+    // sequenced flashers 900→330 m
+    const st = range(330,900,30).reverse(); const N=st.length;
+    st.forEach((d,k)=> add('flash',-d-3,0,C.flash,[0.5,k/N*0.62,0.035],1.4));
+    if (precise){
+      for (let d=30; d<=270; d+=30) row('side',-d,[...sideRow,...sideRow.map(v=>-v)],C.red);
+      row('appr',-150,[3.5,5,6.5,-3.5,-5,-6.5],C.appr);
+    }
+  } else {
+    // Calvert
+    const hw = {150:9,300:15,450:21,600:27,750:33};
+    for (let d=30; d<=900; d+=30){
+      if (d<=300) row('appr',-d, precise ? barrette5 : [0], C.appr);
+      else if (d<=600) row('appr',-d,[-0.8,0.8],C.appr);
+      else row('appr',-d,[-1.6,0,1.6],C.appr);
+    }
+    for (const d of [150,300,450,600,750]){
+      const w=hw[d], from = precise&&d===150 ? 3.5 : 3.5, to = precise&&d===150 ? 7 : w;
+      const n=Math.max(1,Math.round((to-from)/2.7)); const zs=[];
+      for(let i=0;i<=n;i++){ const z=from+(to-from)*i/n; zs.push(z,-z); }
+      row('appr',-d,zs,C.appr);
+    }
+    if (precise) for (let d=30; d<=270; d+=30) row('side',-d,[...sideRow,...sideRow.map(v=>-v)],C.red);
+  }
+}
+
+function build(){
+  L = [];
+  const {scheme,cat} = state;
+  buildApproach(scheme,cat);
+  // threshold — green
+  row('thr',0,range(-21,21,3),C.green);
+  // runway end — red
+  row('end',RW_L+0.5, cat===3 ? range(-21,21,3) : range(-21,21,6), C.red);
+  // edge lights 60 m; last 600 m yellow
+  for (let x=0; x<=RW_L+1e-6; x+=60){ const c = x>RW_L-600 ? C.yellow : C.white; add('edge',x,-RW_W/2-1.5,c); add('edge',x,RW_W/2+1.5,c); }
+  if (cat>=2){
+    // centreline lights
+    const sp = cat===3 ? 15 : 30; let k=0;
+    for (let x=sp/2; x<RW_L; x+=sp, k++){
+      const r = RW_L-x;
+      const c = r>900 ? C.white : r>300 ? (k%2 ? C.red : C.white) : C.red;
+      add('cl',x,0.6,c,null,0.15);
+    }
+    // touchdown zone barrettes to 900 m
+    const tsp = cat===3 ? 30 : 60;
+    for (let x=tsp; x<=900; x+=tsp) for (const z of [...sideRow,...sideRow.map(v=>-v)]) add('tdz',x,z,C.white,null,0.15);
+    // stop bar & runway guard lights
+    row('stop',TX, [], C.red);
+    for (const x of range(TX-10.5,TX+10.5,3)) add('stop',x,90,C.red,null,0.3);
+    add('stop',TX-TW/2-3,90,C.yellow,[1,0,0.5],0.9);
+    add('stop',TX+TW/2+3,90,C.yellow,[1,0.5,0.5],0.9);
+  }
+  // taxiway edge — blue
+  for (let z=45; z<=TZ-TW/2-5; z+=30){ add('taxi',TX-TW/2-1,z,C.blue,null,0.35); add('taxi',TX+TW/2+1,z,C.blue,null,0.35); }
+  for (let x=210; x<=RW_L-210; x+=30){
+    add('taxi',x,TZ+TW/2+1,C.blue,null,0.35);
+    if (Math.abs(x-TX)>TW) add('taxi',x,TZ-TW/2-1,C.blue,null,0.35);
+  }
+  if (cat===3){
+    // lead-off lights from runway centreline + taxiway centreline
+    const P0=[TX-110,0.6], P1=[TX,0.6], P2=[TX,60];
+    const pts=[]; let prev=null, acc=15;
+    for (let t=0;t<=1.0001;t+=0.002){
+      const x=(1-t)**2*P0[0]+2*(1-t)*t*P1[0]+t*t*P2[0], z=(1-t)**2*P0[1]+2*(1-t)*t*P1[1]+t*t*P2[1];
+      if (prev) acc += Math.hypot(x-prev[0],z-prev[1]);
+      if (acc>=15){ pts.push([x,z]); acc=0; } prev=[x,z];
+    }
+    for (let z=75; z<=TZ; z+=15) pts.push([TX,z]);
+    pts.forEach(([x,z],i)=> add('taxi',x,z, z<150 ? (i%2?C.yellow:C.green) : C.green, null, 0.15));
+    for (let d=15; d<=1500; d+=15){ if (TX-d>=210) add('taxi',TX-d,TZ,C.green,null,0.15); if (TX+d<=RW_L-210) add('taxi',TX+d,TZ,C.green,null,0.15); }
+  }
+  // PAPI
+  PAPI_Z.forEach((z,i)=> add('papi',PAPI_X-0.7,z,C.red,null,0.8));
+}
+
+// ---------- point material ----------
+const mat = new THREE.ShaderMaterial({
+  uniforms:{uTime:{value:0}, uScale:{value:1}, uMin:{value:2.5}, uFogK:{value:0}},
+  vertexShader:`
+    uniform float uTime, uScale, uMin, uFogK;
+    attribute vec3 aColor; attribute float aSize; attribute vec3 aFlash;
+    varying vec3 vColor; varying float vOn;
+    void main(){
+      vec4 mv = modelViewMatrix*vec4(position,1.0);
+      float on = 1.0;
+      if (aFlash.x > 0.0){ float t = fract(uTime/aFlash.x); on = step(aFlash.y,t)*step(t,aFlash.y+aFlash.z); }
+      float d = length(mv.xyz);
+      vOn = on; vColor = aColor * exp(-uFogK*d);
+      float ps = aSize*uScale/max(-mv.z,0.1);
+      gl_PointSize = on > 0.5 ? clamp(ps, uMin, 70.0) : 0.0;
+      gl_Position = projectionMatrix*mv;
+    }`,
+  fragmentShader:`
+    varying vec3 vColor; varying float vOn;
+    void main(){
+      if (vOn < 0.5) discard;
+      vec2 c = gl_PointCoord-0.5; float r = length(c)*2.0;
+      if (r > 1.0) discard;
+      float core = smoothstep(0.42,0.0,r);
+      float glow = exp(-r*r*5.0)*0.55;
+      gl_FragColor = vec4(vColor*(core+glow) + vec3(core*core*0.45)*length(vColor), 1.0);
+    }`,
+  transparent:true, depthWrite:false, blending:THREE.AdditiveBlending
+});
+let points=null, papiIdx=[];
+function rebuild(){
+  build();
+  const counts={}; for(const l of L) counts[l.g]=(counts[l.g]||0)+1;
+  const vis=L.filter(l=>state.layers[l.g]);
+  const n=vis.length, pos=new Float32Array(n*3), col=new Float32Array(n*3), size=new Float32Array(n), fl=new Float32Array(n*3);
+  papiIdx=[];
+  vis.forEach((l,i)=>{
+    pos.set([l.x,l.y,l.z],i*3); col.set(l.c,i*3); size[i]=SIZES[l.g]; if(l.f) fl.set(l.f,i*3);
+    if(l.g==='papi') papiIdx.push(i);
+  });
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  g.setAttribute('aColor',new THREE.BufferAttribute(col,3));
+  g.setAttribute('aSize',new THREE.BufferAttribute(size,1));
+  g.setAttribute('aFlash',new THREE.BufferAttribute(fl,3));
+  if(points){ scene.remove(points); points.geometry.dispose(); }
+  points=new THREE.Points(g,mat); points.frustumCulled=false; scene.add(points);
+  renderLayers(counts); renderDesc();
+}
+
+// ---------- UI ----------
+const $ = id => document.getElementById(id);
+const rgb = c => `rgb(${c.map(v=>Math.round(v*255)).join(',')})`;
+function renderLayers(counts){
+  $('layers').innerHTML = LAYERS.filter(l=>counts[l.id]).map(l=>`
+    <label class="layer"><input type="checkbox" data-l="${l.id}" ${state.layers[l.id]?'checked':''}>
+    <span class="sw" style="background:${rgb(l.c)};color:${rgb(l.c)}"></span>${l.name}<span class="n">${counts[l.id]}</span></label>`).join('');
+  $('layers').querySelectorAll('input').forEach(i=>i.onchange=()=>{ state.layers[i.dataset.l]=i.checked; rebuild(); });
+}
+function renderDesc(){
+  const {scheme,cat}=state, p=cat>=2, items=[];
+  if (scheme==='alpa'){
+    items.push('<b>ALPA-ATA</b> (американская система, ALSF): центральный ряд из барретов по 5 белых огней через 30 м на длину 900 м');
+    items.push('Световой горизонт на 300 м шириной 30 м');
+    items.push('Импульсные «бегущие» огни от 900 до 330 м — вспышки бегут к порогу дважды в секунду');
+    if (p) items.push('Внутренние 300 м: красные боковые барреты по 3 огня (продолжение линий зоны приземления) и дополнительный горизонт на 150 м');
+  } else {
+    items.push('<b>Система Кальверта</b> (английская, ИКАО): центральный ряд с кодированием расстояния — 0–300 м одиночные огни, 300–600 м по 2 огня, 600–900 м по 3 огня');
+    items.push('Пять световых горизонтов через 150 м (150, 300, 450, 600, 750 м), расширяющихся от порога — образуют «воронку» к ВПП');
+    if (p) items.push('Внутренние 300 м: центральные барреты по 5 огней, красные боковые ряды, горизонт на 150 м заполняет промежуток между центром и боковыми рядами');
+  }
+  items.push('Входные огни — зелёные, ограничительные — красные'+(cat===3?' (через 3 м)':''));
+  items.push('Кромочные огни ВПП — белые через 60 м, последние 600 м — жёлтые');
+  items.push('PAPI слева на 300 м: на глиссаде 2 красных + 2 белых');
+  if (p){
+    items.push(`Осевые огни ВПП через ${cat===3?15:30} м: белые → чередование красный/белый (900–300 м до конца) → красные (последние 300 м)`);
+    items.push(`Огни зоны приземления: барреты по 3 огня на 900 м от порога через ${cat===3?30:60} м`);
+    items.push('Стоп-линия (красная) и мигающие жёлтые огни защиты ВПП на РД');
+  }
+  if (cat===3) items.push('Осевые огни РД — зелёные; огни схода с ВПП в зоне ILS чередуются зелёный/жёлтый');
+  $('desc').innerHTML = '<ul>'+items.map(s=>`<li>${s}</li>`).join('')+'</ul>';
+  $('minima').innerHTML = MINIMA[cat].txt;
+}
+function seg(id,key,parse){
+  $(id).querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    $(id).querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+    state[key]=parse(b.dataset.v); rebuild(); applyAtmos();
+  });
+}
+seg('schemeSeg','scheme',v=>v);
+seg('catSeg','cat',v=>+v);
+$('toggle').onclick=()=>$('panel').classList.toggle('hidden');
+$('fogBtn').onclick=()=>{ state.fog=!state.fog; $('fogBtn').classList.toggle('on',state.fog); applyAtmos(); };
+$('dayBtn').onclick=()=>{ state.day=!state.day; $('dayBtn').classList.toggle('on',state.day); applyAtmos(); };
+$('lblBtn').classList.add('on');
+$('lblBtn').onclick=()=>{ state.labels=!state.labels; labelGroup.visible=state.labels; $('lblBtn').classList.toggle('on',state.labels); };
+
+function applyAtmos(){
+  const day=state.day;
+  mats.ground.color.set(day?0x4f6b3a:0x0a0f0a);
+  mats.runway.color.set(day?0x55575c:0x17181b);
+  mats.shoulder.color.set(day?0x6b6a62:0x101113);
+  mats.taxi.color.set(day?0x5c5d61:0x141518);
+  mats.mark.color.set(day?0xeeeeee:0x4a4a4a);
+  mats.markY.color.set(day?0xe8c030:0x4a4220);
+  stars.visible=!day && !state.fog;
+  if (state.fog){
+    const rvr=MINIMA[state.cat].rvr, fc= day?0xb8bec6:0x1b1e23;
+    scene.background=new THREE.Color(fc); scene.fog=new THREE.Fog(fc,0,rvr*1.1);
+    mat.uniforms.uFogK.value=1.4/rvr;
+  } else {
+    scene.background=new THREE.Color(day?0x8fb6e0:0x04060b); scene.fog=null; mat.uniforms.uFogK.value=0;
+  }
+  [mats.ground,mats.runway,mats.shoulder,mats.taxi,mats.mark,mats.markY,mats.papiBox].forEach(m=>m.needsUpdate=true);
+}
+
+// ---------- camera control ----------
+let yaw=-Math.PI/2, pitch=-GS, speed=60, auto=null;
+const keys={};
+function setCam(x,y,z,yw,pt){ camera.position.set(x,y,z); yaw=yw; pitch=pt; auto=null; $('autoBtn').classList.remove('on'); }
+const glideY = x => Math.max(0,(AIM-x))*Math.tan(GS)+3;
+const VIEWS = {
+  glide2k:  ()=>setCam(-2700, glideY(-2700), 0, -Math.PI/2, -GS),
+  glide500: ()=>setCam(-300, glideY(-300), 0, -Math.PI/2, -GS*1.5),
+  top:      ()=>setCam(-380, 650, 0, -Math.PI/2, -1.5),
+  side:     ()=>setCam(-700, 160, -650, Math.PI*0.84, -0.2),
+  threshold:()=>setCam(-80, 45, 0, -Math.PI/2, -0.55),
+  back:     ()=>setCam(500, 12, 0, Math.PI/2, -0.04),
+};
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>VIEWS[b.dataset.view]());
+$('autoBtn').onclick=()=>{
+  if (auto){ auto=null; $('autoBtn').classList.remove('on'); return; }
+  setCam(-3200, glideY(-3200), 0, -Math.PI/2, -GS);
+  auto={v:70}; $('autoBtn').classList.add('on');
+};
+addEventListener('keydown',e=>{
+  if (e.target.tagName==='INPUT') return;
+  keys[e.code]=true;
+  if (auto && /Key[WASDQEC]|Space/.test(e.code)){ auto=null; $('autoBtn').classList.remove('on'); }
+  if (e.code==='Space') e.preventDefault();
+});
+addEventListener('keyup',e=>keys[e.code]=false);
+addEventListener('blur',()=>{ for(const k in keys) keys[k]=false; });
+let drag=null;
+renderer.domElement.addEventListener('pointerdown',e=>{ drag={x:e.clientX,y:e.clientY}; renderer.domElement.setPointerCapture(e.pointerId); });
+renderer.domElement.addEventListener('pointermove',e=>{
+  if(!drag) return;
+  yaw -= (e.clientX-drag.x)*0.003; pitch -= (e.clientY-drag.y)*0.003;
+  pitch=Math.max(-1.55,Math.min(1.55,pitch)); drag={x:e.clientX,y:e.clientY};
+});
+renderer.domElement.addEventListener('pointerup',()=>drag=null);
+renderer.domElement.addEventListener('wheel',e=>{ e.preventDefault(); speed=Math.max(5,Math.min(800,speed*(e.deltaY>0?1/1.15:1.15))); },{passive:false});
+
+const fwd=new THREE.Vector3(), right=new THREE.Vector3(), up=new THREE.Vector3(0,1,0);
+let curSpeed=0;
+function update(dt){
+  if (auto){
+    const p=camera.position;
+    if (p.x>AIM+20) auto.v=Math.max(0,auto.v-3*dt);
+    p.x+=auto.v*dt; p.z=0; p.y=glideY(p.x);
+    yaw=-Math.PI/2; pitch = p.x<AIM ? -GS : -0.03;
+    curSpeed=auto.v;
+    if (auto.v<=0){ auto=null; $('autoBtn').classList.remove('on'); }
+  } else {
+    const k=keys, lt=1.5*dt;
+    if(k.ArrowLeft) yaw+=lt; if(k.ArrowRight) yaw-=lt;
+    if(k.ArrowUp) pitch=Math.min(1.55,pitch+lt); if(k.ArrowDown) pitch=Math.max(-1.55,pitch-lt);
+    camera.rotation.set(pitch,yaw,0);
+    camera.getWorldDirection(fwd); right.crossVectors(fwd,up).normalize();
+    const v=speed*(k.ShiftLeft||k.ShiftRight?5:1)*dt, mv=new THREE.Vector3();
+    if(k.KeyW) mv.add(fwd); if(k.KeyS) mv.sub(fwd);
+    if(k.KeyD) mv.add(right); if(k.KeyA) mv.sub(right);
+    if(k.KeyE||k.Space) mv.y+=1; if(k.KeyQ||k.KeyC) mv.y-=1;
+    curSpeed = mv.lengthSq()>0 ? v/dt : 0;
+    if (mv.lengthSq()>0) camera.position.addScaledVector(mv.normalize(),v);
+    camera.position.y=Math.max(1.5,camera.position.y);
+  }
+  camera.rotation.set(pitch,yaw,0);
+}
+
+// PAPI colour by viewing angle
+const papiCol=[0,0,0,0];
+function updatePapi(){
+  const p=camera.position, horiz=PAPI_X-p.x;
+  let reds=0, txt='PAPI: не виден (вы за ним)';
+  if (horiz>5){
+    const ang=Math.atan2(p.y-0.8,horiz)*180/Math.PI;
+    for(let i=0;i<4;i++){ papiCol[i]= ang>PAPI_ANG[i] ? 1 : 0; if(!papiCol[i]) reds++; }
+    txt = ['PAPI: 4 белых — сильно выше глиссады','PAPI: 1 красный, 3 белых — немного выше','PAPI: 2 красных, 2 белых — на глиссаде ✓','PAPI: 3 красных, 1 белый — немного ниже','PAPI: 4 красных — сильно ниже глиссады!'][reds];
+  }
+  $('papiTxt').textContent=txt;
+  $('papiTxt').style.color = reds===2 ? '#5dff8f' : reds===0||reds===4 ? '#ff6b5a' : '#ffcc33';
+  if (!points || !papiIdx.length) return;
+  const a=points.geometry.attributes.aColor;
+  papiIdx.forEach((vi,i)=>{ const c= horiz>5 ? (papiCol[i]?C.white:C.red) : [0.15,0.15,0.15]; a.setXYZ(vi,c[0],c[1],c[2]); });
+  a.needsUpdate=true;
+}
+
+let hudT=0;
+function updateHud(dt){
+  hudT+=dt; if(hudT<0.1) return; hudT=0;
+  const p=camera.position, d=-p.x;
+  $('hDist').textContent = d>=0 ? `${Math.round(d)} м` : `за порогом ${Math.round(-d)} м`;
+  $('hAlt').textContent = `${Math.round(p.y)} м`;
+  const ang=Math.atan2(p.y,AIM-p.x)*180/Math.PI;
+  $('hAng').textContent = p.x<AIM ? `${ang.toFixed(2)}°` : '—';
+  $('hSpd').textContent = `${Math.round(curSpeed*3.6)} км/ч`;
+  const dh=MINIMA[state.cat].dh;
+  $('dh').style.display = (p.x<AIM && p.y<=dh+3 && p.y>=dh-6) ? 'block' : 'none';
+  $('dh').textContent = `ВПР ${dh} м (CAT ${['I','II','III'][state.cat-1]}) — решение!`;
+}
+
+function resize(){
+  renderer.setSize(innerWidth,innerHeight); camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  const h=renderer.getDrawingBufferSize(new THREE.Vector2()).y;
+  mat.uniforms.uScale.value = h/(2*Math.tan(camera.fov*Math.PI/360));
+  mat.uniforms.uMin.value = 3.2*renderer.getPixelRatio();
+}
+addEventListener('resize',resize);
+
+let last=performance.now();
+function loop(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  update(dt); updatePapi(); updateHud(dt);
+  mat.uniforms.uTime.value=now/1000;
+  renderer.render(scene,camera);
+  requestAnimationFrame(loop);
+}
+resize(); rebuild(); applyAtmos(); VIEWS.glide2k();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

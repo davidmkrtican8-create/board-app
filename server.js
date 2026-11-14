@@ -212,6 +212,11 @@ const ipOf = req => String(req.headers['x-forwarded-for'] || req.socket.remoteAd
 const recent = req => (fails.get(ipOf(req)) || []).filter(t => Date.now() - t < 6e5);
 const limited = req => recent(req).length >= 10;
 const fail = req => fails.set(ipOf(req), recent(req).concat(Date.now()));
+// 3D-модель огней аэродрома (airport.html): видна только владельцу, открывается по секретной ссылке /m/<код>.
+// «Сменить ссылку» в кабинете увеличивает v — старая ссылка перестаёт работать.
+const MF = path.join(DIR, '_models.json');
+let MOD = { v: 0 }; try { MOD = Object.assign(MOD, JSON.parse(fs.readFileSync(MF, 'utf8'))); } catch (e) {}
+const modelCode = () => sign('airport.' + MOD.v).replace(/[^a-zA-Z0-9]/g, '').slice(0, 20);
 const validInvite = c => T.invites.find(i => i.code === String(c || '') && !i.used && Date.now() - i.created < 14 * 864e5);
 const who = t => ({ name: t.name, login: t.login, role: t.role || 'teacher' });
 const randPw = () => crypto.randomBytes(9).toString('base64').replace(/[^A-Za-z0-9]/g, '').slice(0, 10) || 'board' + Date.now();
@@ -761,6 +766,11 @@ function admin(req, res, u) {
     const all = {}; mine().forEach(s => { const r = room(s.id); if (r) all[s.id] = r.s; });
     return json(res, { index: { students: mine() }, rooms: all });
   }
+  if (u.pathname === '/api/admin/model') {
+    if (!isOwner) { res.writeHead(403); return res.end(); }
+    if (req.method === 'POST') { MOD.v++; fs.writeFileSync(MF, JSON.stringify(MOD)); }
+    return json(res, { path: '/m/' + modelCode() });
+  }
   if (req.method === 'GET' && u.pathname === '/api/admin/teachers') {
     if (!isOwner) { res.writeHead(403); return res.end(); }
     return json(res, {
@@ -841,6 +851,7 @@ http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   if (u.pathname.startsWith('/api/admin/')) return admin(req, res, u);
   if (['/api/login', '/api/register', '/api/invite'].includes(u.pathname)) return account(req, res, u);
+  if (u.pathname === '/three.module.js') return sendFile(req, res, path.join(__dirname, 'three.module.js'), 'text/javascript; charset=utf-8', 'public, max-age=86400'); // 3D-библиотека для airport.html — со своего сервера, без внешних CDN
   const pj = u.pathname.match(/^\/pdfjs\/(pdf(?:\.worker)?\.min\.mjs)$/);
   if (pj) { // pdf.js для просмотра сборников задач в кабинете преподавателя
     return sendFile(req, res, path.join(__dirname, pj[1]), 'text/javascript; charset=utf-8', 'public, max-age=86400');
@@ -917,6 +928,8 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8' });
     return res.end(JSON.stringify({ name: 'Доска', short_name: 'Доска', start_url: '/b/' + mf[1], scope: '/', display: 'fullscreen', display_override: ['fullscreen', 'standalone'], background_color: '#f4f1fa', theme_color: '#6a3fc4', icons: [{ src: '/icon.png', sizes: '512x512', type: 'image/png', purpose: 'any' }] }));
   }
+  const md = u.pathname.match(/^\/m\/([A-Za-z0-9]{20})$/);
+  if (md && eq(md[1], modelCode())) return PAGE('airport.html')(req, res); // 3D-модель огней — только по секретной ссылке
   if (u.pathname === '/t') return PAGE('admin.html')(req, res);
   if (u.pathname === '/' || u.pathname === '/index.html') return PAGE('index.html')(req, res); // главная страница
   const b = u.pathname.match(/^\/b\/([a-z0-9]{4,32})$/);

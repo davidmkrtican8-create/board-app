@@ -125,7 +125,7 @@ body.nosidebar #side{display:none}
   <div class="top"><b>Ученики</b><button id="addS">+ Ученик</button><button id="addG" title="Группа: общие доски для нескольких учеников, у каждого свой кабинет">+ Группа</button></div>
   <div id="list"></div>
   <div id="whoami" style="font-size:12px;color:var(--mut)"></div>
-  <div class="foot"><button id="tch" hidden title="Пригласить репетиторов и управлять их аккаунтами">Репетиторы</button><button id="tgb" title="Telegram-бот: уведомления и конспекты">Telegram</button><button id="cpw" title="Сменить свой пароль">Пароль</button><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden><button id="lo" title="Выйти из кабинета на этом устройстве">Выйти</button><button id="rb" title="Вернуть учеников и доски из копии, которую кабинет сам сохраняет в вашем браузере">Восстановить из автокопии</button><div id="bkst" style="font-size:12px;color:var(--mut);width:100%"></div></div>
+  <div class="foot"><button id="tch" hidden title="Пригласить репетиторов и управлять их аккаунтами">Репетиторы</button><button id="mdl" hidden title="3D-модель огней аэродрома: ссылка видна только вам">3D-огни</button><button id="tgb" title="Telegram-бот: уведомления и конспекты">Telegram</button><button id="cpw" title="Сменить свой пароль">Пароль</button><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden><button id="lo" title="Выйти из кабинета на этом устройстве">Выйти</button><button id="rb" title="Вернуть учеников и доски из копии, которую кабинет сам сохраняет в вашем браузере">Восстановить из автокопии</button><div id="bkst" style="font-size:12px;color:var(--mut);width:100%"></div></div>
  </div>
  <div id="main">
   <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk" class="keep">Задачи</button><button id="hwk" class="keep" title="Домашние задания ученика">📚 Домашка<span id="hwkn"></span></button><button id="tgs" title="Отправить конспект урока ученику и родителям в Telegram">📨 Конспект</button><button id="lnk">Ссылка ученика</button><button id="mem" hidden title="Кто занимается в этой группе">👥 Участники</button><button id="ren">Переименовать</button><button id="del">Удалить</button><button id="fs" class="keep" title="Фокус: убрать панели">⛶</button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button><button id="th" class="keep" title="Светлая / тёмная тема">◐</button></div>
@@ -161,7 +161,7 @@ async function load(){
  if(r.status===401){const had=!!tok;tok='';localStorage.removeItem('tok');return showLogin(had?'Вход устарел или пароль сменили. Войдите снова.':'',had)}
  me=await r.json();localStorage.setItem('tlogin',me.login);
  students=await (await api('/api/admin/students')).json();
- $('login').hidden=true;$('app').hidden=false;$('tch').hidden=me.role!=='owner';$('whoami').textContent='Вы вошли как '+me.name+' ('+me.login+')';render();
+ $('login').hidden=true;$('app').hidden=false;$('tch').hidden=me.role!=='owner';$('mdl').hidden=me.role!=='owner';$('whoami').textContent='Вы вошли как '+me.name+' ('+me.login+')';render();
  const last=localStorage.getItem('last:'+me.login);
  if(!cur&&students.length)pick(students.some(s=>s.id===last)?last:students[0].id);
 }
@@ -286,6 +286,16 @@ async function teachers(d){
  d.b.append(el('div',{className:'row',style:'border:0'},el('button',{textContent:'Закрыть',onclick:d.close})));
 }
 $('tch').onclick=()=>teachers();
+async function model(d,reset){
+ const r=await api('/api/admin/model',reset?{method:'POST'}:undefined);if(!r.ok){alert('Не получилось');return}const link=location.origin+(await r.json()).path;
+ if(!d)d=dlg('3D-модель огней аэродрома');while(d.b.children.length>1)d.b.lastChild.remove();
+ d.b.append(el('div',{className:'mut',textContent:'Кнопка и ссылка есть только у вас. Открыть модель сможет любой, кому вы отправите ссылку (без входа и без VPN). Если ссылка ушла не туда — смените её: старая перестанет работать.'}));
+ const cp=el('button',{className:'pri',textContent:'Копировать ссылку'});cp.onclick=()=>copy(link,cp);
+ const nw=el('button',{textContent:'Сменить ссылку'});nw.onclick=()=>{if(confirm('Сделать новую ссылку? Старая перестанет открываться у всех, кому вы её отправляли.'))model(d,true)};
+ d.b.append(el('div',{className:'row'},el('div',{className:'grow'},el('code',{textContent:link}))));
+ d.b.append(el('div',{className:'row',style:'border:0'},el('button',{textContent:'Открыть',onclick:()=>open(link,'_blank')}),cp,nw,el('button',{textContent:'Закрыть',onclick:d.close})));
+}
+$('mdl').onclick=()=>model();
 
 (async()=>{
  const old=localStorage.getItem('adm'); // раньше в браузере хранился пароль владельца: переходим на вход по логину
