@@ -131,6 +131,7 @@ body.focus #main{padding:4px;gap:4px}
 .tile .nm{position:absolute;left:4px;bottom:4px;background:rgba(0,0,0,.55);padding:1px 6px;border-radius:6px;font-size:11px;z-index:1}
 .tile.talk{outline:3px solid #2e7d32}
 #hwb,#hwt{background:var(--ac);color:var(--panel);border:1px solid var(--ac);font-weight:700;white-space:nowrap}
+#side .grpb{margin-top:4px;text-align:left}
 #hwb:hover,#hwt:hover{background:color-mix(in srgb,var(--ac) 88%,var(--tx))}#hwb{margin-top:6px;padding:8px 10px}
 .hwn{display:inline-block;background:var(--panel);color:var(--ac);border-radius:9px;padding:0 6px;margin-left:6px;font-size:11px;font-weight:800;line-height:16px}.hwn[hidden]{display:none}
 .tile .vb{position:absolute;right:4px;top:4px;z-index:3;background:rgba(0,0,0,.55);color:#fff;border:0;border-radius:6px;padding:0 5px;font-size:13px;line-height:20px;cursor:pointer}
@@ -234,6 +235,7 @@ const cv=document.getElementById('cv'),rg=document.getElementById('ovl'),wrap=do
 let ctx=cv.getContext('2d');const rctx=rg.getContext('2d'),mctx=document.createElement('canvas').getContext('2d');
 const room=location.pathname.split('/')[2],me='c'+Math.random().toString(36).slice(2,10).padEnd(8,'0');
 const isTeacher=window.self!==window.top;let initDone=false;
+const ME=(new URLSearchParams(location.search).get('u')||'').replace(/[^a-z0-9]/g,'').slice(0,32); // ученик на доске группы: его id (кабинет и подпись — его)
 addEventListener('hashchange',()=>{const hp=(location.hash.match(/^#p=([\w-]+)$/)||[])[1];if(hp&&pages.some(p=>p.id===hp))openPage(hp)});
 let pages=[],strokes={},images={},page=null,live={},color='#1a1a1a',bg='grid',cur=null,lastEmit=0,mine=[],redo=[];
 let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,lastP=[0,0],editImg=null,editStroke=null,jump=null,fingerPan=false;
@@ -624,10 +626,10 @@ function onOp(o){
  if(o.page&&SNAP_OPS.includes(o.t))snapDirty[o.page]=Date.now(); // доска изменилась — позже сохраним её PDF для вечернего конспекта
  if(o.from===me&&(o.t==='strokeset'||o.t==='imgset'||o.t==='stroke'))return; // своё эхо со старым положением заставляло объект дёргаться
  if(o.t==='rtc'){onRtc(o);return}
- if(o.t==='init'){callInit(o.call);myName=o.name||null;$('who').textContent=o.name?'Кабинет: '+o.name:'Доска';document.title=o.name||'Доска';pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};for(const pg in strokes)for(const id in strokes[pg])strokes[pg][id].id=id; // у загруженных объектов нет поля id — проставляем
+ if(o.t==='init'){callInit(o.call);myName=o.name||null;$('who').textContent=o.group?'👥 Группа: '+o.group:o.name?'Кабинет: '+o.name:'Доска';document.title=o.group||o.name||'Доска';pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};for(const pg in strokes)for(const id in strokes[pg])strokes[pg][id].id=id; // у загруженных объектов нет поля id — проставляем
  const hp=(location.hash.match(/^#p=([\w-]+)$/)||[])[1];if(hp&&!initDone&&pages.some(p=>p.id===hp))page=hp;initDone=true; // ссылка на конкретную доску (из кабинета ученика)
  if(!page||!pages.some(p=>p.id===page))page=pages[0].id;openPage(page);return}
- if(o.t==='peers'){$('st').textContent=peersTxt='Онлайн: '+o.n;if(lead)sendView(true);return}
+ if(o.t==='peers'){$('st').textContent=peersTxt='Онлайн: '+o.n+(o.who&&o.who.length?' · '+o.who.join(', '):'');if(lead)sendView(true);return}
  if(o.t==='laser'){if(o.from!==me&&Array.isArray(o.pts)){const l=(lasers[o.from]=lasers[o.from]||{page:o.page,pts:[]}),n0=performance.now();l.page=o.page;
   for(let i=0;i+1<o.pts.length;i+=2)l.pts.push({x:+o.pts[i],y:+o.pts[i+1],t:n0+i*4});laserLoop()}return}
  if(o.t==='view'){if(o.from===me)return;if(o.stop){leaderView=null;detached=false}else{leaderView={page:o.page,x:+o.x,y:+o.y,w:+o.w,h:+o.h};applyLeader()}followUI();return}
@@ -645,7 +647,7 @@ function onOp(o){
  renderPages();redraw();
  if(o.t==='title'&&o.id===page&&document.activeElement!==$('title'))$('title').value=o.title;
 }
-const es=new EventSource('/api/'+room+'/events?c='+me);
+const es=new EventSource('/api/'+room+'/events?c='+me+(ME?'&u='+ME:''));
 es.onmessage=e=>onOp(JSON.parse(e.data));
 es.onerror=()=>{$('st').textContent='Переподключение…'};
 setInterval(()=>{if(Object.keys(cursors).length)drawOverlay()},1000);
@@ -1936,9 +1938,14 @@ $('fm').onchange=async()=>{
  else if(v==='delp')delPage();
  else if(v==='clr'&&!viewOnly&&await modal('Очистить эту доску для всех? Вернуть нельзя.',{ok:'Очистить'})){strokes[page]={};images[page]={};redraw();send({t:'clear',page:page})}
 };
-if(!isTeacher){['hwb','hwt'].forEach(i=>{$(i).hidden=false;$(i).onclick=()=>{location.href='/s/'+room}});
+if(!isTeacher){const mine=ME||room;['hwb','hwt'].forEach(i=>{$(i).hidden=false;$(i).onclick=()=>{location.href='/s/'+mine}});
+ // кнопки групп: со своей доски — в группу, с доски группы — обратно на свою
+ let grpDone=false;const groupsUI=j=>{if(grpDone)return;grpDone=true;const side=$('side'),at=$('hwb').nextSibling;
+  const add=(txt,href,tt)=>{const b=document.createElement('button');b.className='grpb';b.textContent=txt;b.title=tt;b.onclick=()=>{location.href=href};side.insertBefore(b,at)};
+  if(ME)add('← Моя доска','/b/'+ME,'Ваша личная доска');
+  (j.groups||[]).filter(g=>g.id!==room).forEach(g=>add('👥 '+g.name,'/b/'+g.id+'?u='+mine,'Общая доска группы'))};
  // на кнопке — сколько домашек ещё не сдано
- const hwCount=()=>fetch('/api/'+room+'/hw').then(r=>r.ok?r.json():null).then(j=>{if(!j)return;const n=(j.list||[]).filter(h=>h.st==='new').length;
+ const hwCount=()=>fetch('/api/'+mine+'/hw').then(r=>{if(r.status===404){['hwb','hwt'].forEach(i=>{$(i).hidden=true});return null}return r.ok?r.json():null}).then(j=>{if(!j)return;groupsUI(j);const n=(j.list||[]).filter(h=>h.st==='new').length;
   document.querySelectorAll('.hwn').forEach(e=>{e.hidden=!n;e.textContent=n;e.title='Не сдано домашек: '+n})}).catch(()=>{});
  hwCount();setInterval(hwCount,300000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)hwCount()})}
 $('cp').onclick=()=>{const t=location.origin+location.pathname;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{$('cp').textContent='Скопировано'},()=>{prompt('Ссылка:',t)});setTimeout(()=>{$('cp').textContent='Копировать ссылку'},1500)};

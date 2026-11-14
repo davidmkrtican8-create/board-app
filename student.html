@@ -25,6 +25,7 @@ header{display:flex;align-items:center;gap:12px;margin-bottom:6px}
 header h1{font-size:26px;line-height:1.15;letter-spacing:-.5px;margin:0;font-weight:800}
 header .sub{font-size:13px;color:var(--mut)}
 header .hd{flex:1;min-width:0}
+.grp{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--bd);border-left:5px solid #6a3fc4;border-radius:14px;padding:12px 14px;margin:12px 0 0;text-decoration:none;color:var(--tx);box-shadow:0 2px 0 var(--bd)}.grp b{display:block}.grp span{font-size:13px;color:var(--mut)}.grp .go{margin-left:auto;font-size:26px;color:var(--mut)}
 .streak{margin:14px 0 4px;background:linear-gradient(135deg,#ff8a3d,#ff4f8b);color:#fff;border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:14px;box-shadow:0 6px 18px rgba(255,79,139,.22)}
 .streak .f{font-size:36px;line-height:1}.streak b{font-size:18px;display:block;line-height:1.25}.streak span{font-size:13px;opacity:.92}
 .days{display:flex;gap:5px;margin-top:7px}.days i{width:22px;height:22px;border-radius:6px;background:rgba(255,255,255,.3);font-style:normal;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:700}.days i.y{background:#fff;color:#ff5a6e}
@@ -83,6 +84,7 @@ h2{font-size:20px;font-weight:800;letter-spacing:-.3px;margin:24px 0 10px;displa
 <div class="wrap">
  <div id="home">
   <header><div class="ava" id="ava">?</div><div class="hd"><h1 id="hi">Мой кабинет</h1><div class="sub" id="tch"></div></div><a id="toBoard" class="open" href="#"><button class="pri">✏️<span> Доска</span></button></a></header>
+  <div id="grps"></div>
   <div id="streak"></div>
   <h2>Домашка <small id="hwc"></small></h2><div id="list"></div>
   <h2>Прогресс</h2>
@@ -165,6 +167,7 @@ function home(){
  $('hw').hidden=true;$('home').hidden=false;open=null;
  $('hi').textContent='Привет, '+String(D.name).split(/\s+/)[0]+'!';$('ava').textContent=(String(D.name).trim()[0]||'?').toUpperCase();$('tch').textContent=D.teacher?'Преподаватель: '+D.teacher:'';document.title=D.name+' — кабинет';
  $('toBoard').href='/b/'+sid;
+ const gp=$('grps');gp.innerHTML='';(D.groups||[]).forEach(g=>gp.append(el('a',{className:'grp',href:'/b/'+g.id+'?u='+sid},el('div',{textContent:'👥',style:'font-size:26px'}),el('div',null,el('b',{textContent:g.name}),el('span',{textContent:'Общая доска группы'})),el('span',{className:'go',textContent:'›'}))));
  const l=$('list');l.innerHTML='';
  if(!D.list.length)l.append(el('div',{className:'empty',textContent:'Домашних заданий пока нет 🎉'}));
  const order=h=>h.st==='new'?0:h.st==='sent'?1:2;

@@ -65,6 +65,9 @@ button,input{font:inherit;color:var(--tx);background:var(--panel);border:1px sol
 .dlg .pri,#lf .pri{background:var(--ac);color:#fff;border-color:var(--ac)}.dlg .err{color:#d32f2f;min-height:18px}
 .dlg code{font-size:12px;word-break:break-all;background:color-mix(in srgb,var(--ac) 10%,transparent);padding:4px 6px;border-radius:6px}
 body.nosidebar #side{display:none}
+.st .gi{font-size:15px;line-height:1}.st .gm{font-size:11px;color:var(--mut);margin-left:auto}.lh{font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;padding:10px 8px 2px}
+#side .top{flex-wrap:wrap;gap:6px}
+.memlist{display:flex;flex-direction:column;gap:4px;max-height:50vh;overflow:auto;margin:8px 0}.memlist label{display:flex;gap:8px;align-items:center;padding:6px 8px;border:1px solid var(--bd);border-radius:8px;cursor:pointer}
 .badge{background:#d32f2f;color:#fff;border-radius:10px;font-size:11px;font-weight:700;padding:1px 6px;margin-left:auto}
 #hwk{background:var(--ac);color:var(--panel);border:1px solid var(--ac);font-weight:700}#hwk:hover{background:color-mix(in srgb,var(--ac) 88%,var(--tx))}
 #hwkn:not(:empty){background:var(--panel);color:var(--ac);border-radius:10px;font-size:11px;font-weight:800;padding:1px 6px;margin-left:6px}
@@ -118,13 +121,13 @@ body.nosidebar #side{display:none}
 </div>
 <div id="app" hidden>
  <div id="side">
-  <div class="top"><b>Ученики</b><button id="addS">+ Ученик</button></div>
+  <div class="top"><b>Ученики</b><button id="addS">+ Ученик</button><button id="addG" title="Группа: общие доски для нескольких учеников, у каждого свой кабинет">+ Группа</button></div>
   <div id="list"></div>
   <div id="whoami" style="font-size:12px;color:var(--mut)"></div>
   <div class="foot"><button id="tch" hidden title="Пригласить репетиторов и управлять их аккаунтами">Репетиторы</button><button id="tgb" title="Telegram-бот: уведомления и конспекты">Telegram</button><button id="cpw" title="Сменить свой пароль">Пароль</button><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden><button id="lo" title="Выйти из кабинета на этом устройстве">Выйти</button><button id="rb" title="Вернуть учеников и доски из копии, которую кабинет сам сохраняет в вашем браузере">Восстановить из автокопии</button><div id="bkst" style="font-size:12px;color:var(--mut);width:100%"></div></div>
  </div>
  <div id="main">
-  <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk" class="keep">Задачи</button><button id="hwk" class="keep" title="Домашние задания ученика">📚 Домашка<span id="hwkn"></span></button><button id="tgs" title="Отправить конспект урока ученику и родителям в Telegram">📨 Конспект</button><button id="lnk">Ссылка ученика</button><button id="ren">Переименовать</button><button id="del">Удалить</button><button id="fs" class="keep" title="Фокус: убрать панели">⛶</button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button><button id="th" class="keep" title="Светлая / тёмная тема">◐</button></div>
+  <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk" class="keep">Задачи</button><button id="hwk" class="keep" title="Домашние задания ученика">📚 Домашка<span id="hwkn"></span></button><button id="tgs" title="Отправить конспект урока ученику и родителям в Telegram">📨 Конспект</button><button id="lnk">Ссылка ученика</button><button id="mem" hidden title="Кто занимается в этой группе">👥 Участники</button><button id="ren">Переименовать</button><button id="del">Удалить</button><button id="fs" class="keep" title="Фокус: убрать панели">⛶</button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button><button id="th" class="keep" title="Светлая / тёмная тема">◐</button></div>
   <div id="work">
    <iframe id="fr" allow="microphone; camera; autoplay; clipboard-write"></iframe>
    <div id="tasks" hidden>
@@ -163,21 +166,24 @@ async function load(){
 }
 function render(){const l=$('list');l.innerHTML='';
  if(!students.length){const d=document.createElement('div');d.className='st';d.style.color='var(--mut)';d.textContent='Пока нет учеников. Нажмите «+ Ученик».';l.appendChild(d)}
- students.forEach(s=>{const d=document.createElement('div');d.className='st'+(s.id===cur?' on':'');
-  const dot=document.createElement('span');dot.className='dot';dot.style.background=s.color;
+ const isG=s=>s.type==='group',list=students.filter(s=>!isG(s)).concat(students.filter(isG));let gh=false;
+ list.forEach(s=>{if(isG(s)&&!gh){gh=true;const h=document.createElement('div');h.className='lh';h.textContent='Группы';l.appendChild(h)}
+  const d=document.createElement('div');d.className='st'+(s.id===cur?' on':'');
+  const dot=document.createElement('span');if(isG(s)){dot.className='gi';dot.textContent='👥'}else{dot.className='dot';dot.style.background=s.color}
   const t=document.createElement('span');t.textContent=s.name;d.append(dot,t);
+  if(isG(s)){const m=document.createElement('span');m.className='gm';m.textContent=(s.members||[]).length+' уч.';d.append(m)}
   const pn=(window.hwPend||{})[s.id];if(pn){const b=document.createElement('span');b.className='badge';b.textContent=pn;b.title='Домашек ждут проверки: '+pn;d.append(b)}
   d.onclick=()=>pick(s.id);l.appendChild(d)});if(window.hwOnPick)window.hwOnPick()}
 function pick(id,hash){cur=id;if(me)localStorage.setItem('last:'+me.login,id);const s=students.filter(x=>x.id===id)[0];
  if(!s){cur=null;$('nm').textContent='Выберите ученика';$('fr').src='about:blank';render();return}
- $('nm').textContent=s.name;render();
+ $('nm').textContent=(s.type==='group'?'👥 ':'')+s.name;render();$('mem').hidden=s.type!=='group';$('lnk').hidden=s.type==='group';
  const f=$('fr'),prev=f.getAttribute('src')||'';
  if(!prev.startsWith('/b/')||prev.split(/[/#]/)[2]===id){f.src='/b/'+id+(hash||'');return}
  // перед сменой ученика доска сохраняет снимок для вечернего конспекта (не дольше 4 с)
  let done=false;const go=()=>{if(done)return;done=true;removeEventListener('message',h);if(cur===id)f.src='/b/'+id+(hash||'')};
  const h=e=>{if(e.origin===location.origin&&e.data&&e.data.t==='snapdone')go()};addEventListener('message',h);setTimeout(go,4000);
  try{f.contentWindow.postMessage({t:'snapnow'},location.origin)}catch(e){go()}}
-window.hwCtx={cur:()=>cur,students:()=>students,render:()=>render(),open:(id,hash)=>pick(id,hash)};
+window.hwCtx={cur:()=>cur,students:()=>students,render:()=>render(),open:(id,hash)=>pick(id,hash),isGroup:id=>(students.find(x=>x.id===id)||{}).type==='group'};
 async function op(o){const r=await api('/api/admin/op',{method:'POST',body:JSON.stringify(o)});
  const j=r.ok?await r.json():null;if(!j||j.error){alert(j&&j.error||'Не получилось');return false}
  if(Array.isArray(j))students=j;render();return j}
@@ -204,9 +210,24 @@ $('showpw').onchange=()=>{const t=$('showpw').checked?'text':'password';$('pw').
 $('lo').onclick=()=>{if(confirm('Выйти из кабинета на этом устройстве? Автокопия досок останется.')){localStorage.removeItem('tok');location.reload()}};
 $('addS').onclick=async()=>{const n=prompt('Имя ученика (можно с классом, например «Миша 8кл»):');if(!n||!n.trim())return;
  if(await op({t:'add',name:n}))pick(students[students.length-1].id)};
+function groupDlg(g){ // создать группу или поменять участников
+ const d=dlg(g?'Участники: '+g.name:'Новая группа'),kids=students.filter(s=>s.type!=='group');
+ const nm=el('input',{placeholder:'Название, например «ОГЭ 9Б, вторник»',value:g?g.name:''});nm.style.width='100%';
+ const box=el('div',{className:'memlist'}),sel=new Set(g?g.members||[]:[]);
+ if(!kids.length)box.append(el('p',{className:'mut',textContent:'Сначала добавьте учеников кнопкой «+ Ученик».'}));
+ kids.forEach(s=>{const cb=el('input',{type:'checkbox',checked:sel.has(s.id)});cb.onchange=()=>{cb.checked?sel.add(s.id):sel.delete(s.id)};box.append(el('label',null,cb,el('span',{textContent:s.name})))});
+ const ok=el('button',{className:'pri',textContent:g?'Сохранить':'Создать группу'});
+ ok.onclick=async()=>{const n=nm.value.trim();if(!n){nm.focus();return}
+  const r=await op(g?{t:'group-set',id:g.id,name:n,members:[...sel]}:{t:'group-add',name:n,members:[...sel]});if(!r)return;d.close();
+  if(!g){const ng=students.filter(x=>x.type==='group').pop();if(ng)pick(ng.id)}else pick(g.id)};
+ d.b.append(nm,el('p',{className:'mut',style:'margin:10px 0 0',textContent:'Кто занимается в группе (у каждого остаётся свой личный кабинет, домашка и Telegram):'}),box,
+  el('div',{className:'row',style:'display:flex;gap:8px'},ok,el('button',{textContent:'Отмена',onclick:d.close})));
+ setTimeout(()=>nm.focus(),50)}
+$('addG').onclick=()=>groupDlg(null);
+$('mem').onclick=()=>{const g=students.find(x=>x.id===cur);if(g&&g.type==='group')groupDlg(g)};
 $('ren').onclick=async()=>{if(!cur)return;const s=students.filter(x=>x.id===cur)[0];const n=prompt('Новое имя:',s.name);if(!n||!n.trim())return;await op({t:'rename',id:cur,name:n});pick(cur)};
 $('del').onclick=async()=>{if(!cur)return;const s=students.filter(x=>x.id===cur)[0];
- if(!confirm('Удалить ученика «'+s.name+'» вместе со всеми его досками? Это нельзя отменить.'))return;
+ if(!confirm(s.type==='group'?'Удалить группу «'+s.name+'» вместе с её общими досками? Ученики, их кабинеты и домашки останутся.':'Удалить ученика «'+s.name+'» вместе со всеми его досками? Это нельзя отменить.'))return;
  const id=cur;cur=null;await op({t:'delete',id:id});pick(students.length?students[0].id:null)};
 $('lnk').onclick=()=>{if(!cur)return;const t=location.origin+'/b/'+cur;
  (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{$('lnk').textContent='Скопировано';setTimeout(()=>{$('lnk').textContent='Ссылка ученика'},1500)},()=>prompt('Ссылка ученика:',t))};
@@ -720,7 +741,7 @@ async function startDraft(){
  if(!draft){draft=await loadDraft(sid);if(draft&&!draft.tasks.length)draft=null}
  if(!draft)draft={sid,tasks:[],title:new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'}),due:''}; // название по умолчанию — сегодняшняя дата
  window.hwDraft=true;tray();if(window.hwTasksRedraw)window.hwTasksRedraw();
- loadRep(sid);
+ if(!(C().isGroup&&C().isGroup(sid)))loadRep(sid); // у группы «работы над ошибками» нет — она у каждого ученика своя
 }
 // «Работа над ошибками»: какие старые ошибки ученика пора повторить
 async function loadRep(sid){
@@ -884,7 +905,7 @@ async function sendDraft(){
  const r=await api('/api/admin/hw',{method:'POST',body:JSON.stringify({t:'add',s:d.sid,title:d.title.trim()||new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'}),due,tasks:d.tasks.map(k=>k.imgName?{imgName:k.imgName,w:k.w,h:k.h,text:k.text,num:k.num,ans:k.ans}:{img:k.src,w:k.w,h:k.h,text:k.text,num:k.num,ans:k.ans}),rep:d.repInfo&&d.repInfo.on?d.rep:[]})});
  const j=r.ok?await r.json():{error:'Не получилось отправить (слишком большие картинки?)'};
  if(j.error){alert(j.error);return}
- stopDraft();alert('Домашка отправлена! Ученик увидит её в своём кабинете: кнопка «📚 Домашка» на его доске.');
+ stopDraft();alert(j.group?'Домашка отправлена всем ученикам группы ('+j.sent+'). Каждый решает и сдаёт её в своём кабинете.':'Домашка отправлена! Ученик увидит её в своём кабинете: кнопка «🎓 Кабинет» на его доске.');
 }
 
 // ---------- окно «Домашка ученика» ----------
@@ -893,7 +914,23 @@ const chip=h=>h.st==='sent'?el('span',{className:'chip sent',textContent:'Ждё
 const imgU=(sid,n)=>'/hwimg/'+sid+'/'+n;
 async function load(sid){const r=await api('/api/admin/hw?s='+sid);return r.ok?r.json():null}
 async function post(o){const r=await api('/api/admin/hw',{method:'POST',body:JSON.stringify(o)});const j=r.ok?await r.json():{error:'Не получилось'};if(j.error){alert(j.error);return null}pending();return j}
+async function openGroup(d,gid){ // «Домашка» у группы: задать всем сразу, проверять — у каждого
+ const g=C().students().find(x=>x.id===gid)||{},mem=(g.members||[]).map(id=>C().students().find(x=>x.id===id)).filter(Boolean);
+ d.b.innerHTML='';
+ d.b.append(el('h2',{textContent:'Домашка группы: '+g.name}),
+  el('div',{className:'row'},el('button',{className:'pri',textContent:'+ Задать домашку группе',onclick:()=>{d.close();startDraft()}}),
+   el('span',{className:'mut grow',textContent:'Каждый ученик получит свою копию: решает, сдаёт и получает оценку сам.'}),el('button',{textContent:'Закрыть',onclick:d.close})));
+ {const dr=await loadDraft(gid);if(dr&&dr.tasks.length)d.b.append(el('div',{className:'hwi',style:'border-style:dashed'},
+  el('div',{className:'grow'},el('b',{textContent:'📝 Черновик: '+(dr.title||'без названия')}),el('div',{className:'mut',textContent:dr.tasks.length+' зад. · ученики его не видят'})),
+  el('button',{className:'pri',textContent:'Продолжить черновик',onclick:()=>{d.close();startDraft()}})))}
+ if(!mem.length){d.b.append(el('p',{className:'mut',textContent:'В группе пока нет учеников — добавьте их кнопкой «👥 Участники».'}));return}
+ d.b.append(el('b',{textContent:'Ученики группы'}));
+ for(const s of mem){const L=await load(s.id)||[],nw=L.filter(h=>h.st==='new').length,sn=L.filter(h=>h.st==='sent').length;
+  d.b.append(el('div',{className:'hwi'},el('div',{className:'grow'},el('b',{textContent:s.name}),el('div',{className:'mut',textContent:(sn?'ждут проверки: '+sn+' · ':'')+(nw?'не сдано: '+nw:'всё сдано')})),
+   sn?el('span',{className:'chip sent',textContent:'Ждёт проверки'}):null,el('button',{className:sn?'pri':'',textContent:sn?'Проверить':'Открыть',onclick:()=>openList(d,s.id)})))}
+}
 async function openList(d,sid){
+ if(C().isGroup&&C().isGroup(sid))return openGroup(d,sid);
  const L=await load(sid);if(!L){alert('Не получилось загрузить');return}
  d.b.innerHTML='';
  const link=location.origin+'/s/'+sid;
@@ -988,6 +1025,7 @@ $('tgb').onclick=async()=>{
 window.hwTgRow=async(box,sid)=>{
  const r=await api('/api/admin/tg-student?s='+sid);if(!r.ok)return;const g=await r.json();if(!g.on){box.append(el('span',{className:'mut',textContent:'Telegram: бот не подключён (кнопка «Telegram» внизу слева)'}));return}
  const st=g.subs.filter(x=>x.who==='s').length,pa=g.subs.filter(x=>x.who==='p').length;
+ if(g.group){box.append(el('span',{className:'grow',textContent:'Telegram: подключено учеников '+st+', родителей '+pa+'. Ссылки — у каждого ученика в его окне «Домашка».'}));return}
  box.append(el('span',{className:'grow',textContent:'Telegram: ученик '+(st?'✅':'— не подключён')+' · родители: '+(pa||'нет')}),copyBtn('Ссылка ученику',g.s),copyBtn('Ссылка родителям',g.p));
 };
 // --- конспект урока ---

@@ -20,6 +20,10 @@ let index = { students: [] };
 try { index = JSON.parse(fs.readFileSync(IDX, 'utf8')); } catch (e) {}
 const saveIndex = () => fs.writeFileSync(IDX, JSON.stringify(index));
 const nameOf = id => (index.students.find(s => s.id === id) || {}).name || null;
+// группы: запись в том же списке, что и ученики, с type:'group' и members — у группы свои общие доски, у участников свои кабинеты
+const isGroup = id => (index.students.find(s => s.id === id) || {}).type === 'group';
+const membersOf = id => { const g = index.students.find(s => s.id === id); return g && g.type === 'group' ? (g.members || []).filter(m => index.students.some(s => s.id === m && s.type !== 'group')) : []; };
+const groupsOf = sid => index.students.filter(g => g.type === 'group' && (g.members || []).includes(sid));
 
 // Комната = папка одного ученика (внутри неё несколько досок-страниц)
 function room(id) {
@@ -291,6 +295,11 @@ function hwCopy(sid, n) { // копия картинки под новым им�
   const m = crypto.randomBytes(8).toString('hex') + n.slice(n.lastIndexOf('.'));
   try { fs.copyFileSync(path.join(HWD, sid, n), path.join(HWD, sid, m)); return m; } catch (e) { return null; }
 }
+function hwCopyTo(from, n, to) { // картинку задачи группы — в папку участника
+  if (!HNAME.test(String(n))) return null;
+  const m = crypto.randomBytes(8).toString('hex') + n.slice(n.lastIndexOf('.'));
+  try { fs.mkdirSync(path.join(HWD, to), { recursive: true }); fs.copyFileSync(path.join(HWD, from, n), path.join(HWD, to, m)); return m; } catch (e) { return null; }
+}
 const repDue = H => (H.mis || []).filter(x => !x.out && Date.now() - x.at >= REP_DAYS * 864e5).sort((a, b) => a.at - b.at).slice(0, REP_MAX);
 function repCheck(sid, H, h) { // после проверки: ошибки — в копилку, исправленные — из копилки
   H.mis = H.mis || []; H.fixed = H.fixed || 0;
@@ -421,6 +430,10 @@ function tgDrop(chat) { // человек заблокировал бота — 
 const tCode = tid => 't' + tid + '_' + sign('tg' + tid).slice(0, 12).replace(/[^A-Za-z0-9]/g, 'x');
 const tgLink = code => TG.bot ? 'https://t.me/' + TG.bot + '?start=' + code : '';
 // написать ученику и его родителям; f(кто) возвращает текст: 's' — ученику, 'p' — родителю
+function subsOf(id) { // кому писать: ученик и родители; для группы — все участники и их родители
+  if (!isGroup(id)) return TG.subs[id] || [];
+  const seen = new Set(), out = []; membersOf(id).forEach(m => (TG.subs[m] || []).forEach(x => { if (!seen.has(x.chat)) { seen.add(x.chat); out.push(x); } })); return out;
+}
 function tgStudent(sid, f) { (TG.subs[sid] || []).forEach(x => { const t = f(x.who); if (t) tgSay(x.chat, t); }); }
 function tgTeacher(tid, text) { (TG.tsubs[tid] || []).forEach(c => tgSay(c, text)); }
 function tgOnMessage(m) {
@@ -515,7 +528,7 @@ async function snapSend() {
       if (!due.length) { if (!Object.keys(m).length) delete SN[sid]; continue; }
       const last = Math.max(...due.map(pg => m[pg].t)), old = due.some(pg => m[pg].day !== today);
       if (Date.now() - last < 30 * 60e3 || (hr < 21 && !old)) continue;
-      const L = TG.token && !(TG.noAuto || {})[s.owner] ? (TG.subs[sid] || []) : [];
+      const L = TG.token && !(TG.noAuto || {})[s.owner] ? subsOf(sid) : [];
       for (const pg of due.sort((a, b) => m[a].t - m[b].t)) {
         const e = m[pg]; let buf = null; try { buf = fs.readFileSync(path.join(SND, sid, pg + '.pdf')); } catch (er) {}
         let miss = 0; e.got = e.got || []; e.tries = (e.tries || 0) + 1;
@@ -538,7 +551,7 @@ function tgAdmin(req, res, u, me) { // /api/admin/tg…
   if (req.method === 'GET' && u.pathname === '/api/admin/tg') return json(res, { on: !!TG.token, bot: TG.bot, owner: isOwner, me: (TG.tsubs[me.id] || []).length, link: tgLink(tCode(me.id)), auto: !(TG.noAuto || {})[me.id] });
   if (req.method === 'GET' && u.pathname === '/api/admin/tg-student') {
     const sid = String(u.searchParams.get('s') || ''); if (!own(sid)) { res.writeHead(404); return res.end(); }
-    return json(res, { on: !!TG.token, s: tgLink('s' + sid), p: tgLink('p' + sid), subs: (TG.subs[sid] || []).map(x => ({ who: x.who, name: x.name })) });
+    return json(res, { on: !!TG.token, group: isGroup(sid), s: tgLink('s' + sid), p: tgLink('p' + sid), subs: subsOf(sid).map(x => ({ who: x.who, name: x.name })) });
   }
   if (req.method === 'POST' && u.pathname === '/api/admin/tg') return body(req, res, 30e6, j => tgPost(req, res, j, me, isOwner, own).catch(() => { try { res.writeHead(500); res.end(); } catch (e) {} }));
   res.writeHead(404); res.end();
@@ -558,7 +571,7 @@ async function tgPost(req, res, j, me, isOwner, own) {
     if (j.t === 'send') { // конспект урока
       const s = own(String(j.s || '')); if (!s) { res.writeHead(404); return res.end(); }
       if (!TG.token) return json(res, { error: 'Telegram-бот не подключён' });
-      const L = TG.subs[s.id] || []; if (!L.length) return json(res, { error: 'Ни ученик, ни родители ещё не подключили Telegram' });
+      const L = subsOf(s.id); if (!L.length) return json(res, { error: isGroup(s.id) ? 'Никто из группы ещё не подключил Telegram' : 'Ни ученик, ни родители ещё не подключили Telegram' });
       const text = String(j.text || '').trim().slice(0, 3500);
       let pdf = null; if (typeof j.pdf === 'string' && j.pdf.length < 28e6) pdf = Buffer.from(j.pdf, 'base64');
       const fname = String(j.fname || 'Конспект.pdf').replace(/[\\/:*?"<>|\r\n]/g, '_').slice(0, 100);
@@ -580,7 +593,7 @@ async function tgPost(req, res, j, me, isOwner, own) {
 function hwTeacher(req, res, u, me) { // /api/admin/hw…
   const own = id => index.students.find(x => x.id === id && x.owner === me.id);
   if (req.method === 'GET' && u.pathname === '/api/admin/hw-pending') {
-    const o = {}; index.students.filter(s => s.owner === me.id).forEach(s => { const n = hwPending(s.id); if (n) o[s.id] = n; });
+    const o = {}; index.students.filter(s => s.owner === me.id).forEach(s => { const n = s.type === 'group' ? membersOf(s.id).reduce((a, m) => a + hwPending(m), 0) : hwPending(s.id); if (n) o[s.id] = n; });
     return json(res, o);
   }
   if (req.method === 'GET' && u.pathname === '/api/admin/hw-rep') {
@@ -633,6 +646,22 @@ function hwTeacher(req, res, u, me) { // /api/admin/hw…
       }
       if (!tasks.length) return json(res, { error: 'В задачах нет ни картинки, ни текста' });
       if (H.draft) { const used = new Set(tasks.map(t => t.img)); H.draft.tasks.forEach(t => { if (t.img && !used.has(t.img)) hwRm(sid, t.img); }); H.draft = null; } // черновик отправлен
+      const due0 = Number.isFinite(+j.due) && +j.due > 0 ? +j.due : null, title0 = String(j.title || '').trim().slice(0, 80) || 'Домашка';
+      if (isGroup(sid)) { // домашка группе: каждому участнику своя копия (свои ответы, проверка, прогресс, уведомления)
+        const mem = membersOf(sid); if (!mem.length) { tasks.forEach(t => hwRm(sid, t.img)); hwSave(sid); return json(res, { error: 'В группе пока нет учеников — добавьте их кнопкой «Участники»' }); }
+        const dd = due0 ? ', сдать до ' + dmy(due0) : '';
+        for (const m of mem) {
+          const M = hwOf(m); if (M.list.length >= 300) continue;
+          const mt = tasks.map(t => Object.assign({}, t, { id: crypto.randomBytes(4).toString('hex'), img: t.img ? hwCopyTo(sid, t.img, m) : null }));
+          const mh = { id: crypto.randomBytes(5).toString('hex'), title: title0, due: due0, created: Date.now(), tasks: mt, st: 'new', answers: {}, auto: {}, marks: {}, photos: [], board: null, comment: '', group: sid };
+          M.list.unshift(mh); hwSave(m);
+          const mn = nameOf(m);
+          tgStudent(m, w => w === 's' ? '📚 Новая домашка от ' + me.name + ': «' + mh.title + '» (' + mt.length + ' зад.' + dd + ').\nОткрыть: ' + TG.site + '/s/' + m + '?hw=' + mh.id
+            : '📚 ' + mn + ': задана домашка «' + mh.title + '»' + dd + '.');
+        }
+        tasks.forEach(t => hwRm(sid, t.img)); hwSave(sid);
+        return json(res, { group: true, sent: mem.length });
+      }
       const nid = crypto.randomBytes(5).toString('hex'), want = Array.isArray(j.rep) && repOn(me.id) ? j.rep.map(String) : [];
       for (const x of repDue(H)) if (want.includes(x.id)) { // задачи на повторение — в конец домашки
         tasks.push({ id: crypto.randomBytes(4).toString('hex'), img: x.img ? hwCopy(sid, x.img) : null, w: x.w, h: x.h, text: x.text, num: x.num, ans: x.ans, rep: x.id });
@@ -674,11 +703,11 @@ function hwTeacher(req, res, u, me) { // /api/admin/hw…
 }
 function hwStudent(req, res, sid) { // /api/<id>/hw — открывается по ссылке ученика
   const s = index.students.find(x => x.id === sid);
-  if (!s) { res.writeHead(404); return res.end(); }
+  if (!s || s.type === 'group') { res.writeHead(404); return res.end(); }
   const H = hwOf(sid);
   const out = () => {
     const r = room(sid), t = byId(s.owner);
-    json(res, { name: s.name, teacher: t ? t.name : '', rep: { fixed: H.fixed || 0, left: (H.mis || []).length }, list: H.list.map(hwPublic), pages: r ? r.s.pages.map(p => ({ id: p.id, title: p.title })) : [], tg: TG.token ? { s: tgLink('s' + sid), p: tgLink('p' + sid), on: (TG.subs[sid] || []).some(x => x.who === 's') } : null });
+    json(res, { name: s.name, teacher: t ? t.name : '', groups: groupsOf(sid).map(g => ({ id: g.id, name: g.name })), rep: { fixed: H.fixed || 0, left: (H.mis || []).length }, list: H.list.map(hwPublic), pages: r ? r.s.pages.map(p => ({ id: p.id, title: p.title })) : [], tg: TG.token ? { s: tgLink('s' + sid), p: tgLink('p' + sid), on: (TG.subs[sid] || []).some(x => x.who === 's') } : null });
   };
   if (req.method === 'GET') return out();
   if (req.method !== 'POST') { res.writeHead(405); return res.end(); }
@@ -770,14 +799,24 @@ function admin(req, res, u) {
       const id = crypto.randomBytes(6).toString('hex');
       index.students.push({ id, name: nm, color: COLORS[mine().length % COLORS.length], owner: me.id });
       saveIndex(); save(room(id));
+    } else if (j.t === 'group-add' && nm) {
+      if (mine().length >= 300) return json(res, { error: 'Слишком много учеников и групп' });
+      const id = crypto.randomBytes(6).toString('hex'), mem = (Array.isArray(j.members) ? j.members : []).map(String).filter(m => own(m) && !isGroup(m));
+      index.students.push({ id, name: nm, color: '#6a3fc4', owner: me.id, type: 'group', members: [...new Set(mem)] });
+      saveIndex(); save(room(id));
+    } else if (j.t === 'group-set') {
+      const g = own(j.id); if (!g || g.type !== 'group') return json(res, { error: 'Группа не найдена' });
+      if (nm) g.name = nm;
+      if (Array.isArray(j.members)) g.members = [...new Set(j.members.map(String).filter(m => own(m) && !isGroup(m)))];
+      saveIndex();
     } else if (j.t === 'rename' && nm) {
       const s = own(j.id); if (s) { s.name = nm; saveIndex(); }
     } else if (j.t === 'delete') {
-      if (own(j.id)) { index.students = index.students.filter(x => x.id !== j.id); saveIndex(); dropRoom(j.id); }
+      if (own(j.id)) { index.students = index.students.filter(x => x.id !== j.id); index.students.forEach(g => { if (g.members) g.members = g.members.filter(m => m !== j.id); }); saveIndex(); dropRoom(j.id); }
     } else if (j.t === 'restore' && j.data && j.data.index && Array.isArray(j.data.index.students)) {
       const taken = new Set(index.students.filter(s => s.owner !== me.id).map(s => s.id)); // чужих учеников копия не трогает
       const inc = j.data.index.students.filter(s => RID.test(String(s.id)) && !taken.has(s.id))
-        .map(s => ({ id: s.id, name: String(s.name || '').slice(0, 60), color: String(s.color || '#888').slice(0, 9), owner: me.id }));
+        .map(s => Object.assign({ id: s.id, name: String(s.name || '').slice(0, 60), color: String(s.color || '#888').slice(0, 9), owner: me.id }, s.type === 'group' ? { type: 'group', members: (Array.isArray(s.members) ? s.members : []).map(String).filter(m => RID.test(m)) } : {}));
       let todo = inc;
       if (j.merge) { // вернуть только недостающих, существующих не трогать
         const have = new Set(mine().map(x => x.id));
@@ -829,7 +868,7 @@ http.createServer((req, res) => {
   }
   const sp = u.pathname.match(/^\/s\/([a-z0-9]{4,32})$/);
   if (sp) { // кабинет ученика
-    if (!index.students.some(x => x.id === sp[1])) { res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end('<!doctype html><meta charset="utf-8"><body style="font:16px system-ui;max-width:420px;margin:12vh auto;padding:0 18px"><h2>Кабинет не найден</h2><p>Попросите у преподавателя новую ссылку.</p>'); }
+    if (!index.students.some(x => x.id === sp[1] && x.type !== 'group')) { res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end('<!doctype html><meta charset="utf-8"><body style="font:16px system-ui;max-width:420px;margin:12vh auto;padding:0 18px"><h2>Кабинет не найден</h2><p>Попросите у преподавателя новую ссылку.</p>'); }
     return PAGE('student.html')(req, res);
   }
   const m = u.pathname.match(/^\/api\/([a-z0-9]{4,32})\/(events|op)$/);
@@ -845,13 +884,15 @@ http.createServer((req, res) => {
         const z = zlib.createGzip({ level: 6, memLevel: 7 }); z.pipe(res); z.on('error', () => {});
         cl = { write: d => { z.write(d); z.flush(); }, end: () => z.end() };
       }
-      const cid = String(u.searchParams.get('c') || '');
-      cl.write('data: ' + JSON.stringify({ t: 'init', s: r.s, name: nameOf(r.id), call: [...r.call] }) + '\n\n');
+      const cid = String(u.searchParams.get('c') || ''), uid = String(u.searchParams.get('u') || '');
+      const who = isGroup(r.id) && membersOf(r.id).includes(uid) ? nameOf(uid) : null; cl.who = who;
+      const peers = () => ({ t: 'peers', n: r.clients.size, who: [...r.clients].map(c => c.who).filter(Boolean) });
+      cl.write('data: ' + JSON.stringify({ t: 'init', s: r.s, name: who || nameOf(r.id), group: isGroup(r.id) ? nameOf(r.id) : undefined, call: [...r.call] }) + '\n\n');
       r.clients.add(cl);
-      bcast(r, { t: 'peers', n: r.clients.size });
+      bcast(r, peers());
       const ping = setInterval(() => cl.write(': ping\n\n'), 20000);
       req.on('close', () => {
-        clearInterval(ping); r.clients.delete(cl); if (gz) cl.end(); bcast(r, { t: 'peers', n: r.clients.size });
+        clearInterval(ping); r.clients.delete(cl); if (gz) cl.end(); bcast(r, peers());
         if (RID.test(cid) && r.call.delete(cid)) bcast(r, { t: 'rtc', kind: 'bye', from: cid });
       });
       return;
