@@ -68,6 +68,7 @@ h2{font-size:20px;font-weight:800;letter-spacing:-.3px;margin:24px 0 10px;displa
 .task .txt{white-space:pre-wrap;margin:6px 0}
 .ans{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}.ans input{width:170px}
 .res{font-weight:700}.res.ok{color:var(--ok)}.res.bad{color:var(--bad)}
+.actions.top{margin:6px 0 14px}.actions.top button{padding:12px 16px;font-size:16px;border-radius:12px}
 .actions{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
 .photos{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
 .ph{position:relative}.ph img{width:120px;height:150px;object-fit:cover;border-radius:10px;border:1px solid var(--bd);display:block;cursor:zoom-in}
@@ -192,6 +193,14 @@ function tgCard(){
   D.tg.on?null:el('a',{href:D.tg.s,target:'_blank',rel:'noopener'},el('button',{className:'pri',textContent:'Подключить'})),cp));
 }
 const plural=(n,a,b,c)=>{n%=100;if(n>10&&n<20)return c;n%=10;return n===1?a:n>1&&n<5?b:c};
+function solveBtns(h,edit,top){ // «Решать на доске» и «Добавить фото тетради»
+ const acts=el('div',{className:'actions'+(top?' top':'')});
+ acts.append(el('button',{className:edit?'pri':'',textContent:(h.board?'✏️ Открыть доску с решением':'✏️ Решать на доске'),onclick:async()=>{
+  if(h.board){location.href='/b/'+sid+'?own=1#p='+h.board;return}
+  toast('Готовлю доску…');await flush();const j=await call({t:'board',id:h.id});if(!j)return;
+  const n=j.list.find(x=>x.id===h.id);if(n&&n.board)location.href='/b/'+sid+'?own=1#p='+n.board}}));
+ if(edit)acts.append(el('button',{textContent:'📷 Добавить фото тетради',onclick:()=>$('pf').click()}));
+ return acts}
 function show(id){
  const h=D.list.find(x=>x.id===id);if(!h)return home();open=id;
  $('home').hidden=true;const w=$('hw');w.hidden=false;w.innerHTML='';
@@ -200,6 +209,7 @@ function show(id){
  w.append(el('header',null,el('h1',{textContent:h.title}),chip(h)));
  if(h.st==='checked'&&h.comment)w.append(el('div',{className:'note',textContent:'💬 Преподаватель: '+h.comment}));
  if(edit&&h.comment)w.append(el('div',{className:'note',textContent:'💬 Вернули на доработку: '+h.comment}));
+ w.append(solveBtns(h,edit,true)); // те же кнопки сразу наверху — чтобы бросались в глаза
  if(edit)w.append(el('p',{className:'mut',textContent:'Короткие ответы впишите в поля. Решение обязательно: на доске или фото тетради. Когда всё готово, нажмите «Сдать на проверку».'}));
  h.tasks.forEach((t,i)=>{
   const c=el('div',{className:'task'});
@@ -219,13 +229,7 @@ function show(id){
  });
  // решение: доска и фото
  w.append(el('h2',{textContent:'Решение'}));
- const acts=el('div',{className:'actions'});
- acts.append(el('button',{className:edit?'pri':'',textContent:h.board?'Открыть доску с решением':'Решать на доске',onclick:async()=>{
-  if(h.board){location.href='/b/'+sid+'?own=1#p='+h.board;return}
-  toast('Готовлю доску…');await flush();const j=await call({t:'board',id:h.id});if(!j)return;
-  const n=j.list.find(x=>x.id===h.id);if(n&&n.board)location.href='/b/'+sid+'?own=1#p='+n.board}}));
- if(edit)acts.append(el('button',{textContent:'📷 Добавить фото тетради',onclick:()=>$('pf').click()}));
- w.append(acts);
+ w.append(solveBtns(h,edit));
  const ph=el('div',{className:'photos'});
  h.photos.forEach(n=>{const im=el('img',{src:img(n),alt:'Фото решения'});im.onclick=()=>zoom(im.src);
   const box=el('div',{className:'ph'},im);
