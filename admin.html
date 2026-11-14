@@ -289,11 +289,11 @@ $('tch').onclick=()=>teachers();
 async function model(d,reset){
  const r=await api('/api/admin/model',reset?{method:'POST'}:undefined);if(!r.ok){alert('Не получилось');return}const link=location.origin+(await r.json()).path;
  if(!d)d=dlg('3D-модель огней аэродрома');while(d.b.children.length>1)d.b.lastChild.remove();
- d.b.append(el('div',{className:'mut',textContent:'Кнопка и ссылка есть только у вас. Открыть модель сможет любой, кому вы отправите ссылку (без входа и без VPN). Если ссылка ушла не туда — смените её: старая перестанет работать.'}));
- const cp=el('button',{className:'pri',textContent:'Копировать ссылку'});cp.onclick=()=>copy(link,cp);
+ d.b.append(el('div',{className:'mut',textContent:'Кнопка и ссылка есть только у вас. Открыть модель сможет любой, кому вы отправите ссылку (без входа и без VPN). «Ссылка на контрольную» открывает модель сразу в режиме контрольной: огни не горят, студент определяет их цвета и получает оценку. Если ссылка ушла не туда — смените её: старые перестанут работать.'}));
+ const cp=el('button',{className:'pri',textContent:'Копировать ссылку'});cp.onclick=()=>copy(link,cp);const ct=el('button',{className:'pri',textContent:'Ссылка на контрольную'});ct.onclick=()=>copy(link+'?test',ct);ct.title='Модель сразу откроется в режиме контрольной: огни не горят, нужно определить их цвет';
  const nw=el('button',{textContent:'Сменить ссылку'});nw.onclick=()=>{if(confirm('Сделать новую ссылку? Старая перестанет открываться у всех, кому вы её отправляли.'))model(d,true)};
  d.b.append(el('div',{className:'row'},el('div',{className:'grow'},el('code',{textContent:link}))));
- d.b.append(el('div',{className:'row',style:'border:0'},el('button',{textContent:'Открыть',onclick:()=>open(link,'_blank')}),cp,nw,el('button',{textContent:'Закрыть',onclick:d.close})));
+ d.b.append(el('div',{className:'row',style:'border:0'},el('button',{textContent:'Открыть',onclick:()=>open(link,'_blank')}),cp,ct,nw,el('button',{textContent:'Закрыть',onclick:d.close})));
 }
 $('mdl').onclick=()=>model();
 

@@ -38,6 +38,19 @@ li{margin:2px 0}
 #help{position:absolute;right:12px;bottom:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;color:var(--muted);font-size:12px;max-width:330px}
 kbd{background:rgba(255,255,255,.1);border-radius:4px;padding:0 5px;color:var(--fg);font:inherit}
 #toggle{position:absolute;left:12px;bottom:12px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:8px;padding:8px 12px;cursor:pointer;font:inherit}
+#testToggle.on{background:#9a3d1a;border-color:#e0703f}
+.pal{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px}
+.pal button{display:flex;align-items:center;gap:7px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--fg);padding:7px;border-radius:7px;cursor:pointer;font:inherit;text-align:left}
+.pal button:disabled{opacity:.35;cursor:default}
+.pal button.on{outline:2px solid var(--acc)}
+.sw2{width:18px;height:10px;border-radius:5px;flex:none}
+#stName{width:100%;box-sizing:border-box;padding:8px;border-radius:7px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--fg);font:inherit}
+.sel{margin-top:8px;padding:8px;border-radius:7px;background:rgba(255,255,255,.06)}
+.res{margin-top:10px;padding:10px;border-radius:8px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
+.big{font-size:22px;font-weight:700}
+.mist{cursor:pointer;padding:5px 0;border-bottom:1px solid var(--line);font-size:12px}
+.mist:hover{color:#fff}
+.wide:disabled{opacity:.4;cursor:default}
 @media (max-width:700px){#panel{width:calc(100% - 24px);max-height:55%}#help{display:none}#hud{top:auto;bottom:56px;min-width:0;font-size:11px}}
 </style>
 </head>
@@ -45,6 +58,7 @@ kbd{background:rgba(255,255,255,.1);border-radius:4px;padding:0 5px;color:var(--
 <div id="panel">
   <h1>Светосигнальное оборудование</h1>
   <div class="sub">3D-модель огней приближения и ВПП</div>
+  <button class="wide" id="testToggle">📝 Режим контрольной</button>
 
   <h2>Схема огней приближения</h2>
   <div class="seg" id="schemeSeg">
@@ -60,11 +74,24 @@ kbd{background:rgba(255,255,255,.1);border-radius:4px;padding:0 5px;color:var(--
   </div>
   <div class="min" id="minima"></div>
 
+  <div id="testBox" hidden>
+    <h2>Контрольная: определите цвет огней</h2>
+    <input id="stName" placeholder="Фамилия и имя" autocomplete="name">
+    <div class="sel" id="selInfo"></div>
+    <div class="pal" id="pal"></div>
+    <div class="note" id="prog"></div>
+    <button class="wide" id="checkBtn">✔ Проверить</button>
+    <button class="wide" id="resetBtn">Начать заново</button>
+    <div id="result"></div>
+  </div>
+
+  <div id="learnBlock">
   <h2>Что входит в схему</h2>
   <div id="desc"></div>
 
   <h2>Слои огней</h2>
   <div id="layers"></div>
+  </div>
 
   <h2>Виды</h2>
   <div class="btns">
@@ -125,6 +152,34 @@ const LAYERS = [
   {id:'stop',  name:'Стоп-линия и защита ВПП',  c:C.yellow},
 ];
 const SIZES = {appr:1.7, side:1.6, flash:3.2, thr:1.5, edge:1.3, cl:0.9, tdz:0.9, end:1.5, papi:2.4, taxi:0.8, stop:1.2};
+// ---------- контрольная ----------
+const test = {on:false, ans:{}, sel:null, hover:null, checked:false, locked:/[?&]test\b/.test(location.search)};
+const ELEMS = {
+  'appr-cl':'Центральный ряд огней приближения', 'appr-bars':'Световые горизонты', 'appr-flash':'Импульсные («бегущие») огни',
+  'appr-side':'Боковые ряды огней приближения', 'thr':'Входные огни', 'end':'Ограничительные огни',
+  'edge-main':'Кромочные огни ВПП (основная часть)', 'edge-last':'Кромочные огни ВПП — последние 600 м',
+  'cl-white':'Осевые огни ВПП — дальше 900 м от конца', 'cl-mix':'Осевые огни ВПП — от 900 до 300 м до конца', 'cl-red':'Осевые огни ВПП — последние 300 м',
+  'tdz':'Огни зоны приземления', 'papi':'PAPI (на глиссаде)', 'stopbar':'Огни стоп-линии', 'guard':'Огни защиты ВПП',
+  'taxi-edge':'Боковые огни РД', 'taxi-lead':'Осевые огни схода с ВПП (в зоне ВПП/ILS)', 'taxi-cl':'Осевые огни РД'
+};
+const ANS = [['W','Белый'],['G','Зелёный'],['R','Красный'],['Y','Жёлтый'],['B','Синий'],['RW','Красный / белый'],['GY','Зелёный / жёлтый']];
+const ANS_NAME = Object.fromEntries(ANS);
+const ANS_COL = {W:[C.white],G:[C.green],R:[C.red],Y:[C.yellow],B:[C.blue],RW:[C.red,C.white],GY:[C.green,C.yellow]};
+const UNLIT=[.16,.17,.19], SELC=[.3,.85,1], HOVC=[.55,.62,.75];
+const colorKey = c => c===C.green?'G':c===C.red?'R':c===C.yellow?'Y':c===C.blue?'B':'W';
+function elemOf(l){
+  switch(l.g){
+    case 'appr': return Math.abs(l.z)>2.5 ? 'appr-bars' : 'appr-cl';
+    case 'side': return 'appr-side';
+    case 'flash': return 'appr-flash';
+    case 'edge': return l.c===C.yellow ? 'edge-last' : 'edge-main';
+    case 'cl': { const r=RW_L-l.x; return r>900?'cl-white':r>300?'cl-mix':'cl-red'; }
+    case 'stop': return l.c===C.red ? 'stopbar' : 'guard';
+    case 'taxi': return l.c===C.blue ? 'taxi-edge' : l.z<150 ? 'taxi-lead' : 'taxi-cl';
+    default: return l.g;
+  }
+}
+let vis=[], truth={}, elemOrder=[];
 const MINIMA = {
   1:{txt:'<b>CAT I</b>: ВПР ≥ 60 м, RVR ≥ 550 м', rvr:550, dh:60},
   2:{txt:'<b>CAT II</b>: ВПР 30–60 м, RVR ≥ 300 м', rvr:300, dh:30},
@@ -333,11 +388,14 @@ let points=null, papiIdx=[];
 function rebuild(){
   build();
   const counts={}; for(const l of L) counts[l.g]=(counts[l.g]||0)+1;
-  const vis=L.filter(l=>state.layers[l.g]);
+  const kc={}, ks={}; truth={}; elemOrder=[];
+  L.forEach(l=>{ l.e=elemOf(l); l.k=kc[l.e]=(kc[l.e]??-1)+1; (ks[l.e]=ks[l.e]||new Set()).add(colorKey(l.c)); });
+  for (const e in ks){ elemOrder.push(e); const k=[...ks[e]].sort().join(''); truth[e] = e==='papi'||k==='RW' ? 'RW' : k==='GY' ? 'GY' : k; }
+  vis = test.on ? L : L.filter(l=>state.layers[l.g]);
   const n=vis.length, pos=new Float32Array(n*3), col=new Float32Array(n*3), size=new Float32Array(n), fl=new Float32Array(n*3);
   papiIdx=[];
   vis.forEach((l,i)=>{
-    pos.set([l.x,l.y,l.z],i*3); col.set(l.c,i*3); size[i]=SIZES[l.g]; if(l.f) fl.set(l.f,i*3);
+    pos.set([l.x,l.y,l.z],i*3); col.set(l.c,i*3); size[i]=SIZES[l.g]; if(l.f && !test.on) fl.set(l.f,i*3);
     if(l.g==='papi') papiIdx.push(i);
   });
   const g=new THREE.BufferGeometry();
@@ -348,6 +406,7 @@ function rebuild(){
   if(points){ scene.remove(points); points.geometry.dispose(); }
   points=new THREE.Points(g,mat); points.frustumCulled=false; scene.add(points);
   renderLayers(counts); renderDesc();
+  if (test.on){ paintTest(); renderTest(); }
 }
 
 // ---------- UI ----------
@@ -386,7 +445,7 @@ function renderDesc(){
 function seg(id,key,parse){
   $(id).querySelectorAll('button').forEach(b=>b.onclick=()=>{
     $(id).querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
-    state[key]=parse(b.dataset.v); rebuild(); applyAtmos();
+    state[key]=parse(b.dataset.v); resetTest(); rebuild(); applyAtmos();
   });
 }
 seg('schemeSeg','scheme',v=>v);
@@ -444,13 +503,16 @@ addEventListener('keydown',e=>{
 addEventListener('keyup',e=>keys[e.code]=false);
 addEventListener('blur',()=>{ for(const k in keys) keys[k]=false; });
 let drag=null;
-renderer.domElement.addEventListener('pointerdown',e=>{ drag={x:e.clientX,y:e.clientY}; renderer.domElement.setPointerCapture(e.pointerId); });
+let down=null;
+renderer.domElement.addEventListener('pointerdown',e=>{ drag={x:e.clientX,y:e.clientY}; down={x:e.clientX,y:e.clientY}; renderer.domElement.setPointerCapture(e.pointerId); });
 renderer.domElement.addEventListener('pointermove',e=>{
-  if(!drag) return;
+  if(!drag){ if(test.on && e.pointerType==='mouse'){ const h=pick(e.clientX,e.clientY); if(h!==test.hover){ test.hover=h; paintTest(); } renderer.domElement.style.cursor=h?'pointer':''; } return; }
   yaw -= (e.clientX-drag.x)*0.003; pitch -= (e.clientY-drag.y)*0.003;
   pitch=Math.max(-1.55,Math.min(1.55,pitch)); drag={x:e.clientX,y:e.clientY};
 });
-renderer.domElement.addEventListener('pointerup',()=>drag=null);
+renderer.domElement.addEventListener('pointerup',e=>{ drag=null;
+  if (test.on && down && Math.hypot(e.clientX-down.x,e.clientY-down.y)<6){ test.sel=pick(e.clientX,e.clientY); paintTest(); renderTest(); }
+  down=null; });
 renderer.domElement.addEventListener('wheel',e=>{ e.preventDefault(); speed=Math.max(5,Math.min(800,speed*(e.deltaY>0?1/1.15:1.15))); },{passive:false});
 
 const fwd=new THREE.Vector3(), right=new THREE.Vector3(), up=new THREE.Vector3(0,1,0);
@@ -483,6 +545,7 @@ function update(dt){
 // PAPI colour by viewing angle
 const papiCol=[0,0,0,0];
 function updatePapi(){
+  if (test.on){ $('papiTxt').textContent='PAPI: —'; $('papiTxt').style.color=''; return; }
   const p=camera.position, horiz=PAPI_X-p.x;
   let reds=0, txt='PAPI: не виден (вы за ним)';
   if (horiz>5){
@@ -512,6 +575,67 @@ function updateHud(dt){
   $('dh').textContent = `ВПР ${dh} м (CAT ${['I','II','III'][state.cat-1]}) — решение!`;
 }
 
+function pick(cx,cy){
+  const r=renderer.domElement.getBoundingClientRect(), v=new THREE.Vector3(); let best=-1, bd=20*20;
+  vis.forEach((l,i)=>{ v.set(l.x,l.y,l.z).project(camera); if (v.z>1) return;
+    const dx=(v.x+1)/2*r.width-(cx-r.left), dy=(1-v.y)/2*r.height-(cy-r.top), d=dx*dx+dy*dy; if (d<bd){ bd=d; best=i; } });
+  return best<0 ? null : vis[best].e;
+}
+function paintTest(){
+  if (!points || !test.on) return;
+  const a=points.geometry.attributes.aColor, sz=points.geometry.attributes.aSize;
+  vis.forEach((l,i)=>{
+    const key = test.checked ? truth[l.e] : test.ans[l.e];
+    let c = UNLIT, s = SIZES[l.g];
+    if (key){ const cs=ANS_COL[key]; c = l.e==='papi' && key==='RW' ? (l.k<2?C.red:C.white) : cs[l.k%cs.length]; }
+    if (l.e===test.sel){ if(!key) c=SELC; s*=1.9; } else if (l.e===test.hover){ if(!key) c=HOVC; s*=1.4; }
+    a.setXYZ(i,c[0],c[1],c[2]); sz.setX(i,s);
+  });
+  a.needsUpdate=true; sz.needsUpdate=true;
+}
+function renderTest(){
+  const done=elemOrder.filter(e=>test.ans[e]).length, s=test.sel;
+  $('prog').textContent=`Отмечено групп: ${done} из ${elemOrder.length}`;
+  if (!s) $('selInfo').innerHTML='Нажмите на любой огонь на модели — выделится вся группа таких огней. Затем выберите её цвет ниже.';
+  else if (test.checked){ const ok=test.ans[s]===truth[s];
+    $('selInfo').innerHTML=`<b>${ELEMS[s]}</b><br>Правильно: <b>${ANS_NAME[truth[s]]}</b>`+(ok?' ✓':`<br><span style="color:#ff8a7a">Ваш ответ: ${ANS_NAME[test.ans[s]]||'нет ответа'}</span>`); }
+  else $('selInfo').innerHTML=`<b>${ELEMS[s]}</b><br><span style="color:var(--muted)">${test.ans[s]?'Ваш ответ: '+ANS_NAME[test.ans[s]]+' (можно изменить)':'Какого цвета эти огни?'}</span>`;
+  $('pal').querySelectorAll('button').forEach(b=>{ b.disabled=!s||test.checked; b.classList.toggle('on',!!s&&test.ans[s]===b.dataset.k); });
+  $('checkBtn').disabled=test.checked; $('stName').disabled=test.checked;
+}
+function resetTest(){ test.ans={}; test.sel=null; test.hover=null; test.checked=false; $('result').innerHTML=''; }
+const swatch = k => { const cs=ANS_COL[k].map(rgb); return cs.length>1 ? `linear-gradient(90deg,${cs[0]} 50%,${cs[1]} 50%)` : cs[0]; };
+$('pal').innerHTML = ANS.map(([k,n])=>`<button data-k="${k}"><span class="sw2" style="background:${swatch(k)}"></span>${n}</button>`).join('');
+$('pal').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+  if (!test.sel || test.checked) return;
+  test.ans[test.sel]=b.dataset.k; paintTest(); renderTest();
+});
+$('checkBtn').onclick=()=>{
+  const n=elemOrder.length, done=elemOrder.filter(e=>test.ans[e]).length;
+  if (done<n && !confirm(`Отмечено ${done} из ${n} групп. Неотмеченные будут засчитаны как ошибки. Проверить?`)) return;
+  test.checked=true; test.sel=null;
+  const bad=elemOrder.filter(e=>test.ans[e]!==truth[e]), ok=n-bad.length, pct=Math.round(ok/n*100);
+  const grade = pct>=90?5:pct>=75?4:pct>=50?3:2;
+  const nm=$('stName').value.trim()||'Без имени', dt=new Date().toLocaleString('ru-RU',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'});
+  $('result').innerHTML=`<div class="res"><b>${nm.replace(/[<>&]/g,'')}</b> · ${dt}<br>${state.scheme==='alpa'?'ALPA-ATA':'Кальверт'}, CAT ${['I','II','III'][state.cat-1]}<br>
+    <span class="big">${ok} из ${n}</span> (${pct}%) — оценка <b>${grade}</b></div>`+
+    (bad.length?'<h2>Ошибки (нажмите, чтобы показать на модели)</h2>'+bad.map(e=>`<div class="mist" data-e="${e}">✗ ${ELEMS[e]}: ${ANS_NAME[test.ans[e]]||'нет ответа'} → правильно <b>${ANS_NAME[truth[e]]}</b></div>`).join(''):'<div class="sel" style="color:#5dff8f">Все ответы верные! 🎉</div>');
+  $('result').querySelectorAll('.mist').forEach(m=>m.onclick=()=>{ test.sel=m.dataset.e; paintTest(); renderTest(); });
+  paintTest(); renderTest();
+  $('result').scrollIntoView({behavior:'smooth',block:'start'});
+};
+$('resetBtn').onclick=()=>{ if (test.checked || confirm('Стереть все ответы?')) { resetTest(); paintTest(); renderTest(); } };
+function setTest(on){
+  test.on=on; resetTest();
+  $('testBox').hidden=!on; $('learnBlock').hidden=on;
+  $('testToggle').classList.toggle('on',on);
+  $('testToggle').textContent = on ? '📖 Выйти из контрольной (обучение)' : '📝 Режим контрольной';
+  if (test.locked) $('testToggle').hidden=true;
+  renderer.domElement.style.cursor='';
+  rebuild();
+}
+$('testToggle').onclick=()=>{ if (test.on && !test.checked && Object.keys(test.ans).length && !confirm('Выйти из контрольной? Ответы пропадут.')) return; setTest(!test.on); };
+
 function resize(){
   renderer.setSize(innerWidth,innerHeight); camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
   const h=renderer.getDrawingBufferSize(new THREE.Vector2()).y;
@@ -529,6 +653,7 @@ function loop(now){
   requestAnimationFrame(loop);
 }
 resize(); rebuild(); applyAtmos(); VIEWS.glide2k();
+if (test.locked) setTest(true);
 requestAnimationFrame(loop);
 </script>
 </body>
