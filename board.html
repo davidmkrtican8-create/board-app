@@ -649,9 +649,18 @@ function onOp(o){
  renderPages();redraw();
  if(o.t==='title'&&o.id===page&&document.activeElement!==$('title'))$('title').value=o.title;
 }
-const es=new EventSource('/api/'+room+'/events?c='+me+(ME?'&u='+ME:''));
-es.onmessage=e=>onOp(JSON.parse(e.data));
-es.onerror=()=>{$('st').textContent='Переподключение…'};
+// поток событий доски. Если за 7 с лист не пришёл (некоторые сети/фильтры задерживают сжатый поток) — переподключаемся без сжатия и запоминаем это на устройстве
+let es=null,noGz=(()=>{try{return localStorage.getItem('sseNoGz')==='1'}catch(e){return false}})();
+function connectES(){
+ if(es)try{es.close()}catch(e){}
+ es=new EventSource('/api/'+room+'/events?c='+me+(ME?'&u='+ME:'')+(noGz?'&nogz=1':''));
+ es.onmessage=e=>onOp(JSON.parse(e.data));
+ es.onerror=()=>{$('st').textContent='Переподключение…'};
+ if(!noGz)setTimeout(()=>{if(initDone||noGz)return;noGz=true;try{localStorage.setItem('sseNoGz','1')}catch(e){}
+  try{navigator.sendBeacon&&navigator.sendBeacon('/api/log',JSON.stringify({m:'sse-nogz-fallback',u:navigator.userAgent,p:location.pathname}))}catch(e){}
+  connectES()},7000);
+}
+connectES();
 setInterval(()=>{if(Object.keys(cursors).length)drawOverlay()},1000);
 
 // ---------- камера ----------
@@ -967,7 +976,7 @@ cv.addEventListener('pointerdown',e=>{
  if(e.pointerType==='mouse'&&e.button===2)return;
  if(tbox&&e.target===cv)closeText();
  try{cv.setPointerCapture(e.pointerId)}catch(_){}
- if(e.pointerType==='pen'){if(!penSeen){penSeen=true;try{localStorage.setItem('penSeen','1')}catch(_){}} // запоминаем: на этом планшете есть стилус
+ if(e.pointerType==='pen'){if(!penSeen){penSeen=true;try{localStorage.setItem('penSeen','1')}catch(_){}if(window.fpT)window.fpT()} // запоминаем: на этом планшете есть стилус
   if(pan&&pan.touch){pan=null;ptrs.clear();gest=null}} // ладонь начала двигать доску, а потом коснулось перо — доску больше не двигаем
  if(e.pointerType==='touch'){
   if(cur&&curPen)return; // пока пишет стилус, касания ладони и пальцев не считаем
@@ -1976,7 +1985,7 @@ $('zfit').onclick=()=>{fit()};
 if(window.visualViewport)window.visualViewport.addEventListener('resize',chkZoom);
 $('newt').onclick=()=>{if(!jump)return;view.y=jump.y-40;$('newt').hidden=true;jump=null;redraw()};
 if(!isTeacher)['clr','delp'].forEach(v=>{const o=$('fm').querySelector('[value='+v+']');if(o)o.remove()}); // ученик не видит «Очистить» и «Удалить»
-if(navigator.maxTouchPoints>0){$('fp').hidden=false;const fpT=()=>{$('fp').textContent='Палец и простой стилус: '+(touchPans()?'листают':'рисуют')};
+if(navigator.maxTouchPoints>0){$('fp').hidden=false;const fpT=window.fpT=()=>{$('fp').textContent='Палец и простой стилус: '+(touchPans()?'листают':'рисуют')};
  try{const v=localStorage.getItem('fingerPan');fpSet=v==='0'||v==='1';fingerPan=v==='1'}catch(_){}fpT(); // выбор запоминается на этом устройстве
  // простой стилус (не Apple Pencil) iPad видит как палец: чтобы им писать, выберите «рисуют»
  $('fp').onclick=()=>{fingerPan=!touchPans();fpSet=true;try{localStorage.setItem('fingerPan',fingerPan?'1':'0')}catch(_){}fpT()}}

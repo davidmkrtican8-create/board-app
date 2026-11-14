@@ -888,7 +888,7 @@ http.createServer((req, res) => {
     if (!r) { res.writeHead(404); return res.end(); }
     if (m[2] === 'events' && req.method === 'GET') {
       // поток событий сжимаем: доска с картинками при открытии приходит в 3–5 раз быстрее, каждое сообщение уходит сразу (flush)
-      const gz = /\bgzip\b/.test(String(req.headers['accept-encoding'] || ''));
+      const gz = /\bgzip\b/.test(String(req.headers['accept-encoding'] || '')) && !u.searchParams.has('nogz'); // nogz — сеть ученика задерживает сжатый поток
       res.writeHead(200, Object.assign({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' }, gz ? { 'Content-Encoding': 'gzip' } : {}));
       let cl = res;
       if (gz) {
