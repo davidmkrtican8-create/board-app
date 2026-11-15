@@ -247,7 +247,7 @@ const ME=(new URLSearchParams(location.search).get('u')||'').replace(/[^a-z0-9]/
 addEventListener('hashchange',()=>{const hp=(location.hash.match(/^#p=([\w-]+)$/)||[])[1];if(hp&&pages.some(p=>p.id===hp))openPage(hp)});
 let pages=[],strokes={},images={},page=null,live={},color='#1a1a1a',bg='grid',cur=null,lastEmit=0,mine=[],redo=[];
 let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,lastP=[0,0],editImg=null,editStroke=null,jump=null,fingerPan=false;
-let rectC=null,rq=0,pendErase=[],pendPage=null,eraseT=0,peersTxt='';
+let rectC=null,rq=0,pendErase=[],pendPage=null,eraseT=0,peersTxt='',msel=null; // msel — выделение рамкой: {ids,imgs,box}
 let curPid=null,curPen=false,curT0=0,curX=0,curY=0,curTr=0,viewOnly=false,dark=false,penSeen=(()=>{try{return localStorage.getItem('penSeen')==='1'}catch(e){return false}})(),myName=null,ptr=null,curTool='pen',lastCur=0,lastCurP=[-9,-9];
 const views={},imgEl={},ptrs=new Map(),cursors={};
 const $=i=>document.getElementById(i),tool=()=>curTool;
@@ -491,6 +491,7 @@ function placeDone(){ // кнопка «Готово» рядом с редак�
  const b=$('edone'),g=editImg&&(images[page]||{})[editImg];let rc=null;
  if(g)rc=[g.x,g.y,g.x+g.w,g.y+g.h];
  else{const sk=editStroke&&(strokes[page]||{})[editStroke];if(sk)rc=strokeBox(sk)}
+ if(!rc&&msel)rc=msel.box;
  const dl=$('edel');
  if(!rc){b.hidden=true;dl.hidden=true;return}
  b.hidden=false;dl.hidden=viewOnly;const s=view.s;
@@ -567,6 +568,10 @@ function redraw(){
  ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(L,0,0);ctx.restore();
  ctx.restore();
  for(const id in ims)if(handlesOn(id))drawHandles(ims[id]);
+ if(msel||(cur&&cur.mq)){ // выделение рамкой: выбранная область и рамка, которую сейчас тянут
+  ctx.save();ctx.strokeStyle='rgba(106,63,196,.95)';ctx.lineWidth=2/s;ctx.setLineDash([8/s,6/s]);
+  const R=(a,b,c,d)=>{const x=Math.min(a,c),y=Math.min(b,d),w=Math.abs(c-a),h=Math.abs(d-b);ctx.fillStyle='rgba(106,63,196,.07)';ctx.fillRect(x,y,w,h);ctx.strokeRect(x,y,w,h)};
+  if(msel)R(...msel.box);if(cur&&cur.mq)R(...cur.mq);ctx.restore()}
  if(editStroke&&strokes[page]&&strokes[page][editStroke]){ // пунктирная рамка вокруг только что созданного объекта
   const bb=strokeBox(strokes[page][editStroke]);ctx.save();ctx.strokeStyle='rgba(106,63,196,.9)';ctx.lineWidth=2/s;ctx.setLineDash([8/s,6/s]);
   ctx.strokeRect(bb[0],bb[1],bb[2]-bb[0],bb[3]-bb[1]);ctx.restore();
@@ -626,7 +631,7 @@ function removePage(id){
  pages=pages.filter(x=>x.id!==id);delete strokes[id];delete images[id];delete views[id];
  if(page===id){page=null;openPage(pages[0].id)}else renderPages();
 }
-function openPage(id){page=id;live={};$('newt').hidden=true;jump=null;editImg=null;editStroke=null;view=views[id]||(views[id]=defView());renderPages();redraw();
+function openPage(id){page=id;live={};$('newt').hidden=true;jump=null;editImg=null;editStroke=null;msel=null;view=views[id]||(views[id]=defView());renderPages();redraw();
  const p=pages.filter(x=>x.id===id)[0];$('title').value=p?p.title:''}
 
 // ---------- сообщения от сервера ----------
@@ -1032,14 +1037,18 @@ cv.addEventListener('pointerdown',e=>{
  }
  if(t==='er'){cur={erasing:1,gone:[]};eraseAt(p[0],p[1]);return}
  if(t==='text'){const id=strokeAt(p[0],p[1],true,true);openText(id?strokes[page][id].pts[0]:p[0],id?strokes[page][id].pts[1]:p[1],id);return}
- if(t==='mv'){ // двигать: сначала фигуры/линии/текст, потом картинки; пустое место — листаем доску
+ if(t==='mv'){ // двигать: внутри выделенной области — тащим всё сразу; потом фигуры/линии/текст, картинки; пустое место — рамка выделения
+  if(msel){
+   if(inBox(msel.box,p[0],p[1])){const ps=strokes[page]||{},ims=images[page]||{};cur={gmv:1,sx:p[0],sy:p[1],os:{},oi:{},ob:msel.box.slice()};
+    msel.ids.forEach(id=>{if(ps[id])cur.os[id]=ps[id].pts.slice()});msel.imgs.forEach(id=>{if(ims[id])cur.oi[id]=[ims[id].x,ims[id].y]});return}
+   msel=null;redraw()}
   const hh=handleAt(p[0],p[1]);
   if(hh){const g2=images[page][hh.id];cur={mv:hh.id,size:hh.type==='size',dx:p[0]-g2.x,dy:p[1]-g2.y,r:g2.h/g2.w};return}
   const sid=strokeAt(p[0],p[1],true);
   if(sid){const sk=strokes[page][sid];editImg=null;editStroke=sid;cur={mvs:sid,sx:p[0],sy:p[1],orig:sk.pts.slice()};redraw();return}
   const iid=imgAt(p[0],p[1]);
   if(iid){const g=images[page][iid];editStroke=null;editImg=iid;cur={mv:iid,size:false,dx:p[0]-g.x,dy:p[1]-g.y,r:g.h/g.w};redraw();return}
-  pan={id:e.pointerId,x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};return;
+  editImg=null;editStroke=null;cur={mq:[p[0],p[1],p[0],p[1]]};redraw();return; // рамка выделения (листать — рукой, пробелом или двумя пальцами)
  }
  const w=penW(); // толщина чернил привязана к листу, а не к масштабу
  cur=t==='pen'?{id:newId(),k:'pen',pts:[p[0],p[1]],c:color,w:w,pr:(e.pointerType==='pen'&&S.prs)?[pn(e)]:null,sm:e.pointerType==='mouse',ex:p[0],ey:p[1]}
@@ -1087,6 +1096,11 @@ cv.addEventListener('pointermove',e=>{
   sk.w=r2(u);sk.pts=[r2(tl[0]-(c.xa-.9)*u),r2(tl[1]+(c.yb+1.2)*u)];inval(sk);rd();
   const t2=Date.now();if(t2-lastEmit>80){lastEmit=t2;send({t:'stroke',page:page,stroke:clean(sk)})}
   return}
+ if(cur.mq){const p=pos(e);cur.mq[2]=p[0];cur.mq[3]=p[1];rd();return}
+ if(cur.gmv){const p=pos(e),dx=p[0]-cur.sx,dy=p[1]-cur.sy,ps=strokes[page]||{},ims=images[page]||{};
+  for(const id in cur.os)if(ps[id]){ps[id].pts=cur.os[id].map((v,i)=>r2(v+(i%2?dy:dx)));inval(ps[id])}
+  for(const id in cur.oi)if(ims[id]){ims[id].x=r2(cur.oi[id][0]+dx);ims[id].y=r2(cur.oi[id][1]+dy)}
+  if(msel)msel.box=[cur.ob[0]+dx,cur.ob[1]+dy,cur.ob[2]+dx,cur.ob[3]+dy];rd();return}
  if(cur.mvs){const p=pos(e),sk=(strokes[page]||{})[cur.mvs];if(!sk)return;
   const dx=p[0]-cur.sx,dy=p[1]-cur.sy;sk.pts=cur.orig.map((v,i)=>r2(v+(i%2?dy:dx)));inval(sk);rd();
   const t2=Date.now();if(t2-lastEmit>80){lastEmit=t2;send({t:'strokeset',page:page,id:cur.mvs,pts:sk.pts})}
@@ -1117,6 +1131,11 @@ function end(e){
  if(cur&&curPid!==null&&e.pointerId!==curPid)return; // ладонь оторвалась — линию пера не обрываем
  clearTimeout(holdT);if(!cur)return;const s=cur;cur=null;curPid=null;if(s.erasing){flushErase();if(s.gone&&s.gone.length){mine.push({page:page,dels:s.gone});redo=[]}return}
  if(s.mvs){const sk=(strokes[page]||{})[s.mvs];if(sk)send({t:'strokeset',page:page,id:s.mvs,pts:sk.pts});return}
+ if(s.mq){const q=s.mq;if((Math.abs(q[2]-q[0])+Math.abs(q[3]-q[1]))*view.s<8)msel=null;else mselPick(q);redraw();return}
+ if(s.gmv){const ps=strokes[page]||{},ims=images[page]||{};
+  for(const id in s.os)if(ps[id])send({t:'strokeset',page:page,id:id,pts:ps[id].pts});
+  for(const id in s.oi){const g=ims[id];if(g)send({t:'imgset',page:page,id:id,x:r2(g.x),y:r2(g.y),w:r2(g.w),h:r2(g.h)})}
+  if(msel)mselBox();redraw();return}
  if(s.laser){laserFlush();return}
  if(s.orbit){const sk=(strokes[page]||{})[s.orbit];if(sk)send({t:'stroke',page:page,stroke:clean(sk)});return}
  if(s.axres){const sk=(strokes[page]||{})[s.axres];if(sk)send({t:'stroke',page:page,stroke:clean(sk)});return}
@@ -1147,7 +1166,7 @@ document.addEventListener('keydown',e=>{
  if(isTextTarget(a))return;
  if((e.metaKey||e.ctrlKey)&&e.code==='KeyV'&&!viewOnly&&a!==pcatch){pcatch.focus({preventScroll:true});setTimeout(()=>{pcatch.textContent='';if(document.activeElement===pcatch)pcatch.blur()},300);return}
  if(e.code==='Space'&&!(tg==='SELECT'||tg==='BUTTON')){space=true;setCursor();e.preventDefault();return}
- if((editImg||editStroke)&&(e.key==='Enter'||e.key==='Escape')&&tg!=='SELECT'){editImg=null;editStroke=null;redraw();e.preventDefault();return}
+ if((editImg||editStroke||msel)&&(e.key==='Enter'||e.key==='Escape')&&tg!=='SELECT'){editImg=null;editStroke=null;msel=null;redraw();e.preventDefault();return}
  if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&e.key==='0'){fit();return}
  const plain=!e.metaKey&&!e.ctrlKey&&!e.altKey&&tg!=='SELECT'&&!viewOnly; // быстрые клавиши (работают в любой раскладке)
  if(plain&&e.code==='KeyE'){setTool(isEr(tool())?'pen':ersTool());return} // E — ластик (ещё раз — обратно перо)
@@ -1155,7 +1174,7 @@ document.addEventListener('keydown',e=>{
  if(plain&&e.code==='KeyH'){setTool(tool()==='hl'?'pen':'hl');return} // H — маркер
  if(plain&&e.code==='KeyL'){setTool(tool()==='laser'?'pen':'laser');return} // L — указка
  if(plain&&e.code==='KeyV'){setTool(tool()==='mv'?'pen':'mv');return} // V — обычная стрелка «Двигать» (ещё раз — перо)
- if(plain&&(e.key==='Delete'||e.key==='Backspace')&&(editStroke||editImg)){if(delSel())e.preventDefault();return} // удалить выделенное
+ if(plain&&(e.key==='Delete'||e.key==='Backspace')&&(editStroke||editImg||msel)){if(delSel())e.preventDefault();return} // удалить выделенное
  const z=e.code==='KeyZ',y=e.code==='KeyY';
  if(!(e.metaKey||e.ctrlKey)||!(z||y))return;
  e.preventDefault();if(viewOnly)return;(y||e.shiftKey)?redoAct():undo();
@@ -1236,7 +1255,29 @@ pcatch.addEventListener('input',()=>{pcatch.textContent=''});
 $('fi').onchange=()=>{if($('fi').files[0])addImage($('fi').files[0]);$('fi').value=''};
 
 // ---------- отмена / возврат ----------
+// ---------- выделение рамкой (стрелка V, тянуть по пустому месту): перенести или удалить сразу задачу и решение ----------
+function mselBox(){
+ const ps=strokes[page]||{},ims=images[page]||{};msel.ids=msel.ids.filter(id=>ps[id]);msel.imgs=msel.imgs.filter(id=>ims[id]);
+ let a=1e12,b=1e12,c=-1e12,d=-1e12;
+ for(const id of msel.ids){const q=strokeBox(ps[id]);a=Math.min(a,q[0]);b=Math.min(b,q[1]);c=Math.max(c,q[2]);d=Math.max(d,q[3])}
+ for(const id of msel.imgs){const g=ims[id];a=Math.min(a,g.x);b=Math.min(b,g.y);c=Math.max(c,g.x+g.w);d=Math.max(d,g.y+g.h)}
+ if(a>c){msel=null;return}msel.box=[a,b,c,d];
+}
+function mselPick(q){ // в выделение попадает всё, у чего середина внутри рамки
+ const x0=Math.min(q[0],q[2]),x1=Math.max(q[0],q[2]),y0=Math.min(q[1],q[3]),y1=Math.max(q[1],q[3]),inR=(x,y)=>x>=x0&&x<=x1&&y>=y0&&y<=y1;
+ const ps=strokes[page]||{},ims=images[page]||{};
+ const ids=Object.keys(ps).filter(id=>{const b=strokeBox(ps[id]);return inR((b[0]+b[2])/2,(b[1]+b[3])/2)});
+ const imgs=Object.keys(ims).filter(id=>{const g=ims[id];return inR(g.x+g.w/2,g.y+g.h/2)});
+ msel=ids.length||imgs.length?{ids:ids,imgs:imgs}:null;if(msel)mselBox();
+}
+function mselDel(){ // удалить всё выделенное (Ctrl+Z вернёт)
+ if(!msel||viewOnly)return false;const ps=strokes[page]||{},ims=images[page]||{},dels=[];
+ for(const id of msel.ids)if(ps[id]){dels.push({id:id,stroke:ps[id]});delete ps[id]}
+ for(const id of msel.imgs)if(ims[id]){dels.push({id:id,img:ims[id]});delete ims[id]}
+ msel=null;if(dels.length){send({t:'erase',page:page,ids:dels.map(d=>d.id)});mine.push({page:page,dels:dels});redo=[]}redraw();return true;
+}
 function delSel(){ // удалить выделенную картинку или фигуру (Ctrl+Z вернёт)
+ if(msel)return mselDel();
  if(viewOnly)return false;let d=null;
  if(editImg&&(images[page]||{})[editImg]){d={img:images[page][editImg]};d.id=editImg;delete images[page][editImg]}
  else if(editStroke&&(strokes[page]||{})[editStroke]){d={stroke:strokes[page][editStroke]};d.id=editStroke;delete strokes[page][editStroke]}
@@ -1258,7 +1299,7 @@ function undo(){
 }
 function redoAct(){
  const r=redo.pop();if(!r)return;
- if(r.redels){const ids=r.redels.map(d=>d.id);ids.forEach(id=>{if(strokes[r.page])delete strokes[r.page][id]});send({t:'erase',page:r.page,ids:ids});mine.push({page:r.page,dels:r.redels});redraw();return}
+ if(r.redels){const ids=r.redels.map(d=>d.id);ids.forEach(id=>{if(strokes[r.page])delete strokes[r.page][id];if(images[r.page])delete images[r.page][id]});send({t:'erase',page:r.page,ids:ids});mine.push({page:r.page,dels:r.redels});redraw();return}
  if(r.redel){if(strokes[r.page])delete strokes[r.page][r.id];if(images[r.page])delete images[r.page][r.id];send({t:'erase',page:r.page,id:r.id});mine.push({page:r.page,id:r.id,del:r.redel});redraw();return}
  if(r.stroke){(strokes[r.page]=strokes[r.page]||{})[r.id]=r.stroke;send({t:'stroke',page:r.page,stroke:clean(Object.assign({id:r.id},r.stroke))})}
  else{(images[r.page]=images[r.page]||{})[r.id]=r.img;send({t:'image',page:r.page,img:Object.assign({id:r.id},r.img)})}
@@ -1875,7 +1916,7 @@ $('callb').innerHTML=ic('phone')+'<span class="lbl">Звонок</span>';
 function setTool(v){
  if(v==='axes'){insertAxes();return}
  if(v==='plot'){insertPlot();return}
- curTool=v;closeText();updTools();setCursor();drawOverlay();redraw();
+ curTool=v;if(v!=='mv')msel=null;closeText();updTools();setCursor();drawOverlay();redraw();
 }
 function togglePE(){setTool(tool()==='pen'?ersTool():'pen')} // перо ⇄ ластик одной кнопкой
 function updTools(){
@@ -2017,7 +2058,7 @@ function setColor(c){ // выбрать цвет пера (из быстрых �
   m.append(g,own);m.hidden=false;
   m.style.top=(pb.offsetTop+pb.offsetHeight+4)+'px';m.style.left=Math.max(10,Math.min(pb.offsetLeft-100,$('main').clientWidth-m.offsetWidth-10))+'px'};
  document.addEventListener('pointerdown',e=>{const m=$('palp');if(!m.hidden&&!m.contains(e.target)&&e.target!==pb)m.hidden=true},true)}
-$('edone').onclick=()=>{editImg=null;editStroke=null;redraw()};
+$('edone').onclick=()=>{editImg=null;editStroke=null;msel=null;redraw()};
 $('edel').onclick=()=>{delSel()};
 $('zfit').onclick=()=>{fit()};
 if(window.visualViewport)window.visualViewport.addEventListener('resize',chkZoom);
