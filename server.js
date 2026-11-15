@@ -27,7 +27,7 @@ const groupsOf = sid => index.students.filter(g => g.type === 'group' && (g.memb
 
 // Комната = папка одного ученика (внутри неё несколько досок-страниц)
 function room(id) {
-  if (rooms[id]) return rooms[id];
+  if (rooms[id]) { rooms[id].last = Date.now(); return rooms[id]; }
   let s;
   try { s = JSON.parse(fs.readFileSync(path.join(DIR, id + '.json'), 'utf8')); }
   catch (e) {
@@ -36,12 +36,17 @@ function room(id) {
   }
   s.images = s.images || {};
   for (const pg in s.strokes || {}) delete s.strokes[pg].undefined; // объекты без номера (старая ошибка правки после перезагрузки)
-  return (rooms[id] = { id, s, clients: new Set(), timer: null, call: new Set() });
+  return (rooms[id] = { id, s, clients: new Set(), timer: null, call: new Set(), last: Date.now(), pend: false });
 }
 function save(r) {
-  clearTimeout(r.timer);
-  r.timer = setTimeout(() => fs.writeFile(path.join(DIR, r.id + '.json'), JSON.stringify(r.s), () => {}), 1000);
+  clearTimeout(r.timer); r.pend = true; r.last = Date.now();
+  r.timer = setTimeout(() => fs.writeFile(path.join(DIR, r.id + '.json'), JSON.stringify(r.s), () => { r.pend = false; }), 1000);
 }
+// доски, которые 30 минут никто не держит открытыми (и всё уже записано на диск), убираем из памяти; при открытии загрузятся снова
+setInterval(() => {
+  const now = Date.now();
+  for (const id in rooms) { const r = rooms[id]; if (!r.clients.size && !r.call.size && !r.pend && now - r.last > 30 * 60e3) delete rooms[id]; }
+}, 5 * 60e3);
 function bcast(r, msg) {
   const d = 'data: ' + JSON.stringify(msg) + '\n\n';
   r.clients.forEach(c => c.write(d));
@@ -906,7 +911,7 @@ http.createServer((req, res) => {
       bcast(r, peers());
       const ping = setInterval(() => cl.write(': ping\n\n'), 20000);
       req.on('close', () => {
-        clearInterval(ping); r.clients.delete(cl); if (gz) cl.end(); bcast(r, peers());
+        clearInterval(ping); r.clients.delete(cl); r.last = Date.now(); if (gz) cl.end(); bcast(r, peers());
         if (RID.test(cid) && r.call.delete(cid)) bcast(r, { t: 'rtc', kind: 'bye', from: cid });
       });
       return;
