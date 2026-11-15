@@ -534,8 +534,11 @@ async function snapSend() {
       const last = Math.max(...due.map(pg => m[pg].t)), old = due.some(pg => m[pg].day !== today);
       if (Date.now() - last < 30 * 60e3 || (hr < 21 && !old)) continue;
       const L = TG.token && !(TG.noAuto || {})[s.owner] ? subsOf(sid) : [];
+      const rr = room(sid);
       for (const pg of due.sort((a, b) => m[a].t - m[b].t)) {
         const e = m[pg]; let buf = null; try { buf = fs.readFileSync(path.join(SND, sid, pg + '.pdf')); } catch (er) {}
+        // доска, подготовленная заранее (только вставленные задачи, ничего не написано) — конспект не шлём
+        if (rr && !Object.keys(rr.s.strokes[pg] || {}).some(id => !/^h[0-9a-f]+t$/.test(id))) { e.sent = Date.now(); continue; }
         let miss = 0; e.got = e.got || []; e.tries = (e.tries || 0) + 1;
         if (buf) for (const x of L) {
           if (e.got.includes(x.chat)) continue;
