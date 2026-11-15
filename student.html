@@ -114,6 +114,10 @@ const toast=(t,ms)=>{const s=$('st');s.textContent=t;s.classList.add('on');clear
 const img=n=>'/hwimg/'+sid+'/'+n;
 const day=t=>new Date(t).toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
 const late=h=>h.st==='new'&&h.due&&Date.now()>h.due+864e5;
+// кабинет может быть открыт поверх доски (во время звонка): тогда ссылки на доски не уходят со страницы, а говорят доске, что открыть
+const inBoard=(()=>{try{return window.parent!==window&&window.parent.location.pathname.startsWith('/b/')}catch(e){return false}})();
+function go(u){if(inBoard)parent.postMessage({t:'go',url:u},location.origin);else location.href=u}
+document.addEventListener('click',e=>{const a=inBoard&&e.target.closest&&e.target.closest('a[href^="/b/"]');if(a){e.preventDefault();go(a.getAttribute('href'))}},true);
 async function call(o){
  const r=await fetch('/api/'+sid+'/hw',o?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)}:{});
  const j=r.ok?await r.json().catch(()=>null):null;
@@ -189,9 +193,9 @@ const plural=(n,a,b,c)=>{n%=100;if(n>10&&n<20)return c;n%=10;return n===1?a:n>1&
 function solveBtns(h,edit,top){ // «Решать на доске» и «Добавить фото тетради»
  const acts=el('div',{className:'actions'+(top?' top':'')});
  acts.append(el('button',{className:edit?'pri':'',textContent:(h.board?'✏️ Открыть доску с решением':'✏️ Решать на доске'),onclick:async()=>{
-  if(h.board){location.href='/b/'+sid+'?own=1#p='+h.board;return}
+  if(h.board){go('/b/'+sid+'?own=1#p='+h.board);return}
   toast('Готовлю доску…');await flush();const j=await call({t:'board',id:h.id});if(!j)return;
-  const n=j.list.find(x=>x.id===h.id);if(n&&n.board)location.href='/b/'+sid+'?own=1#p='+n.board}}));
+  const n=j.list.find(x=>x.id===h.id);if(n&&n.board)go('/b/'+sid+'?own=1#p='+n.board)}}));
  if(edit)acts.append(el('button',{textContent:'📷 Добавить фото тетради',onclick:()=>$('pf').click()}));
  return acts}
 function show(id){

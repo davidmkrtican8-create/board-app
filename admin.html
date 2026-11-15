@@ -27,6 +27,8 @@ button,input{font:inherit;color:var(--tx);background:var(--panel);border:1px sol
 #pw{padding:12px;font-size:16px}
 #go{padding:12px;font-size:16px;background:var(--ac);color:#fff;border-color:var(--ac)}
 #msg{min-height:20px}#msg.err{color:#d32f2f}
+#callpill{position:fixed;left:12px;bottom:12px;z-index:30;display:flex;align-items:center;gap:8px;background:#2e7d32;color:#fff;border-radius:24px;padding:6px 8px 6px 14px;box-shadow:0 4px 14px rgba(0,0,0,.25);font-weight:600;font-size:14px}
+#callpill button{border-radius:18px;padding:5px 12px;font-size:13px;font-weight:700;background:#fff;color:#2e7d32;border:0}#callpill button.end{background:#c62828;color:#fff}
 #lf details{color:var(--mut);font-size:14px}#lf summary{cursor:pointer}#lf details p{margin:8px 0 0}
 #app{height:100%;display:flex}
 #app[hidden],#login[hidden],#lf [hidden]{display:none}
@@ -148,6 +150,8 @@ body.nosidebar #side{display:none}
  </div>
 </div>
 <script>
+// рамка с доской может смениться (доска со звонком прячется, открывается новая) — подписки вешаем через onFr
+window.frHooks=[];window.onFr=fn=>{frHooks.push(fn);const f=document.getElementById("fr");if(f)fn(f)};
 (function(){
 const $=i=>document.getElementById(i);
 let tok=localStorage.getItem('tok')||'',students=[],cur=null,me=null,regMode=false;
@@ -191,12 +195,37 @@ function render(){const l=$('list');l.innerHTML='';
 function pick(id,hash){cur=id;if(me)localStorage.setItem('last:'+me.login,id);const s=students.filter(x=>x.id===id)[0];
  if(!s){cur=null;$('nm').textContent='Выберите ученика';$('fr').src='about:blank';render();return}
  $('nm').textContent=(s.type==='group'?'👥 ':'')+s.name;render();$('mem').hidden=s.type!=='group';$('lnk').hidden=s.type==='group';
- const f=$('fr'),prev=f.getAttribute('src')||'';
- if(!prev.startsWith('/b/')||prev.split(/[/#]/)[2]===id){f.src='/b/'+id+(hash||'');return}
+ const f=$('fr'),prev=f.getAttribute('src')||'',pk=document.getElementById('frpark'),sidOf=u=>(u||'').split(/[/#?]/)[2];
+ // вернулись к ученику, чья доска со звонком спрятана, — показываем её же (звонок не прерывался)
+ if(pk&&pk.dataset.sid===id){f.remove();pk.id='fr';pk.style.display='';delete pk.dataset.sid;callPill();try{pk.contentWindow.postMessage({t:'side',hide:document.body.classList.contains('admfocus')},location.origin)}catch(e){}
+  if(hash)try{pk.contentWindow.location.hash=hash}catch(e){}return}
+ // на открытой доске идёт звонок, а выбран другой ученик — доску со звонком прячем, не перезагружая, и открываем рядом новую
+ if(f.dataset.call==='1'&&!pk&&prev.startsWith('/b/')&&sidOf(prev)!==id){
+  f.id='frpark';f.dataset.sid=sidOf(prev);f.style.display='none';
+  const nf=document.createElement('iframe');nf.id='fr';nf.setAttribute('allow',f.getAttribute('allow')||'');f.parentNode.insertBefore(nf,f);
+  frHooks.forEach(fn=>fn(nf));nf.src='/b/'+id+(hash||'');callPill();return}
+ if(!prev.startsWith('/b/')||sidOf(prev)===id){f.src='/b/'+id+(hash||'');return}
  // перед сменой ученика доска сохраняет снимок для вечернего конспекта (не дольше 4 с)
  let done=false;const go=()=>{if(done)return;done=true;removeEventListener('message',h);if(cur===id)f.src='/b/'+id+(hash||'')};
  const h=e=>{if(e.origin===location.origin&&e.data&&e.data.t==='snapdone')go()};addEventListener('message',h);setTimeout(go,4000);
  try{f.contentWindow.postMessage({t:'snapnow'},location.origin)}catch(e){go()}}
+// плашка «звонок продолжается»: доска со звонком спрятана, пока смотрите другого ученика
+function callPill(){
+ const pk=document.getElementById('frpark');let p=document.getElementById('callpill');
+ if(!pk){if(p)p.remove();return}
+ if(!p){p=document.createElement('div');p.id='callpill';document.body.appendChild(p)}
+ const s=students.find(x=>x.id===pk.dataset.sid),nm=s?s.name:'ученик';p.innerHTML='';
+ const t=document.createElement('span');t.textContent='📞 Звонок: '+nm;
+ const back=document.createElement('button');back.textContent='Вернуться';back.onclick=()=>pick(pk.dataset.sid);
+ const end=document.createElement('button');end.className='end';end.textContent='Завершить';end.onclick=()=>{try{pk.contentWindow.postMessage({t:'callend'},location.origin)}catch(e){}setTimeout(()=>{const q=document.getElementById('frpark');if(q){q.remove();callPill()}},1500)};
+ p.append(t,back,end);
+}
+addEventListener('message',e=>{ // доска сообщает, идёт ли на ней звонок
+ if(e.origin!==location.origin||!e.data||e.data.t!=='callstate')return;
+ const f=[...document.querySelectorAll('#fr,#frpark')].find(x=>x.contentWindow===e.source);if(!f)return;
+ if(e.data.on)f.dataset.call='1';else delete f.dataset.call;
+ if(f.id==='frpark'&&!e.data.on){f.remove();callPill()}
+});
 window.hwCtx={cur:()=>cur,students:()=>students,render:()=>render(),open:(id,hash)=>pick(id,hash),isGroup:id=>(students.find(x=>x.id===id)||{}).type==='group'};
 async function op(o){const r=await api('/api/admin/op',{method:'POST',body:JSON.stringify(o)});
  const j=r.ok?await r.json():null;if(!j||j.error){alert(j&&j.error||'Не получилось');return false}
@@ -442,8 +471,7 @@ function arrowKey(e){
 }
 document.addEventListener('keydown',arrowKey);
 // и когда курсор на доске (доска в рамке той же страницы)
-$('fr').addEventListener('load',()=>{try{$('fr').contentDocument.addEventListener('keydown',arrowKey)}catch(e){}});
-try{$('fr').contentDocument&&$('fr').contentDocument.addEventListener('keydown',arrowKey)}catch(e){}
+onFr(f=>{f.addEventListener('load',()=>{try{f.contentDocument.addEventListener('keydown',arrowKey)}catch(e){}});try{f.contentDocument&&f.contentDocument.addEventListener('keydown',arrowKey)}catch(e){}});
 async function crop(fx0,fy0,fx1,fy1,pn){
  const page=await pdf.getPage(pn||pageNo),base=page.getViewport({scale:1});
  const sc=Math.max(1,Math.min(4,1100/((fx1-fx0)*base.width))),vp=page.getViewport({scale:sc});
@@ -615,7 +643,7 @@ if(localStorage.getItem('nosidebar')==='1')setSB(true);
 // «фокус»: убирает боковые панели (встроенный полный экран Safari ломает клавиатуру, поэтому без него)
 // ⛶ и ⤢ прячут оба списка слева: учеников (здесь) и досок (внутри доски)
 const sideMsg=()=>{try{$('fr').contentWindow.postMessage({t:'side',hide:document.body.classList.contains('admfocus')},location.origin)}catch(e){}};
-$('fr').addEventListener('load',sideMsg); // при переходе к другому ученику доска загружается заново
+onFr(f=>f.addEventListener('load',sideMsg)); // при переходе к другому ученику доска загружается заново
 $('fs').onclick=()=>{document.body.classList.toggle('admfocus');sideMsg()};
 // настоящий полный экран (кнопка ⤢): вместе с ним включается «фокус»; выход — Esc или ещё раз ⤢
 const fsEl=()=>document.fullscreenElement||document.webkitFullscreenElement,de=document.documentElement;
@@ -638,7 +666,7 @@ let th=localStorage.getItem('admtheme')||'auto';
 function applyTh(){document.documentElement.dataset.theme=th==='auto'?'':th;try{$('fr').contentWindow.postMessage({t:'theme',v:th},location.origin)}catch(e){}}
 // переключаем то, что видно сейчас: тёмная ⇄ светлая (раньше был ещё режим «как в системе», и одно нажатие из трёх ничего не меняло)
 $('th').onclick=()=>{const dark=th==='dark'||(th==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);th=dark?'light':'dark';localStorage.setItem('admtheme',th);applyTh();$('th').title=dark?'Сейчас светлая тема — нажмите для тёмной':'Сейчас тёмная тема — нажмите для светлой'};
-$('fr').addEventListener('load',()=>{if(th!=='auto')applyTh()});
+onFr(f=>f.addEventListener('load',()=>{if(th!=='auto')applyTh()}));
 applyTh();
 // Cmd/Ctrl+Z, когда фокус не в доске: передаём в доску, а не в браузер (иначе Safari «возвращает закрытую вкладку»)
 window.addEventListener('keydown',e=>{

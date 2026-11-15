@@ -83,6 +83,10 @@ body.focus #main{padding:4px;gap:4px}
 #newt{left:50%;bottom:14px;transform:translateX(-50%)}
 #vbadge{left:12px;bottom:12px}
 #zfit{right:12px;bottom:12px}
+#cabov{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;background:var(--bg)}#cabov[hidden]{display:none}
+#cabov .cbh{display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--bd)}#cabov .cbh span{color:var(--mut);font-size:14px}
+#cabov .cbh button{background:var(--ac);color:#fff;border-color:var(--ac);font-weight:700;padding:8px 14px}
+#cabov iframe{flex:1;border:0;width:100%}
 #hwans{position:absolute;left:12px;bottom:12px;z-index:4;width:250px;max-height:60%;display:flex;flex-direction:column;background:var(--panel);color:var(--tx);border:2px solid var(--ac);border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.25);overflow:hidden;font-size:14px}
 #hwans[hidden]{display:none}#hwans.min{width:auto}
 #hwans .hd{border:0;border-radius:0;background:var(--ac);color:#fff;font-weight:700;text-align:left;padding:7px 10px;font-size:14px;cursor:pointer}
@@ -1249,6 +1253,14 @@ window.addEventListener('message',e=>{
  if(d.t==='pdfreq'){buildPDF(false).then(async r=>{const b=new Uint8Array(await r.blob.arrayBuffer());let s='';for(let i=0;i<b.length;i+=32768)s+=String.fromCharCode.apply(null,b.subarray(i,i+32768));
   e.source.postMessage({t:'pdfres',b64:btoa(s),fname:r.fname,title:r.title,page:page},location.origin)}).catch(()=>e.source.postMessage({t:'pdfres',err:1},location.origin));return} // конспект в Telegram из кабинета
  if(d.t==='pasteimg'&&typeof d.src==='string'&&/^data:image\//.test(d.src)){addImageSrc(d.src,!!d.heic);return} // ⌘V, нажатый в кабинете
+ if(d.t==='callend'){if(call.on)callStop();return} // «Завершить» на плашке звонка в кабинете преподавателя
+ if(d.t==='go'&&typeof d.url==='string'){ // ссылка из личного кабинета, открытого поверх доски
+  let u;try{u=new URL(d.url,location.href)}catch(er){return}
+  if(u.origin!==location.origin)return;
+  if(u.pathname!=='/b/'+room||u.searchParams.get('u')){location.href=u.href;return} // другая доска (группа) — обычный переход
+  closeCab();const hp=(u.hash.match(/^#p=([\w-]+)$/)||[])[1];
+  if(hp){let n=0;const tr=()=>{if(pages.some(p=>p.id===hp)){openPage(hp);history.replaceState(null,'','#p='+hp)}else if(n++<40)setTimeout(tr,100)};tr()} // доска домашки могла только что появиться
+  return}
  if(d.t!=='task'||typeof d.src!=='string'||!/^data:image\/(png|jpeg);base64,/.test(d.src))return;
  if(imgFull())return;
  const im=new Image();im.onload=()=>placeImage(im,true,Math.max(0,Math.min(1500,+d.gap||350)));im.src=d.src;
@@ -1439,6 +1451,7 @@ const call={on:false,stream:null,ice:null,peers:new Map(),others:new Map(),mic:t
 const myLabel=()=>isTeacher?'Преподаватель':(myName||'Ученик');
 const sig=(to,kind,data)=>send({t:'rtc',kind:kind,to:to,data:data});
 function callUI(){
+ if(isTeacher)try{parent.postMessage({t:'callstate',on:call.on},location.origin)}catch(e){} // кабинет преподавателя знает, где идёт звонок
  const b=$('callb'),n=call.others.size;
  b.classList.toggle('on',call.on);b.classList.toggle('ring',!call.on&&n>0);
  b.innerHTML=ic(call.on?'phone-off':'phone')+'<span class="lbl">'+(call.on?'Завершить':n?'Присоединиться':'Звонок')+'</span>';$('micb').innerHTML=ic(call.mic?'microphone':'microphone-off');$('camb').innerHTML=ic(call.cam?'video':'video-off');
@@ -1938,6 +1951,7 @@ $('callb').innerHTML=ic('phone')+'<span class="lbl">Звонок</span>';
 function setTool(v){
  if(v==='axes'){insertAxes();return}
  if(v==='plot'){insertPlot();return}
+ if(v==='trig'||v==='trigt'||v==='trign'){insertTrig(v==='trigt',v==='trign');return}
  curTool=v;if(v!=='mv')msel=null;closeText();updTools();setCursor();drawOverlay();redraw();
 }
 function togglePE(){setTool(tool()==='pen'?ersTool():'pen')} // перо ⇄ ластик одной кнопкой
@@ -1953,13 +1967,62 @@ const SHAPE_MENU=[
  ['Линии',[['line','Линия'],['arrow','Стрелка']]],
  ['Плоские фигуры',[['rect','Прямо­угольник'],['sh:square',SHP.square],['sh:circle',SHP.circle],['ellipse','Эллипс'],['sh:tri',SHP.tri],['sh:rtri',SHP.rtri],['sh:para',SHP.para],['sh:trap',SHP.trap],['sh:rhomb',SHP.rhomb],['sh:hex',SHP.hex]]],
  ['Объёмные — можно вращать',[['3d:cube',SOLID_NAMES.cube],['3d:box',SOLID_NAMES.box],['3d:prism',SOLID_NAMES.prism],['3d:pyr',SOLID_NAMES.pyr],['3d:tetra',SOLID_NAMES.tetra],['3d:cyl',SOLID_NAMES.cyl],['3d:cone',SOLID_NAMES.cone],['3d:sphere',SOLID_NAMES.sphere]]],
- ['Графики',[['plot','График функции…'],['axes','Координат­ная плоскость']]]
+ ['Графики',[['plot','График функции…'],['axes','Координат­ная плоскость'],['trig','Тригоно­метри­ческая окружность'],['trign','Окружность без подписей углов'],['trigt','Окружность с осями tg и ctg']]]
 ];
+// ---------- тригонометрическая окружность (для №13): вставляется картинкой — двигать, растягивать, рисовать поверх ----------
+function trigCanvas(tan,bare){ // bare — без подписей углов и лучей (ученик подписывает сам)
+ const N=1600,c=document.createElement('canvas');c.width=c.height=N;const g=c.getContext('2d'),O=N/2,R=tan?390:560,ink='#1a1a1a',acc='#3b5bd6';
+ g.fillStyle='#fff';g.fillRect(0,0,N,N);g.lineCap='round';g.lineJoin='round';
+ const F=(sz,it)=>(it?'italic ':'')+sz+'px "Times New Roman",Times,serif';
+ const frac=(x,y,txt,sz,al)=>{ // подпись: «−√3/2», «5π/6», «π» — дроби рисуем столбиком
+  g.fillStyle=ink;g.textBaseline='middle';let s='';if(txt[0]==='-'){s='−';txt=txt.slice(1)}
+  if(!txt.includes('/')){g.font=F(sz);g.textAlign=al||'center';g.fillText(s+txt,x,y);return}
+  const [a,b]=txt.split('/');g.font=F(sz*.9);const w=Math.max(g.measureText(a).width,g.measureText(b).width)+6;g.font=F(sz);const sw=s?g.measureText(s).width+4:0;
+  let x0=al==='left'?x:al==='right'?x-w-sw:x-(w+sw)/2;if(s){g.textAlign='left';g.fillText(s,x0,y);x0+=sw}
+  g.font=F(sz*.9);g.textAlign='center';g.fillText(a,x0+w/2,y-sz*.48);g.fillText(b,x0+w/2,y+sz*.5);
+  g.strokeStyle=ink;g.lineWidth=2;g.beginPath();g.moveTo(x0,y);g.lineTo(x0+w,y);g.stroke()};
+ const arrow=(x1,y1,x2,y2)=>{g.strokeStyle=ink;g.lineWidth=3;g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke();const a=Math.atan2(y2-y1,x2-x1);
+  g.fillStyle=ink;g.beginPath();g.moveTo(x2,y2);g.lineTo(x2-22*Math.cos(a-.35),y2-22*Math.sin(a-.35));g.lineTo(x2-22*Math.cos(a+.35),y2-22*Math.sin(a+.35));g.fill()};
+ const E=R*(tan?1.95:1.32);arrow(O-E,O,O+E,O);arrow(O,O+E,O,O-E);
+ g.font=F(40,1);g.fillStyle=ink;g.textAlign='left';g.textBaseline='alphabetic';g.fillText('cos',O+E-70,O+48);g.fillText('sin',O+16,O-E+30);
+ g.strokeStyle=ink;g.lineWidth=4;g.beginPath();g.arc(O,O,R,0,7);g.stroke();
+ // значения на осях cos и sin
+ const vals=[['1/2',.5],['√2/2',Math.SQRT1_2],['√3/2',Math.sqrt(3)/2]];
+ g.lineWidth=2.5;
+ for(const [t,v] of vals)for(const sg of [1,-1]){const d=R*v*sg;
+  g.beginPath();g.moveTo(O+d,O-10);g.lineTo(O+d,O+10);g.moveTo(O-10,O-d);g.lineTo(O+10,O-d);g.stroke();
+  frac(O+d,O+(sg>0?52:52),(sg<0?'-':'')+t,30);frac(O-16,O-d,(sg<0?'-':'')+t,30,'right')}
+ frac(O+R+8,O+40,'1',34,'left');frac(O-R-8,O+40,'-1',34,'right');frac(O-14,O-R-24,'1',34,'right');frac(O-14,O+R+26,'-1',34,'right');frac(O-22,O+30,'0',34);
+ // точки и углы
+ const ang=[[0,'0'],[30,'π/6'],[45,'π/4'],[60,'π/3'],[90,'π/2'],[120,'2π/3'],[135,'3π/4'],[150,'5π/6'],[180,'π'],[210,'7π/6'],[225,'5π/4'],[240,'4π/3'],[270,'3π/2'],[300,'5π/3'],[315,'7π/4'],[330,'11π/6']];
+ for(const [d,t] of ang){const a=d*Math.PI/180,x=O+R*Math.cos(a),y=O-R*Math.sin(a);
+  if(!bare){g.strokeStyle='rgba(59,91,214,.25)';g.lineWidth=2;g.setLineDash([10,10]);g.beginPath();g.moveTo(O,O);g.lineTo(x,y);g.stroke();g.setLineDash([])}
+  g.fillStyle=acc;g.beginPath();g.arc(x,y,10,0,7);g.fill();if(bare)continue;
+  if(d%90===0){ // точки на осях: подпись сбоку от оси, чтобы не налезала
+   const P={0:[O+R+26,O-36,'left'],90:[O+30,O-R-44,'left'],180:[O-R-26,O-36,'right'],270:[O+30,O+R+46,'left']}[d];frac(P[0],P[1],t,38,P[2]);continue}
+  const L=tan?R-66:R+(t.includes('/')?78:56);frac(O+L*Math.cos(a),O-L*Math.sin(a),t,tan?34:38)} // с осями tg/ctg подписи углов — внутри круга
+ if(tan){ // ось тангенсов (касательная x=1) и котангенсов (y=1)
+  const tv=[['√3/3',1/Math.sqrt(3)],['1',1],['√3',Math.sqrt(3)]];
+  g.strokeStyle=acc;g.lineWidth=3;g.beginPath();g.moveTo(O+R,O+R*1.9);g.lineTo(O+R,O-R*1.9);g.moveTo(O-R*1.9,O-R);g.lineTo(O+R*1.9,O-R);g.stroke();
+  g.font=F(40,1);g.fillStyle=acc;g.textAlign='right';g.textBaseline='alphabetic';g.fillText('tg',O+R-16,O-R*1.9+30);g.fillText('ctg',O+R*1.9,O-R+52);
+  for(const [t,v] of tv)for(const sg of [1,-1]){const d=R*v*sg;g.strokeStyle=acc;g.lineWidth=2.5;
+   g.beginPath();g.moveTo(O+R-10,O-d);g.lineTo(O+R+10,O-d);g.moveTo(O+d,O-R-10);g.lineTo(O+d,O-R+10);g.stroke();
+   if(!(sg>0&&v===1))frac(O+R+18,O-d,(sg<0?'-':'')+t,30,'left'); // «1» на пересечении осей подписываем один раз
+   if(v>.7||sg>0)frac(O+d,O-R-44,(sg<0?'-':'')+t,30)}
+ }
+ return c;
+}
+function insertTrig(tan,bare){
+ if(viewOnly||imgFull())return;const im=new Image();im.onload=()=>placeImage(im,false);im.src=trigCanvas(tan,bare).toDataURL('image/png');
+}
 function shapeIcon(v,c,col){ // маленькая картинка фигуры тем же кодом, что рисует доску
  const d=2,W=56,H=40;c.width=W*d;c.height=H*d;const keep=ctx;ctx=c.getContext('2d');ctx.scale(d,d);
  try{
   if(v==='axes'){ctx.strokeStyle=ctx.fillStyle=col;ctx.lineWidth=1.6;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(8,24);ctx.lineTo(48,24);ctx.moveTo(24,36);ctx.lineTo(24,4);ctx.stroke();
    ctx.beginPath();ctx.moveTo(50,24);ctx.lineTo(45,21.5);ctx.lineTo(45,26.5);ctx.fill();ctx.beginPath();ctx.moveTo(24,2);ctx.lineTo(21.5,7);ctx.lineTo(26.5,7);ctx.fill();return}
+  if(v==='trig'||v==='trigt'||v==='trign'){ctx.strokeStyle=col;ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(8,20);ctx.lineTo(48,20);ctx.moveTo(28,2);ctx.lineTo(28,38);ctx.stroke();
+   ctx.lineWidth=1.8;ctx.beginPath();ctx.arc(28,20,14,0,7);ctx.stroke();ctx.fillStyle='#3b5bd6';for(const d of [30,45,60,120,135,150,210,225,240,300,315,330]){const a=d*Math.PI/180;ctx.beginPath();ctx.arc(28+14*Math.cos(a),20-14*Math.sin(a),1.6,0,7);ctx.fill()}
+   if(v==='trigt'){ctx.strokeStyle='#3b5bd6';ctx.beginPath();ctx.moveTo(42,4);ctx.lineTo(42,36);ctx.moveTo(10,6);ctx.lineTo(46,6);ctx.stroke()}return}
   if(v==='plot'){ctx.strokeStyle=col;ctx.lineWidth=1.3;ctx.globalAlpha=.6;ctx.beginPath();ctx.moveTo(6,26);ctx.lineTo(50,26);ctx.moveTo(28,4);ctx.lineTo(28,38);ctx.stroke();
    ctx.globalAlpha=1;ctx.strokeStyle='#1565c0';ctx.lineWidth=2;ctx.beginPath();for(let i=0;i<=40;i++){const X=8+i,Y=34-((i-20)/8)**2*3.2;i?ctx.lineTo(X,Y):ctx.moveTo(X,Y)}ctx.stroke();return}
   if(v.startsWith('3d:')){drawStroke({k:'solid',s:JSON.stringify({t:v.slice(3),y:-.6,p:.35}),pts:[11,3,45,37],c:col,w:1.4});return}
@@ -2018,7 +2081,16 @@ $('fm').onchange=async()=>{
  else if(v==='delp')delPage();
  else if(v==='clr'&&!viewOnly&&await modal('Очистить эту доску для всех? Вернуть нельзя.',{ok:'Очистить'})){strokes[page]={};images[page]={};redraw();send({t:'clear',page:page})}
 };
-if(!isTeacher){const mine=ME||room;['hwb','hwt'].forEach(i=>{$(i).hidden=false;$(i).onclick=()=>{location.href='/s/'+mine}});
+// личный кабинет во время звонка открываем поверх доски — страница доски остаётся, звонок не рвётся
+function openCab(url){
+ let o=$('cabov');
+ if(!o){o=document.createElement('div');o.id='cabov';o.hidden=true;
+  o.innerHTML='<div class="cbh"><button id="cabx">← Вернуться к доске</button><span>📞 Звонок продолжается</span></div><iframe id="cabf" title="Личный кабинет"></iframe>';
+  document.body.appendChild(o);$('cabx').onclick=closeCab}
+ $('cabf').src=url;o.hidden=false;
+}
+function closeCab(){const o=$('cabov');if(o&&!o.hidden){o.hidden=true;$('cabf').src='about:blank'}}
+if(!isTeacher){const mine=ME||room;['hwb','hwt'].forEach(i=>{$(i).hidden=false;$(i).onclick=()=>{if(call.on)openCab('/s/'+mine);else location.href='/s/'+mine}});
  // кнопки групп: со своей доски — в группу, с доски группы — обратно на свою
  let grpDone=false;const groupsUI=j=>{if(grpDone)return;grpDone=true;const side=$('side'),at=$('hwb').nextSibling;
   const add=(txt,href,tt)=>{const b=document.createElement('button');b.className='grpb';b.textContent=txt;b.title=tt;b.onclick=()=>{location.href=href};side.insertBefore(b,at)};
