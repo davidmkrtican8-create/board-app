@@ -251,7 +251,8 @@ let rectC=null,rq=0,pendErase=[],pendPage=null,eraseT=0,peersTxt='',msel=null; /
 let curPid=null,curPen=false,curT0=0,curX=0,curY=0,curTr=0,viewOnly=false,dark=false,penSeen=(()=>{try{return localStorage.getItem('penSeen')==='1'}catch(e){return false}})(),myName=null,ptr=null,curTool='pen',lastCur=0,lastCurP=[-9,-9];
 const views={},imgEl={},ptrs=new Map(),cursors={};
 const $=i=>document.getElementById(i),tool=()=>curTool;
-const send=op=>{op.from=me;return fetch('/api/'+room+'/op',{method:'POST',body:JSON.stringify(op)}).catch(()=>{$('st').textContent='Нет связи с сервером'})};
+const send=op=>{op.from=me;const h={};if(op.t==='delPage'||op.t==='clear'){try{h['X-Token']=localStorage.getItem('tok')||''}catch(e){}} // удалять и очищать доски сервер разрешает только репетитору
+ return fetch('/api/'+room+'/op',{method:'POST',headers:h,body:JSON.stringify(op)}).then(r=>{if(r.status===403)$('st').textContent='Удалять и очищать доски может только преподаватель';return r}).catch(()=>{$('st').textContent='Нет связи с сервером'})};
 const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const r2=v=>Math.round(v*100)/100;
 

@@ -912,6 +912,10 @@ http.createServer((req, res) => {
       return;
     }
     if (m[2] === 'op' && req.method === 'POST') return body(req, res, 1.2e6, op => {
+      if (op && (op.t === 'delPage' || op.t === 'clear')) { // удалить или очистить доску может только её репетитор, не ученик
+        const me = auth(req), st = index.students.find(x => x.id === m[1]);
+        if (!me || !st || (st.owner !== me.id && me.id !== 'owner')) { res.writeHead(403); return res.end(); }
+      }
       if (!apply(r.s, op)) { res.writeHead(400); return res.end(); }
       if (op.t === 'rtc') { if (op.kind === 'hello') r.call.add(op.from); if (op.kind === 'bye') r.call.delete(op.from); }
       bcast(r, op);
