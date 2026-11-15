@@ -48,7 +48,10 @@ button,input{font:inherit;color:var(--tx);background:var(--panel);border:1px sol
 #tview{flex:1;min-height:0;overflow:auto;background:#cfc9de;padding:3px}
 #tbox{position:relative;margin:0 auto;background:#fff}
 #tcv{display:block}
-#tbot{display:flex;gap:10px;align-items:center;justify-content:center;padding:10px 4px 14px}#tbot button{font-size:14px;padding:7px 14px}#tbnum{font-size:13px;color:#555}
+#tbot{display:flex;gap:10px;align-items:center;justify-content:center;padding:10px 4px 14px}#tbot button{font-size:14px;padding:7px 14px}#tbnum{font-size:12px;color:#555}
+#tbmid{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px}
+#tocpop{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);width:min(380px,80vw);max-height:60vh;overflow:auto;background:var(--panel,#fff);border:1px solid var(--bd,#ccc);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:6px;z-index:20}
+#tocpop[hidden]{display:none}#tocpop a{display:block;padding:6px 8px;border-radius:6px;color:inherit;text-decoration:none;font-size:14px;cursor:pointer}#tocpop a:hover{background:rgba(106,63,196,.1)}
 #tov{position:absolute;inset:0;touch-action:pan-y pinch-zoom;cursor:crosshair}
 .card{position:absolute;border:2px solid transparent;border-radius:6px;pointer-events:none}
 .card.hot{border-color:var(--ac);background:rgba(106,63,196,.07)}
@@ -137,7 +140,7 @@ body.nosidebar #side{display:none}
     <div class="tr"><button id="tback" title="Назад">↩</button><button id="tprev">←</button><input id="tnum" type="number" min="1"><span id="tcnt"></span><button id="tnext">→</button><select id="tol"><option value="">Оглавление…</option></select></div>
     <div class="tr"><input id="tq" placeholder="Номер задачи, например 4.19" style="flex:1;min-width:120px"><button id="tfind">Найти</button><button id="tpage">Страница целиком → на доску</button></div>
     <div class="tr" style="padding-top:0"><select id="tgap" title="Сколько свободного места оставлять под решением между задачами"><option value="120">Место под решение: мало</option><option value="350">Место под решение: среднее</option><option value="600">Место под решение: много</option></select><label id="tanal" title="Когда отправляете задачу из сборника на доску, её аналог (случайный, ещё не задававшийся этому ученику) сам добавляется в черновик домашки. В конце урока: «Домашка» → «Продолжить черновик» → «Отправить»." style="display:inline-flex;gap:5px;align-items:center;font-size:13px;white-space:nowrap;cursor:pointer"><input type="checkbox" id="tanalc"> 🪄 Аналог в домашку</label><span id="tmsg" style="font-size:12px;color:var(--mut)"></span></div>
-    <div id="tview"><div id="tbox"><canvas id="tcv"></canvas><div id="tov"></div></div><div id="tbot"><button id="tbprev">← Предыдущая</button><span id="tbnum"></span><button id="tbnext">Следующая →</button></div></div>
+    <div id="tview"><div id="tbox"><canvas id="tcv"></canvas><div id="tov"></div></div><div id="tbot"><button id="tbprev">← Предыдущая</button><div id="tbmid"><button id="tbtoc">☰ Оглавление</button><span id="tbnum"></span><div id="tocpop" hidden></div></div><button id="tbnext">Следующая →</button></div></div>
    </div>
   </div>
   <div id="hwtray" hidden></div>
@@ -428,19 +431,18 @@ async function render(markY){
  }
  const sc=$('tview');
  if(markY!=null){const y=vp.convertToViewportPoint(0,markY)[1],m=document.createElement('div');m.className='mk';m.style.top=y+'px';ov.appendChild(m);sc.scrollTop=Math.max(0,y-70);setTimeout(()=>m.remove(),5000)}
- else if(toBottom)sc.scrollTop=sc.scrollHeight;
  else sc.scrollTop=0;
- toBottom=false;
 }
-// листание колесиком/тачпадом: докрутили до низа страницы и крутим дальше — следующая, у верха вверх — предыдущая
-let toBottom=false,wAcc=0,wT=0;
-$('tview').addEventListener('wheel',e=>{
- if(!pdf||e.ctrlKey)return;const sc=$('tview'),now=Date.now();if(now-wT>400)wAcc=0;wT=now;
- const atB=sc.scrollTop+sc.clientHeight>=sc.scrollHeight-2,atT=sc.scrollTop<=1;
- if(e.deltaY>0&&atB&&pageNo<pdf.numPages){wAcc+=e.deltaY;if(wAcc>120){wAcc=0;goto(pageNo+1)}}
- else if(e.deltaY<0&&atT&&pageNo>1){wAcc+=e.deltaY;if(wAcc<-120){wAcc=0;toBottom=true;goto(pageNo-1)}}
- else wAcc=0;
-},{passive:true});
+// листание сборника стрелками ← → на клавиатуре (когда открыта панель задач и курсор не в поле ввода)
+function arrowKey(e){
+ if(!pdf||(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')||e.metaKey||e.ctrlKey||e.altKey)return;
+ if($('tasks').hidden)return;const t=e.target;if(t&&(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||t.isContentEditable))return;
+ e.preventDefault();goto(pageNo+(e.key==='ArrowRight'?1:-1));
+}
+document.addEventListener('keydown',arrowKey);
+// и когда курсор на доске (доска в рамке той же страницы)
+$('fr').addEventListener('load',()=>{try{$('fr').contentDocument.addEventListener('keydown',arrowKey)}catch(e){}});
+try{$('fr').contentDocument&&$('fr').contentDocument.addEventListener('keydown',arrowKey)}catch(e){}
 async function crop(fx0,fy0,fx1,fy1,pn){
  const page=await pdf.getPage(pn||pageNo),base=page.getViewport({scale:1});
  const sc=Math.max(1,Math.min(4,1100/((fx1-fx0)*base.width))),vp=page.getViewport({scale:sc});
@@ -586,6 +588,14 @@ $('tdel').onclick=async()=>{
 $('tbook').onchange=()=>openBook($('tbook').value);
 $('tprev').onclick=()=>goto(pageNo-1);$('tnext').onclick=()=>goto(pageNo+1);
 $('tbprev').onclick=()=>goto(pageNo-1);$('tbnext').onclick=()=>goto(pageNo+1);
+// кнопка «Оглавление» внизу: список разделов сборника; если оглавления в PDF нет — на первую страницу
+$('tbtoc').onclick=e=>{e.stopPropagation();const p=$('tocpop');if(!pdf)return;
+ if(!ol.length){goto(1);return}
+ if(!p.hidden){p.hidden=true;return}
+ p.innerHTML='';ol.forEach(o=>{const a=document.createElement('a');a.textContent=o.t;a.style.paddingLeft=(8+o.depth*16)+'px';if(!o.depth)a.style.fontWeight='600';
+  a.onclick=async()=>{p.hidden=true;const t=await resolveDest(o.d);if(t)goto(t.page,t.y)};p.appendChild(a)});
+ p.hidden=false};
+document.addEventListener('click',e=>{const p=$('tocpop');if(!p.hidden&&!p.contains(e.target))p.hidden=true});
 $('tnum').onchange=()=>goto(+$('tnum').value);
 $('tback').onclick=()=>{if(hist.length)goto(hist.pop(),null,false)};
 $('tol').onchange=async()=>{const v=$('tol').value;if(v==='')return;const t=await resolveDest(ol[+v].d);if(t)goto(t.page,t.y);$('tol').value=''};
