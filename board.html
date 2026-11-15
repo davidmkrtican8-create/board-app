@@ -219,7 +219,7 @@ body.focus #main{padding:4px;gap:4px}
   <h3>Настройки</h3>
   <label>Тема <select id="theme"><option value="auto">Как в системе</option><option value="light">Светлая</option><option value="dark">Тёмная</option></select></label>
   <label>Фон листа <select id="bgs"><option value="grid">Клетка</option><option value="line">Линейка</option><option value="none">Чистый</option></select></label>
-  <label>Шумоподавление в звонке <select id="nrs"><option value="strong">Сильное — убирает скрип пера</option><option value="normal">Обычное</option><option value="off">Выключено</option></select></label>
+  <label>Шумоподавление в звонке <select id="nrs"><option value="strong">Сильное — убирает скрип пера и шорохи</option><option value="normal">Обычное</option><option value="off">Выключено</option></select></label>
   <label class="c"><input type="checkbox" id="snap"> Ровные фигуры (задержать перо)</label>
   <label class="c"><input type="checkbox" id="prs"> Нажим пера: толщина зависит от силы нажатия (обычно лучше выключить)</label>
   <label class="c"><input type="checkbox" id="palm"> Со стилусом пальцы только листают</label>
@@ -536,7 +536,7 @@ function sheetGrid(y0,s,e){
  ctx.stroke();
 }
 const ink=document.createElement('canvas'),ictx=ink.getContext('2d');
-const hlc=document.createElement('canvas'),hctx=hlc.getContext('2d');let hlx=null,hlUsed=false,hlDirty=true;
+const hlc=document.createElement('canvas'),hctx=hlc.getContext('2d');let hlx=null,hlUsed=false,hlDirty=true,inkC=null; // inkC — готовые записи на время рисования линии
 function inkLayer(w,h,tf,draw){
  if(ink.width!==w||ink.height!==h){ink.width=w;ink.height=h}
  if(hlc.width!==w||hlc.height!==h){hlc.width=w;hlc.height=h;hlDirty=false}
@@ -562,7 +562,20 @@ function redraw(){
  for(const id in ims){const g=ims[id],e=getImg(id,g.src);if(e.complete&&e.naturalWidth)ctx.drawImage(e,g.x,g.y,g.w,g.h)}
  const ps=strokes[page]||{},vx0=view.x-60,vx1=view.x+cw/s+60,vy0=view.y-60,vy1=view.y+ch/s+60;
  const L=inkLayer(cv.width,cv.height,[dpr*s,0,0,dpr*s,-view.x*s*dpr,-view.y*s*dpr],()=>{ // чернила на отдельном слое: ластик стирает только их
-  for(const id in ps){const sk=ps[id],B=bbox(sk);if(B[2]<vx0||B[0]>vx1||B[3]<vy0||B[1]>vy1)continue;drawStroke(sk)} // за экраном не рисуем
+  // пока рисуем линию, уже готовые записи не перерисовываем каждый кадр, а берём их готовой картинкой (iPad не «заедает» на заполненной доске)
+  const ckey=page+'|'+view.x+'|'+view.y+'|'+s+'|'+cv.width+'|'+cv.height+'|'+dark,drawing=!!(cur&&cur.pts&&cur.id);
+  if(drawing&&inkC&&inkC.key===ckey&&inkC.cid===cur.id){
+   ictx.save();ictx.setTransform(1,0,0,1,0,0);ictx.drawImage(inkC.ink,0,0);ictx.restore();
+   if(inkC.hl){hctx.save();hctx.setTransform(1,0,0,1,0,0);hctx.drawImage(inkC.hlc,0,0);hctx.restore();hlUsed=true}
+  }else{
+   for(const id in ps){const sk=ps[id],B=bbox(sk);if(B[2]<vx0||B[0]>vx1||B[3]<vy0||B[1]>vy1)continue;drawStroke(sk)} // за экраном не рисуем
+   if(drawing){ // запоминаем готовые записи на время этой линии
+    const mk=w=>{const c=document.createElement('canvas');c.width=cv.width;c.height=cv.height;return c};
+    inkC=inkC&&inkC.ink.width===cv.width&&inkC.ink.height===cv.height?inkC:{ink:mk(),hlc:mk()};
+    const a=inkC.ink.getContext('2d'),b=inkC.hlc.getContext('2d');a.clearRect(0,0,cv.width,cv.height);a.drawImage(ink,0,0);
+    b.clearRect(0,0,cv.width,cv.height);if(hlUsed)b.drawImage(hlc,0,0);Object.assign(inkC,{key:ckey,cid:cur.id,hl:hlUsed});
+   }else if(inkC)inkC.key=null;
+  }
   for(const k in live)if(live[k].page===page)drawStroke(live[k]);
   if(cur&&cur.pts)drawStroke(cur);
  });
@@ -638,6 +651,7 @@ function openPage(id){page=id;live={};$('newt').hidden=true;jump=null;editImg=nu
 // ---------- сообщения от сервера ----------
 function onOp(o){
  if(o.page&&SNAP_OPS.includes(o.t))snapDirty[o.page]=Date.now(); // доска изменилась — позже сохраним её PDF для вечернего конспекта
+ if(inkC&&!['live','cursor','laser','view','rtc'].includes(o.t))inkC.key=null; // чужая правка — картинку готовых записей пересобираем
  if(o.from===me&&(o.t==='strokeset'||o.t==='imgset'||o.t==='stroke'))return; // своё эхо со старым положением заставляло объект дёргаться
  if(o.t==='rtc'){onRtc(o);return}
  if(o.t==='init'){callInit(o.call);myName=o.name||null;$('who').textContent=o.group?'👥 Группа: '+o.group:o.name?'Кабинет: '+o.name:'Доска';document.title=o.group||o.name||'Доска';pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};for(const pg in strokes)for(const id in strokes[pg])strokes[pg][id].id=id; // у загруженных объектов нет поля id — проставляем
@@ -1528,18 +1542,23 @@ function micFilter(raw){
  // раньше здесь резали всё выше 3,6 кГц — голос звучал глухо, «как в бочке»; теперь высокие только приглушаем
  const hp=bq('highpass',80),lp1=bq('highshelf',5000),lp2=bq('lowpass',9500,.7),gate=ac.createGain(),dst=ac.createMediaStreamDestination();lp1.gain.value=-9;
  const dl=ac.createDelay(.2);dl.delayTime.value=.09; // звук идёт на 0,09 с позже: успеваем понять, речь это или стук, и не съесть начало слова
- gate.gain.value=.01;src.connect(hp);hp.connect(lp1);lp1.connect(lp2);lp2.connect(dl);dl.connect(gate);gate.connect(dst);
- const vb=bq('bandpass',1000,.6),va=ac.createAnalyser(),hb=bq('highpass',4500),ha=ac.createAnalyser();
- va.fftSize=ha.fftSize=1024;src.connect(vb);vb.connect(va);src.connect(hb);hb.connect(ha);
+ gate.gain.value=.003;src.connect(hp);hp.connect(lp1);lp1.connect(lp2);lp2.connect(dl);dl.connect(gate);gate.connect(dst);
+ const vb=bq('bandpass',1000,.6),va=ac.createAnalyser(),hb=bq('highpass',4500),ha=ac.createAnalyser(),fa=ac.createAnalyser();
+ va.fftSize=ha.fftSize=1024;fa.fftSize=2048;fa.smoothingTimeConstant=.3;src.connect(vb);vb.connect(va);src.connect(hb);hb.connect(ha);src.connect(fa);
  const buf=new Float32Array(1024),rms=a=>{a.getFloatTimeDomainData(buf);let q=0;for(let i=0;i<buf.length;i++)q+=buf[i]*buf[i];return Math.sqrt(q/buf.length)};
+ // «голос или шорох»: у голоса энергия собрана в гармоники (пики через 100–300 Гц), у шороха бумаги, одежды и стилуса — ровный шум.
+ // Меряем «ровность» спектра в полосе 250–2500 Гц: у речи она низкая, у шума высокая.
+ const fd=new Float32Array(fa.frequencyBinCount),hz=ac.sampleRate/fa.fftSize,b0=Math.round(250/hz),b1=Math.round(2500/hz);
+ const flatness=()=>{fa.getFloatFrequencyData(fd);let lg=0,ar=0,n=0;for(let i=b0;i<=b1;i++){const p=Math.pow(10,Math.max(-140,fd[i])/10)+1e-14;lg+=Math.log(p);ar+=p;n++}return Math.exp(lg/n)/(ar/n)};
  let floor=.002,open=false,last=-1,run=0;
  const t=setInterval(()=>{
   const v=rms(va),h=rms(ha),now=ac.currentTime;
-  if(v<floor)floor=v;else if(!open&&run===0)floor=Math.min(.004,floor*.995+v*.005); // уровень тишины комнаты: подстраивается только в тишине и не выше «тихого фона»
-  const loud=v>Math.max(.008,floor*4)&&v>h*.25; // громко в полосе голоса, а не только в «скрипучей»
-  run=loud?run+1:0; // стук и скрип стилуса — короткие щелчки, речь тянется дольше
-  if(run>=4)last=now;const o=last>=0&&now-last<.3; // открываем после 80 мс речи, держим 0,3 с, чтобы не обрезать концы слов
-  if(o!==open){open=o;gate.gain.setTargetAtTime(o?1:.01,now,o?.008:.06)}
+  if(v<floor)floor=v;else if(!open&&run===0)floor=Math.min(.006,floor*.995+v*.005); // уровень тишины комнаты: подстраивается только в тишине
+  const loud=v>Math.max(.008,floor*4)&&v>h*.35; // громко в полосе голоса, а не только в «шипящей»
+  const voice=loud&&flatness()<(open?.5:.36); // похоже на голос: у речи ~0,03–0,26, у шороха 0,42 и выше (пока говорим — порог мягче, чтобы не рвать слова)
+  run=voice?run+1:Math.max(0,run-1); // стук и шорох — короткие или «шумные», речь тянется дольше
+  if(run>=5)last=now;const o=last>=0&&now-last<.35; // открываем после ~100 мс голоса, держим 0,35 с, чтобы не обрезать концы слов
+  if(o!==open){open=o;gate.gain.setTargetAtTime(o?1:.003,now,o?.008:.05)}
  },20);
  const tr=dst.stream.getAudioTracks()[0];
  return{track:tr,close:()=>{clearInterval(t);try{src.disconnect();gate.disconnect()}catch(e){}tr.stop()}};
@@ -1559,7 +1578,7 @@ async function callStart(){
  $('callb').disabled=true;
  try{
   const AC=window.AudioContext||window.webkitAudioContext;if(AC&&!call.ac)try{call.ac=new AC()}catch(e){} // создаём сразу по нажатию — иначе iPad не даст звук (нужен и фильтру, и усилителю громкости)
-  const ms=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:S.nr!=='off',autoGainControl:true},video:false});
+  const ms=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:S.nr!=='off',autoGainControl:true,voiceIsolation:S.nr==='strong'},video:false}); // voiceIsolation — «Изоляция голоса», где браузер её умеет
   call.raw=ms.getAudioTracks()[0];call.flt=S.nr==='strong'?micFilter(call.raw):null;
   call.stream=new MediaStream([call.flt?call.flt.track:call.raw]);
   try{call.ice=await (await fetch('/api/ice?r='+room)).json()}catch(e){call.ice=[]}
