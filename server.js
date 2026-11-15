@@ -91,7 +91,7 @@ function apply(s, op) {
       const g = op.img;
       if (!g || !ID.test(g.id) || typeof g.src !== 'string' || g.src.length > 900000 || !IMG.test(g.src)) return false;
       const m = (im[op.page] = im[op.page] || {});
-      if (!m[g.id] && Object.keys(m).length >= 40) return false;
+      if (!m[g.id] && Object.keys(m).length >= 80) return false;
       m[g.id] = { src: g.src, x: num(g.x, -1e6, 1e6, 0), y: num(g.y, -1e6, 1e6, 0), w: num(g.w, 1, 1e5, 200), h: num(g.h, 1, 1e5, 200) };
       return true;
     }
@@ -924,7 +924,7 @@ http.createServer((req, res) => {
     });
   }
   if (u.pathname === '/health') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('ok'); } // для сервиса, который не даёт сайту «засыпать»
-  if (u.pathname === '/icon.png') {
+  if (u.pathname === '/icon.png' || u.pathname === '/favicon.ico') { // логотип на вкладке браузера
     const f = path.join(__dirname, 'icon.png');
     if (!fs.existsSync(f)) { res.writeHead(404); return res.end(); }
     res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
