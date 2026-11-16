@@ -99,6 +99,7 @@ h2{font-size:20px;font-weight:800;letter-spacing:-.3px;margin:24px 0 10px;displa
   <h2>Награды</h2><div class="badges" id="badges"></div>
   <h2>Доски с уроков</h2><div class="boards" id="boards"></div>
   <div id="tgc"></div>
+  <p class="hint" style="text-align:center;margin-top:28px"><a href="/privacy" target="_blank">Политика конфиденциальности</a></p>
  </div>
  <div id="hw" hidden></div>
 </div>
@@ -266,5 +267,7 @@ call().then(j=>{if(!j){document.querySelector('.wrap').innerHTML='<div class="em
  const q=new URLSearchParams(location.search).get('hw');if(q&&j.list.some(h=>h.id===q))show(q);else home()});
 })();
 </script>
+<script src="/pd.js"></script>
+<script>if(!inBoard&&window.pdGate)pdGate(sid)</script>
 </body>
 </html>

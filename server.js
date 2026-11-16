@@ -238,13 +238,14 @@ function account(req, res, u) { // вход и регистрация (без а
     if (limited(req)) { res.writeHead(429); return res.end(); }
     const inv = validInvite(j.code);
     if (!inv) { fail(req); return json(res, { error: 'Приглашение недействительно или уже использовано. Попросите новое.' }); }
+    if (j.agree !== true) return json(res, { error: 'Нужно согласие на обработку персональных данных' });
     const login = String(j.login || '').trim().toLowerCase(), name = String(j.name || '').trim().slice(0, 60), pw = String(j.password || '');
     if (!name) return json(res, { error: 'Укажите имя' });
     if (!LOGIN.test(login)) return json(res, { error: 'Логин: от 3 до 32 латинских букв или цифр (можно . _ -)' });
     if (byLogin(login)) return json(res, { error: 'Такой логин уже занят, придумайте другой' });
     if (pw.length < 8 || pw.length > 200) return json(res, { error: 'Пароль должен быть не короче 8 символов' });
     const salt = crypto.randomBytes(16).toString('hex');
-    const t = { id: 't' + crypto.randomBytes(6).toString('hex'), login, name, salt, hash: hashPw(pw, salt), pv: 0, created: Date.now() };
+    const t = { id: 't' + crypto.randomBytes(6).toString('hex'), login, name, salt, hash: hashPw(pw, salt), pv: 0, created: Date.now(), agreed: Date.now() };
     T.teachers.push(t); inv.used = Date.now(); inv.usedBy = t.id; saveT();
     json(res, Object.assign({ token: makeToken(t) }, who(t)));
   });
@@ -458,8 +459,8 @@ function tgOnMessage(m) {
       if (L.length >= 10) L.shift();
       L.push({ chat, who: c[0], name: who }); saveTG();
       return tgSay(chat, c[0] === 's'
-        ? 'Готово, ' + s.name + '! Сюда будут приходить домашки, напоминания о сроках и результаты проверки.\nКабинет: ' + TG.site + '/s/' + s.id + '\nОтключить: /stop'
-        : 'Готово! Сюда будут приходить новости об уроках и домашках ученика: ' + s.name + '.\nОтключить: /stop');
+        ? 'Готово, ' + s.name + '! Сюда будут приходить домашки, напоминания о сроках и результаты проверки.\nКабинет: ' + TG.site + '/s/' + s.id + '\nОтключить: /stop\nКак мы храним данные: ' + TG.site + '/privacy'
+        : 'Готово! Сюда будут приходить новости об уроках и домашках ученика: ' + s.name + '.\nОтключить: /stop\nКак мы храним данные: ' + TG.site + '/privacy');
     }
     const t = [owner(), ...teachersOnly()].find(x => tCode(x.id) === c);
     if (t) {
@@ -859,6 +860,7 @@ http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   if (u.pathname.startsWith('/api/admin/')) return admin(req, res, u);
   if (['/api/login', '/api/register', '/api/invite'].includes(u.pathname)) return account(req, res, u);
+  if (u.pathname === '/pd.js') return sendFile(req, res, path.join(__dirname, 'pd.js'), 'text/javascript; charset=utf-8'); // окно согласия на обработку персональных данных (доска и кабинет ученика)
   if (u.pathname === '/three.module.js') return sendFile(req, res, path.join(__dirname, 'three.module.js'), 'text/javascript; charset=utf-8', 'public, max-age=86400'); // 3D-библиотека для airport.html — со своего сервера, без внешних CDN
   const pj = u.pathname.match(/^\/pdfjs\/(pdf(?:\.worker)?\.min\.mjs)$/);
   if (pj) { // pdf.js для просмотра сборников задач в кабинете преподавателя
@@ -876,6 +878,19 @@ http.createServer((req, res) => {
   }
   const snp = u.pathname.match(/^\/api\/([a-z0-9]{4,32})\/snap$/);
   if (snp && req.method === 'POST') return snapPost(req, res, snp[1]);
+  const cm = u.pathname.match(/^\/api\/([a-z0-9]{4,32})\/consent$/);
+  if (cm) { // согласие на обработку персональных данных: даёт ученик 18+ или родитель, один раз — для доски и кабинета
+    const s = index.students.find(x => x.id === cm[1]);
+    if (!s) { res.writeHead(404); return res.end(); }
+    if (req.method === 'GET') return json(res, { ok: s.type === 'group' || !!s.consent });
+    if (req.method !== 'POST' || s.type === 'group') { res.writeHead(405); return res.end(); }
+    return body(req, res, 500, j => {
+      const w = j.who === 'parent' ? 'parent' : j.who === 'adult' ? 'adult' : null;
+      if (!w) { res.writeHead(400); return res.end(); }
+      if (!s.consent) { s.consent = { at: Date.now(), who: w, v: '2026-11-16' }; saveIndex(); }
+      json(res, { ok: true });
+    });
+  }
   const hm = u.pathname.match(/^\/api\/([a-z0-9]{4,32})\/hw$/);
   if (hm) return hwStudent(req, res, hm[1]);
   const hi = u.pathname.match(/^\/hwimg\/([a-z0-9]{4,32})\/([a-f0-9]{16}\.(jpg|png|webp))$/);
@@ -943,6 +958,8 @@ http.createServer((req, res) => {
   const md = u.pathname.match(/^\/m\/([A-Za-z0-9]{20})$/);
   if (md && eq(md[1], modelCode())) return PAGE('airport.html')(req, res); // 3D-модель огней — только по секретной ссылке
   if (u.pathname === '/t') return PAGE('admin.html')(req, res);
+  if (u.pathname === '/privacy') return PAGE('privacy.html')(req, res); // политика конфиденциальности (152-ФЗ)
+  if (u.pathname === '/consent') return PAGE('consent.html')(req, res); // текст согласия на обработку персональных данных
   if (u.pathname === '/' || u.pathname === '/index.html') return PAGE('index.html')(req, res); // главная страница
   const b = u.pathname.match(/^\/b\/([a-z0-9]{4,32})$/);
   if (b) {

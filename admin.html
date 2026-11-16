@@ -31,7 +31,7 @@ button,input{font:inherit;color:var(--tx);background:var(--panel);border:1px sol
 #callpill button{border-radius:18px;padding:5px 12px;font-size:13px;font-weight:700;background:#fff;color:#2e7d32;border:0}#callpill button.end{background:#c62828;color:#fff}
 #lf details{color:var(--mut);font-size:14px}#lf summary{cursor:pointer}#lf details p{margin:8px 0 0}
 #app{height:100%;display:flex}
-#app[hidden],#login[hidden],#lf [hidden]{display:none}
+#app[hidden],#login[hidden],#lf [hidden],#lf label.chk[hidden]{display:none}
 #side{width:250px;background:var(--panel);border-right:1px solid var(--bd);display:flex;flex-direction:column;padding:10px;gap:8px}
 .top{display:flex;justify-content:space-between;align-items:center}
 #list{flex:1;overflow:auto;display:flex;flex-direction:column;gap:2px}
@@ -118,8 +118,10 @@ body.nosidebar #side{display:none}
   <label for="pw2" class="reg" hidden>Пароль ещё раз</label>
   <input id="pw2" class="reg" hidden type="password" autocomplete="new-password" placeholder="Повторите пароль">
   <label class="chk"><input type="checkbox" id="showpw"> Показать пароль</label>
+  <label class="chk reg" hidden style="align-items:flex-start"><input type="checkbox" id="agree" style="margin-top:3px"> <span>Даю <a href="/consent" target="_blank">согласие на обработку персональных данных</a>, принимаю <a href="/privacy" target="_blank">политику конфиденциальности</a> и подтверждаю, что получу согласие учеников (или их родителей) на внесение их данных</span></label>
   <button id="go" type="submit">Войти</button>
   <div id="msg" role="alert"></div>
+  <p style="font-size:13px;margin:10px 0 0"><a href="/privacy" target="_blank">Политика конфиденциальности</a></p>
   <details id="lhelp">
    <summary>Забыли пароль?</summary>
    <p>Напишите владельцу сайта: он выдаст вам новый пароль.</p>
@@ -238,8 +240,9 @@ $('lf').onsubmit=async e=>{e.preventDefault();
   if(!/^[a-z0-9._-]{3,32}$/.test(login))return showLogin('Логин: от 3 до 32 латинских букв или цифр (можно . _ -)',true);
   if(pw.length<8)return showLogin('Пароль должен быть не короче 8 символов',true);
   if(pw!==$('pw2').value)return showLogin('Пароли не совпадают',true);
+  if(!$('agree').checked)return showLogin('Отметьте согласие на обработку персональных данных',true);
   $('go').disabled=true;$('msg').textContent='Создаю аккаунт…';
-  const r=await post('/api/register',{code:invite,login,name,password:pw}),j=r.ok?await r.json():{error:r.status===429?'Слишком много попыток, подождите 10 минут':'Не получилось'};
+  const r=await post('/api/register',{code:invite,login,name,password:pw,agree:true}),j=r.ok?await r.json():{error:r.status===429?'Слишком много попыток, подождите 10 минут':'Не получилось'};
   if(j.error)return showLogin(j.error,true);
   setTok(j);history.replaceState(null,'','/t');setReg(false);return load();
  }

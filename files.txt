@@ -12,3 +12,6 @@ server.js
 student.html
 airport.html
 three.module.js
+privacy.html
+consent.html
+pd.js

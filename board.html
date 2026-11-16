@@ -241,6 +241,7 @@ body.focus #main{padding:4px;gap:4px}
 </div>
 <script>var errN=0;window.addEventListener('error',function(e){if(/ResizeObserver/.test(e.message||''))return;var s=document.getElementById('st');if(s)s.textContent='Ошибка в скрипте: '+(e.message||'');
  if(errN++<5)try{fetch('/api/log',{method:'POST',body:JSON.stringify({m:String(e.message||'').slice(0,300),l:e.lineno,c:e.colno,s:String(e.error&&e.error.stack||'').slice(0,800),u:navigator.userAgent.slice(0,200),p:location.pathname.slice(0,40)})}).catch(function(){})}catch(_){}})</script>
+<script src="/pd.js"></script>
 <script>
 (function(){
 const cv=document.getElementById('cv'),rg=document.getElementById('ovl'),wrap=document.getElementById('wrap');
@@ -2090,7 +2091,7 @@ function openCab(url){
  $('cabf').src=url;o.hidden=false;
 }
 function closeCab(){const o=$('cabov');if(o&&!o.hidden){o.hidden=true;$('cabf').src='about:blank'}}
-if(!isTeacher){const mine=ME||room;['hwb','hwt'].forEach(i=>{$(i).hidden=false;$(i).onclick=()=>{if(call.on)openCab('/s/'+mine);else location.href='/s/'+mine}});
+if(!isTeacher){const mine=ME||room;if(window.pdGate)pdGate(mine);['hwb','hwt'].forEach(i=>{$(i).hidden=false;$(i).onclick=()=>{if(call.on)openCab('/s/'+mine);else location.href='/s/'+mine}});
  // кнопки групп: со своей доски — в группу, с доски группы — обратно на свою
  let grpDone=false;const groupsUI=j=>{if(grpDone)return;grpDone=true;const side=$('side'),at=$('hwb').nextSibling;
   const add=(txt,href,tt)=>{const b=document.createElement('button');b.className='grpb';b.textContent=txt;b.title=tt;b.onclick=()=>{location.href=href};side.insertBefore(b,at)};
