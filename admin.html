@@ -37,6 +37,7 @@ button,input{font:inherit;color:var(--tx);background:var(--panel);border:1px sol
 #list{flex:1;overflow:auto;display:flex;flex-direction:column;gap:2px}
 .st{display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:8px;cursor:pointer}
 .st.on{background:color-mix(in srgb,var(--ac) 16%,transparent)}
+.grip{flex:none;margin:-4px -4px -4px -2px;padding:4px 2px;cursor:grab;color:var(--mut);opacity:0;touch-action:none;user-select:none;-webkit-user-select:none;font-size:14px;line-height:1}.st:hover .grip,.st.on .grip{opacity:.7}@media (hover:none){.grip{opacity:.45}}.st.drag{opacity:.45;background:color-mix(in srgb,var(--ac) 10%,transparent)}
 .dot{width:8px;height:22px;border-radius:4px;flex:none}
 .foot{display:flex;gap:6px;flex-wrap:wrap}.foot button{font-size:13px;padding:5px 8px}
 #main{flex:1;min-width:0;display:flex;flex-direction:column}
@@ -177,13 +178,29 @@ async function load(){
  if(!cur&&students.length)pick(students.some(s=>s.id===last)?last:students[0].id);
 }
 const gOpen=new Set(); // какие группы раскрыты в списке
-function render(){const l=$('list');l.innerHTML='';
+// перетаскивание строк списка за ручку «⠿» — мышью и пальцем; done() вызывается после отпускания, новый порядок — в DOM
+function sortable(box,sel,done){
+ box.addEventListener('pointerdown',e=>{const h=e.target.closest('.grip'),it=h&&h.closest(sel);if(!it||it.parentNode!==box)return;
+  e.preventDefault();window.sortDrag=1;const k=it.dataset.k,cs=getComputedStyle(box),row=/flex/.test(cs.display)&&cs.flexDirection==='row';it.classList.add('drag');
+  const mv=ev=>{const el=document.elementFromPoint(ev.clientX,ev.clientY),o=el&&el.closest(sel);
+   if(!o||o===it||o.dataset.k!==k||o.parentNode!==box)return;
+   const r=o.getBoundingClientRect(),after=row?ev.clientX>r.left+r.width/2:ev.clientY>r.top+r.height/2;
+   box.insertBefore(it,after?o.nextSibling:o)};
+  const up=()=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);removeEventListener('pointercancel',up);
+   it.classList.remove('drag');window.sortDrag=0;done()};
+  addEventListener('pointermove',mv);addEventListener('pointerup',up);addEventListener('pointercancel',up)}); // слушаем окно: строка переезжает в списке и теряет «захват» указателя
+ box.addEventListener('click',e=>{if(e.target.closest('.grip'))e.stopPropagation()},true)}
+sortable($('list'),'.st',()=>{ // новый порядок учеников и групп сохраняем на сервере
+ const ids=[...$('list').querySelectorAll('.st[data-id]')].map(x=>x.dataset.id),pos=new Map(ids.map((id,i)=>[id,i]));
+ students=students.map((s,i)=>[s,pos.has(s.id)?pos.get(s.id):1e6+i]).sort((a,b)=>a[1]-b[1]).map(x=>x[0]);render();op({t:'order',ids})});
+function render(){if(window.sortDrag)return;const l=$('list');l.innerHTML='';
  if(!students.length){const d=document.createElement('div');d.className='st';d.style.color='var(--mut)';d.textContent='Пока нет учеников. Нажмите «+ Ученик».';l.appendChild(d)}
  // ученики из групп не дублируются в общем списке — они видны под своей группой, когда её раскрыть
  const isG=s=>s.type==='group',groups=students.filter(isG),inG=new Set(groups.flatMap(g=>g.members||[]));
  const row=(s,sub)=>{const d=document.createElement('div');d.className='st'+(s.id===cur?' on':'')+(sub?' sub':'');
   const dot=document.createElement('span');if(isG(s)){dot.className='gi';dot.textContent='👥'}else{dot.className='dot';dot.style.background=s.color}
   const t=document.createElement('span');t.textContent=s.name;d.append(dot,t);
+  if(!sub){d.dataset.id=s.id;d.dataset.k=isG(s)?'g':'s';const gp=document.createElement('span');gp.className='grip';gp.textContent='⠿';gp.title='Перетащите, чтобы поменять порядок';d.prepend(gp)}
   const pn=(window.hwPend||{})[s.id];
   if(isG(s)){const open=gOpen.has(s.id),m=document.createElement('span');m.className='gm';m.textContent=(s.members||[]).length+' уч. '+(open?'▾':'▸');m.title=open?'Свернуть':'Показать учеников группы';
    m.onclick=e=>{e.stopPropagation();open?gOpen.delete(s.id):gOpen.add(s.id);render()};d.append(m)}

@@ -130,6 +130,12 @@ function apply(s, op) {
       s.pages.splice(i, 1); delete st[op.id]; delete im[op.id];
       return true;
     }
+    case 'pageOrder': { // порядок досок ученика (перетаскивание в списке досок)
+      if (!Array.isArray(op.ids) || op.ids.length !== s.pages.length) return false;
+      const by = new Map(s.pages.map(p => [p.id, p])), np = op.ids.map(id => by.get(id));
+      if (np.some(p => !p) || new Set(op.ids).size !== np.length) return false;
+      s.pages = np; return true;
+    }
     case 'title': { const p = s.pages.find(p => p.id === op.id); if (p) p.title = String(op.title || '').slice(0, 80); return true; }
     case 'rtc': return ['hello', 'here', 'offer', 'answer', 'ice', 'bye'].includes(op.kind) && RID.test(String(op.from)) && (!op.to || RID.test(String(op.to))) && JSON.stringify(op.data || null).length < 30000;
     case 'cursor': return Number.isFinite(+op.x) && Number.isFinite(+op.y) && String(op.label || '').length <= 40;
@@ -828,6 +834,10 @@ function admin(req, res, u) {
       if (nm) g.name = nm;
       if (Array.isArray(j.members)) g.members = [...new Set(j.members.map(String).filter(m => own(m) && !isGroup(m)))];
       saveIndex();
+    } else if (j.t === 'order' && Array.isArray(j.ids)) { // порядок учеников и групп в списке (перетаскивание)
+      const pos = new Map(j.ids.slice(0, 400).map((id, i) => [String(id), i]));
+      const my = index.students.filter(s => s.owner === me.id).map((s, i) => [s, pos.has(s.id) ? pos.get(s.id) : 1e6 + i]).sort((a, b) => a[1] - b[1]).map(x => x[0]);
+      let k = 0; index.students = index.students.map(s => s.owner === me.id ? my[k++] : s); saveIndex();
     } else if (j.t === 'rename' && nm) {
       const s = own(j.id); if (s) { s.name = nm; saveIndex(); }
     } else if (j.t === 'delete') {

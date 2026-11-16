@@ -24,6 +24,7 @@ input,textarea,#main input,#main textarea,#side input{-webkit-user-select:text;u
 .pg.on{background:color-mix(in srgb,var(--ac) 16%,transparent);border-color:var(--ac)}
 .pg{display:flex;align-items:center;gap:4px}.pgt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .pg:not(.on) .pgx{opacity:.35}.pg:hover .pgx{opacity:1}
+.grip{flex:none;padding:0 2px;cursor:grab;color:var(--mut);opacity:0;touch-action:none;user-select:none;-webkit-user-select:none;font-size:13px;line-height:20px}.pg:hover .grip,.pg.on .grip{opacity:.7}@media (hover:none){.grip{opacity:.45}}.pg.drag{opacity:.45}
 .pgx{flex:none;padding:0 6px;font-size:12px;line-height:20px;border-color:transparent;background:transparent;color:var(--mut)}.pgx:hover{color:#d32f2f;border-color:#d32f2f}
 button,select,input,textarea{font:inherit;color:var(--tx);background:var(--panel);border:1px solid var(--bd);border-radius:8px;padding:6px 10px}
 button,select,label{touch-action:manipulation}
@@ -633,12 +634,29 @@ function drawOverlay(){
 }
 const ringTools=['hl','pen','line','arrow','rect','ellipse','er','ers'];
 function setCursor(){const t=tool();cv.style.cursor=(space||t==='hand'||viewOnly)?'grab':(S.ring&&ringTools.includes(t))?'none':t==='text'?'text':t==='mv'?'default':'crosshair'}
-function renderPages(){const b=$('pl');b.innerHTML='';
- pages.forEach(p=>{const d=document.createElement('div');d.className='pg'+(p.id===page?' on':'');
+function renderPages(){if(window.sortDrag)return;const b=$('pl');b.innerHTML='';
+ pages.forEach(p=>{const d=document.createElement('div');d.className='pg'+(p.id===page?' on':'');d.dataset.id=p.id;d.dataset.k='p';
+  if(isTeacher&&pages.length>1){const gp=document.createElement('span');gp.className='grip';gp.textContent='⠿';gp.title='Перетащите, чтобы поменять порядок досок';d.appendChild(gp)}
   const t=document.createElement('span');t.className='pgt';t.textContent=p.title||'Без названия';d.appendChild(t);d.onclick=()=>openPage(p.id);
   if(isTeacher&&pages.length>1){const x=document.createElement('button');x.className='pgx';x.textContent='✕';x.title='Удалить эту доску';
    x.onclick=e=>{e.stopPropagation();delPage(p.id)};d.appendChild(x)}
   b.appendChild(d)})}
+// перетаскивание строк списка за ручку «⠿» — мышью и пальцем; done() вызывается после отпускания, новый порядок — в DOM
+function sortable(box,sel,done){
+ box.addEventListener('pointerdown',e=>{const h=e.target.closest('.grip'),it=h&&h.closest(sel);if(!it||it.parentNode!==box)return;
+  e.preventDefault();window.sortDrag=1;const k=it.dataset.k,cs=getComputedStyle(box),row=/flex/.test(cs.display)&&cs.flexDirection==='row';it.classList.add('drag');
+  const mv=ev=>{const el=document.elementFromPoint(ev.clientX,ev.clientY),o=el&&el.closest(sel);
+   if(!o||o===it||o.dataset.k!==k||o.parentNode!==box)return;
+   const r=o.getBoundingClientRect(),after=row?ev.clientX>r.left+r.width/2:ev.clientY>r.top+r.height/2;
+   box.insertBefore(it,after?o.nextSibling:o)};
+  const up=()=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);removeEventListener('pointercancel',up);
+   it.classList.remove('drag');window.sortDrag=0;done()};
+  addEventListener('pointermove',mv);addEventListener('pointerup',up);addEventListener('pointercancel',up)}); // слушаем окно: строка переезжает в списке и теряет «захват» указателя
+ box.addEventListener('click',e=>{if(e.target.closest('.grip'))e.stopPropagation()},true)}
+if(isTeacher)sortable($('pl'),'.pg',()=>{ // новый порядок досок — всем участникам и на сервер
+ const ids=[...$('pl').querySelectorAll('.pg')].map(x=>x.dataset.id);
+ if(ids.length!==pages.length||ids.every((id,i)=>pages[i].id===id)){renderPages();return}
+ const by=new Map(pages.map(p=>[p.id,p]));pages=ids.map(id=>by.get(id));renderPages();send({t:'pageOrder',ids})});
 async function delPage(id){ // удалить одну доску ученика (только у преподавателя); без id — открытую
  if(!isTeacher)return;
  if(pages.length<=1){await modal('Это единственная доска ученика, её нельзя удалить. Можно очистить: «Файл… → Очистить доску».',{ok:'Понятно'});return}
@@ -677,6 +695,7 @@ function onOp(o){
  if(o.t==='delPage'){if(o.from!==me&&pages.some(p=>p.id===o.id)&&pages.length>1)removePage(o.id);return}
  if(o.t==='addPage'&&!pages.some(p=>p.id===o.id))pages.push({id:o.id,title:o.title});
  if(o.t==='title')pages.forEach(p=>{if(p.id===o.id)p.title=o.title});
+ if(o.t==='pageOrder'&&Array.isArray(o.ids)&&o.ids.length===pages.length){const by=new Map(pages.map(p=>[p.id,p]));if(o.ids.every(id=>by.has(id)))pages=o.ids.map(id=>by.get(id))}
  renderPages();redraw();
  if(o.t==='title'&&o.id===page&&document.activeElement!==$('title'))$('title').value=o.title;
 }
