@@ -178,6 +178,7 @@ async function load(){
  if(!cur&&students.length)pick(students.some(s=>s.id===last)?last:students[0].id);
 }
 const gOpen=new Set(); // какие группы раскрыты в списке
+let lastClk={};
 // перетаскивание строк списка за ручку «⠿» — мышью и пальцем; done() вызывается после отпускания, новый порядок — в DOM
 function sortable(box,sel,done){
  box.addEventListener('pointerdown',e=>{const h=e.target.closest('.grip'),it=h&&h.closest(sel);if(!it||it.parentNode!==box)return;
@@ -205,7 +206,9 @@ function render(){if(window.sortDrag)return;const l=$('list');l.innerHTML='';
   if(isG(s)){const open=gOpen.has(s.id),m=document.createElement('span');m.className='gm';m.textContent=(s.members||[]).length+' уч. '+(open?'▾':'▸');m.title=open?'Свернуть':'Показать учеников группы';
    m.onclick=e=>{e.stopPropagation();open?gOpen.delete(s.id):gOpen.add(s.id);render()};d.append(m)}
   if(pn){const b=document.createElement('span');b.className='badge';b.textContent=pn;b.title='Домашек ждут проверки: '+pn;if(isG(s))b.style.marginLeft='6px';d.append(b)}
-  d.onclick=()=>{if(isG(s))gOpen.add(s.id);pick(s.id)};l.appendChild(d)};
+  d.title='Двойной щелчок — переименовать';
+  d.onclick=()=>{const t=Date.now();if(lastClk.id===s.id&&t-lastClk.t<450){lastClk={};renameS(s.id);return}lastClk={id:s.id,t}; // двойной щелчок (или двойное касание на iPad) — переименовать; список перерисовывается после первого щелчка, поэтому считаем щелчки сами
+   if(isG(s))gOpen.add(s.id);pick(s.id)};l.appendChild(d)};
  students.filter(s=>!isG(s)&&!inG.has(s.id)).forEach(s=>row(s));
  if(groups.length){const h=document.createElement('div');h.className='lh';h.textContent='Группы';l.appendChild(h)}
  groups.forEach(g=>{if((g.members||[]).includes(cur))gOpen.add(g.id);row(g);
@@ -288,7 +291,8 @@ function groupDlg(g){ // создать группу или поменять у�
  setTimeout(()=>nm.focus(),50)}
 $('addG').onclick=()=>groupDlg(null);
 $('mem').onclick=()=>{const g=students.find(x=>x.id===cur);if(g&&g.type==='group')groupDlg(g)};
-$('ren').onclick=async()=>{if(!cur)return;const s=students.filter(x=>x.id===cur)[0];const n=prompt('Новое имя:',s.name);if(!n||!n.trim())return;await op({t:'rename',id:cur,name:n});pick(cur)};
+async function renameS(id){const s=students.find(x=>x.id===id);if(!s)return;const n=prompt(s.type==='group'?'Новое название группы:':'Новое имя ученика:',s.name);if(!n||!n.trim()||n.trim()===s.name)return;await op({t:'rename',id,name:n});pick(id)}
+$('ren').onclick=()=>{if(cur)renameS(cur)};
 $('del').onclick=async()=>{if(!cur)return;const s=students.filter(x=>x.id===cur)[0];
  if(!confirm(s.type==='group'?'Удалить группу «'+s.name+'» вместе с её общими досками? Ученики, их кабинеты и домашки останутся.':'Удалить ученика «'+s.name+'» вместе со всеми его досками? Это нельзя отменить.'))return;
  const id=cur;cur=null;await op({t:'delete',id:id});pick(students.length?students[0].id:null)};
