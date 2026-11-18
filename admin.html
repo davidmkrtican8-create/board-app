@@ -135,7 +135,7 @@ body.nosidebar #side{display:none}
   <div class="top"><b>Ученики</b><button id="addS">+ Ученик</button><button id="addG" title="Группа: общие доски для нескольких учеников, у каждого свой кабинет">+ Группа</button></div>
   <div id="list"></div>
   <div id="whoami" style="font-size:12px;color:var(--mut)"></div>
-  <div class="foot"><button id="tch" hidden title="Пригласить репетиторов и управлять их аккаунтами">Репетиторы</button><button id="mdl" hidden title="3D-модель огней аэродрома: ссылка видна только вам">3D-огни</button><button id="hlp" title="Короткая инструкция с картинками: как всё устроено">❓ Помощь</button><button id="tgb" title="Telegram-бот: уведомления и конспекты">Telegram</button><button id="cpw" title="Сменить свой пароль">Пароль</button><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden><button id="lo" title="Выйти из кабинета на этом устройстве">Выйти</button><button id="rb" title="Вернуть учеников и доски из копии, которую кабинет сам сохраняет в вашем браузере">Восстановить из автокопии</button><div id="bkst" style="font-size:12px;color:var(--mut);width:100%"></div></div>
+  <div class="foot"><button id="tch" hidden title="Пригласить репетиторов и управлять их аккаунтами">Репетиторы</button><button id="mdl" hidden title="3D-модель огней аэродрома: ссылка видна только вам">3D-огни</button><button id="hlp" title="Короткая инструкция с картинками: как всё устроено">❓ Помощь</button><button id="chan" title="Telegram-канал УчиДоски: новости и подсказки">📣 Канал</button><button id="tgb" title="Telegram-бот: уведомления и конспекты">Telegram</button><button id="cpw" title="Сменить свой пароль">Пароль</button><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden><button id="lo" title="Выйти из кабинета на этом устройстве">Выйти</button><button id="rb" title="Вернуть учеников и доски из копии, которую кабинет сам сохраняет в вашем браузере">Восстановить из автокопии</button><div id="bkst" style="font-size:12px;color:var(--mut);width:100%"></div></div>
  </div>
  <div id="main">
   <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk" class="keep">Задачи</button><button id="hwk" class="keep" title="Домашние задания ученика">📚 Домашка<span id="hwkn"></span></button><button id="tgs" title="Отправить конспект урока ученику и родителям в Telegram">📨 Конспект</button><button id="lnk">Ссылка ученика</button><button id="mem" hidden title="Кто занимается в этой группе">👥 Участники</button><button id="ren">Переименовать</button><button id="del">Удалить</button><button id="fs" class="keep" title="Фокус: убрать панели">⛶</button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button><button id="th" class="keep" title="Светлая / тёмная тема">◐</button></div>
@@ -176,6 +176,7 @@ async function load(){
  $('login').hidden=true;$('app').hidden=false;$('tch').hidden=me.role!=='owner';$('mdl').hidden=me.role!=='owner';$('whoami').textContent='Вы вошли как '+me.name+' ('+me.login+')';render();
  const last=localStorage.getItem('last:'+me.login);
  if(!cur&&students.length)pick(students.some(s=>s.id===last)?last:students[0].id);
+ chanAsk();
 }
 const gOpen=new Set(); // какие группы раскрыты в списке
 let lastClk={};
@@ -273,6 +274,19 @@ $('lf').onsubmit=async e=>{e.preventDefault();
  if(!r.ok)return showLogin('Неверный логин или пароль. Проверьте раскладку клавиатуры и большие/маленькие буквы.',true);
  setTok(await r.json());$('pw').value='';load()};
 $('showpw').onchange=()=>{const t=$('showpw').checked?'text':'password';$('pw').type=t;$('pw2').type=t};
+const CHAN='https://t.me/uchidoska';
+$('chan').onclick=()=>window.open(CHAN,'_blank','noopener');
+function chanAsk(){ // один раз приглашаем в Telegram-канал (запоминаем в этом браузере для этого логина)
+ const k='chanSeen:'+me.login;try{if(localStorage.getItem(k))return}catch(e){return}
+ setTimeout(()=>{if(document.querySelector('.dlg'))return;try{localStorage.setItem(k,'1')}catch(e){}
+  const o=el('div',{className:'dlg'}),b=el('div'),close=()=>o.remove();
+  b.append(el('h2',{textContent:'📣 У УчиДоски теперь есть Telegram-канал'}),
+   el('p',{style:'margin:0;line-height:1.45',textContent:'Там новости сайта: новые функции, подсказки, как удобнее вести уроки и задавать домашку. Подпишитесь, чтобы ничего не пропустить.'}),
+   el('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},
+    el('button',{className:'pri',textContent:'Подписаться — @uchidoska',onclick:()=>{window.open(CHAN,'_blank','noopener');close()}}),
+    el('button',{textContent:'Не сейчас',onclick:close})),
+   el('p',{className:'mut',style:'margin:0',textContent:'Ссылка на канал всегда есть внизу слева — кнопка «📣 Канал».'}));
+  o.append(b);o.addEventListener('pointerdown',e=>{if(e.target===o)close()});document.body.append(o)},1500)}
 $('hlp').onclick=()=>window.open('/help','_blank'); // инструкция с картинками (PDF) в новой вкладке
 $('lo').onclick=()=>{if(confirm('Выйти из кабинета на этом устройстве? Автокопия досок останется.')){localStorage.removeItem('tok');location.reload()}};
 $('addS').onclick=async()=>{const n=prompt('Имя ученика (можно с классом, например «Миша 8кл»):');if(!n||!n.trim())return;
