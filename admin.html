@@ -700,9 +700,9 @@ window.addEventListener('keydown',e=>{
  e.preventDefault();f.contentWindow.postMessage({t:'key',a:(e.code==='KeyY'||e.shiftKey)?'redo':'undo'},location.origin);
 },true);
 
-// быстрые клавиши доски (V стрелка, E ластик, P перо, H маркер, L указка, Delete, Esc), когда фокус в кабинете, а не в доске
+// быстрые клавиши доски (буквы и цифры — свои у каждого, Delete, Esc), когда фокус в кабинете, а не в доске
 window.addEventListener('keydown',e=>{
- if(e.metaKey||e.ctrlKey||e.altKey||!/^(Key[VEPBHL]|Delete|Escape)$/.test(e.code))return;
+ if(e.metaKey||e.ctrlKey||e.altKey||!/^(Key[A-Z]|Digit[1-9]|Delete|Escape)$/.test(e.code))return;
  const x=document.activeElement;if(x&&(x.tagName==='TEXTAREA'||x.tagName==='INPUT'||x.tagName==='SELECT'||x.isContentEditable))return;
  if(document.querySelector('.dlg'))return;
  const f=$('fr');if(!(f.getAttribute('src')||'').startsWith('/b/'))return;

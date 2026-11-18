@@ -99,6 +99,7 @@ body.focus #main{padding:4px;gap:4px}
 #zhint{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:4;background:#d32f2f;color:#fff;padding:8px 12px;border-radius:10px;font-size:14px;max-width:90%;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.3)}
 #set{position:absolute;right:10px;top:54px;z-index:10;width:300px;max-width:calc(100% - 20px);max-height:calc(100% - 70px);overflow:auto;background:var(--panel);border:1px solid var(--bd);border-radius:12px;padding:14px;box-shadow:0 6px 24px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:9px}
 #set h3{margin:0;font-size:16px}#set label{display:flex;gap:8px;align-items:center;justify-content:space-between;font-size:14px}
+#hkl .hr{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:5px 0;color:var(--tx);font-size:14px}#hkl .hr button,#hkr{min-width:64px;padding:4px 8px;border:1px solid var(--bd);border-radius:7px;background:var(--bg,#fff);color:var(--tx);font:600 13px/1.2 inherit;cursor:pointer}#hkl .hr button.wait{border-color:#6a3fc4;color:#6a3fc4}#hkr{margin-top:6px;font-weight:400}
 #set label.c{justify-content:flex-start}#set details{font-size:13px;color:var(--mut)}#set summary{cursor:pointer}#set p{margin:6px 0 0}
 .mo{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:50}
 .mc{background:var(--panel);color:var(--tx);border:1px solid var(--bd);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px;max-width:340px;width:calc(100% - 30px)}
@@ -176,7 +177,7 @@ body.focus #main{padding:4px;gap:4px}
   <span id="st">Подключение…</span>
   <i class="br keep"></i>
   <span class="tg keep">
-   <button id="tpen" data-k="P" class="keep tb ib" title="Перо (P)"></button>
+   <button id="tpen" data-k="P" class="keep tb ib" title="Перо (P): с Shift — прямая линия"></button>
    <button id="pe" data-k="E" class="keep tb ib" title="Ластик (E)"></button><button id="ersb" class="keep tb chev" title="Размер ластика или «стирает объект целиком»"></button>
    <button id="thl" data-k="H" class="keep tb ib" title="Маркер (H): выделить или подчеркнуть"></button>
    <button id="ttext" class="keep tb ib" title="Текст"></button>
@@ -232,6 +233,7 @@ body.focus #main{padding:4px;gap:4px}
   <label class="c"><input type="checkbox" id="seec"> Видеть курсоры других</label>
   <label class="c"><input type="checkbox" id="showme"> Показывать другим мой курсор</label>
   <button id="fp" hidden>Палец: рисует</button>
+  <details id="hkd"><summary>Горячие клавиши</summary><div id="hkl"></div><button id="hkr" type="button">Вернуть как было</button></details>
   <details><summary>Как открыть на весь экран</summary>
    <p><b>Компьютер:</b> кнопка ⤢ — во весь экран (выйти: Esc). Кнопка ⛶ только убирает панели.</p>
    <p><b>iPhone / iPad:</b> «Поделиться» → «На экран «Домой»»: доска откроется как приложение без панелей Safari.</p>
@@ -295,6 +297,17 @@ const DEF={nr:'strong',theme:'auto',bg:'grid',snap:true,prs:false,palm:true,ring
 const S=Object.assign({},DEF);
 try{Object.assign(S,JSON.parse(localStorage.getItem('bset')||'{}'))}catch(e){}
 const saveS=()=>{try{localStorage.setItem('bset',JSON.stringify(S))}catch(e){}};
+// действия с горячими клавишами (по умолчанию — как раньше; T и N добавлены)
+const HK=[
+ {id:'pen',name:'Перо',btn:'tpen',def:'KeyP',run:()=>setTool('pen')},
+ {id:'ers',name:'Ластик',btn:'pe',def:'KeyE',run:()=>setTool(isEr(tool())?'pen':ersTool())},
+ {id:'hl',name:'Маркер',btn:'thl',def:'KeyH',run:()=>setTool(tool()==='hl'?'pen':'hl')},
+ {id:'text',name:'Текст',btn:'ttext',def:'KeyT',run:()=>setTool(tool()==='text'?'pen':'text')},
+ {id:'mv',name:'Стрелка (двигать)',btn:'tmv',def:'KeyV',run:()=>setTool(tool()==='mv'?'pen':'mv')},
+ {id:'hand',name:'Рука (двигать лист)',btn:'thand',def:'KeyN',run:()=>setTool(tool()==='hand'?'pen':'hand')},
+ {id:'laser',name:'Указка',btn:'tlaser',def:'KeyL',run:()=>setTool(tool()==='laser'?'pen':'laser')}];
+const hk=id=>{const m=S.hk||{};return id in m?m[id]:(HK.find(h=>h.id===id)||{}).def||''};
+let hkSet=null; // какое действие сейчас ждёт новую клавишу
 // толщина: 10 ступеней (10%…100%); текст масштабируется вместе с пером
 const HLC=[['#ffe600','Жёлтый'],['#5ee35e','Зелёный'],['#ff6fb5','Розовый'],['#4fc3ff','Голубой'],['#ffa53d','Оранжевый']],HLW={s:[12,'Тонкий'],m:[22,'Средний'],l:[36,'Широкий']};
 const hlW=()=>(HLW[S.hlw]||HLW.m)[0],hlC=()=>(HLC.find(x=>x[0]===S.hlc)||HLC[0])[0];
@@ -657,7 +670,7 @@ function drawOverlay(){
   }
  }
  if(ptr&&S.ring&&!viewOnly&&ringTools.includes(tool())&&!space){
-  const t=tool(),er=t==='er',r=er?16:t==='ers'?Math.max(3,ersW()*view.s/2):t==='hl'?Math.max(3,hlW()*view.s/2):Math.max(3,penW()*view.s/2);
+  const t=tool(),er=t==='er',r=er?erR()*view.s:t==='ers'?Math.max(3,ersW()*view.s/2):t==='hl'?Math.max(3,hlW()*view.s/2):Math.max(3,penW()*view.s/2);
   c.lineWidth=2;c.strokeStyle='rgba(255,255,255,.95)';c.beginPath();c.arc(ptr.x,ptr.y,r+1,0,6.2832);c.stroke();
   c.lineWidth=1;c.strokeStyle='rgba(0,0,0,.8)';if(er)c.setLineDash([4,3]);c.beginPath();c.arc(ptr.x,ptr.y,r,0,6.2832);c.stroke();c.setLineDash([]);
  }
@@ -998,9 +1011,10 @@ function flushErase(){ // стёртое уходит одним сообщен�
  clearTimeout(eraseT);eraseT=0;if(!pendErase.length)return;
  const ids=pendErase;pendErase=[];send({t:'erase',page:pendPage,ids:ids});
 }
+const erR=()=>Math.max(4/view.s,penW()/2); // ластик «объект целиком» — кружок размером с перо
 function eraseAt(x,y){
- const ps=strokes[page]||{},rad=16/view.s;let any=false;
- for(const id in ps)if(ps[id].k!=='ers'&&hit(ps[id],x,y,rad,false)){if(cur&&cur.gone)cur.gone.push({id:id,stroke:ps[id]});delete ps[id];pendPage=page;pendErase.push(id);any=true} // стёртое запоминаем для ⌘Z
+ const ps=strokes[page]||{},rad=erR();let any=false;
+ for(const id in ps)if(ps[id].k!=='ers'&&hit(ps[id],x,y,rad+(ps[id].k!=='hl'&&ps[id].w<60?ps[id].w/2:0),false)){if(cur&&cur.gone)cur.gone.push({id:id,stroke:ps[id]});delete ps[id];pendPage=page;pendErase.push(id);any=true} // стёртое запоминаем для ⌘Z
  // картинки и задачи ластик не трогает — их удаляют кнопкой 🗑 (инструмент «Двигать» → клик по картинке)
  if(any){rd();if(!eraseT)eraseT=setTimeout(flushErase,70)}
 }
@@ -1106,7 +1120,7 @@ cv.addEventListener('pointerdown',e=>{
    editImg=null;redraw();
   }
  }
- if(t==='er'){cur={erasing:1,gone:[]};eraseAt(p[0],p[1]);return}
+ if(t==='er'){cur={erasing:1,gone:[],le:p};eraseAt(p[0],p[1]);return}
  if(t==='text'){const id=strokeAt(p[0],p[1],true,true);openText(id?strokes[page][id].pts[0]:p[0],id?strokes[page][id].pts[1]:p[1],id);return}
  if(t==='mv'){ // двигать: внутри выделенной области — тащим всё сразу; потом фигуры/линии/текст, картинки; пустое место — рамка выделения
   if(msel){
@@ -1151,7 +1165,9 @@ cv.addEventListener('pointermove',e=>{
  if(!cur)return;
  if(cur.snapped){adjust(pos(e));return}
  const evs=(e.getCoalescedEvents&&e.getCoalescedEvents())||[];if(!evs.length)evs.push(e);
- if(cur.erasing){evs.forEach(v=>{const p=pos(v);eraseAt(p[0],p[1])});return}
+ if(cur.erasing){evs.forEach(v=>{const p=pos(v),l=cur.le; // кружок маленький — между точками мыши проверяем промежуток, чтобы не перескочить линию
+  if(l){const d=Math.hypot(p[0]-l[0],p[1]-l[1]),k=Math.min(40,Math.floor(d/(erR()*1.5)));for(let i=1;i<=k;i++)eraseAt(l[0]+(p[0]-l[0])*i/(k+1),l[1]+(p[1]-l[1])*i/(k+1))}
+  eraseAt(p[0],p[1]);cur.le=p});return}
  if(cur.laser){evs.forEach(v=>{const p=pos(v);laserBuf.push(p[0],p[1]);laserPoint(p)});const t2=Date.now();if(t2-laserT>50){laserT=t2;laserFlush()}return}
  if(cur.orbit){const sk=(strokes[page]||{})[cur.orbit];if(!sk)return;
   setSolid(sk,{y:r2(cur.y0+(e.clientX-cur.x)*.01),p:r2(Math.max(-1.5,Math.min(1.5,cur.p0+(e.clientY-cur.y)*.01)))});return}
@@ -1179,7 +1195,14 @@ cv.addEventListener('pointermove',e=>{
  if(cur.mv){const p=pos(e),g=images[page][cur.mv];
   if(cur.size){g.w=Math.max(20/view.s,p[0]-g.x);g.h=g.w*cur.r}else{g.x=p[0]-cur.dx;g.y=p[1]-cur.dy}
   rd();return}
- if(cur.k==='pen'||cur.k==='ers'||cur.k==='hl'){
+ if((cur.k==='pen'||cur.k==='hl')&&e.shiftKey&&cur.pts.length>=2){ // Shift — прямая линия от точки, где зажали Shift (отпустили — дальше рисуем от руки)
+  if(!cur.sb){cur.sb=cur.pts.slice();cur.sbp=cur.pr?cur.pr.slice():null}
+  const n=cur.sb.length,x0=cur.sb[n-2],y0=cur.sb[n-1];let p=pos(e);
+  const dx=p[0]-x0,dy=p[1]-y0,L=Math.hypot(dx,dy),a=Math.atan2(dy,dx),q=Math.round(a/(Math.PI/4))*(Math.PI/4);
+  if(L&&Math.abs(a-q)<4*DEG)p=[r2(x0+L*Math.cos(q)),r2(y0+L*Math.sin(q))]; // почти ровно по горизонтали, вертикали или 45° — выравниваем
+  cur.pts=cur.sb.concat(p);if(cur.sbp)cur.pr=cur.sbp.concat(pn(e));cur.ex=p[0];cur.ey=p[1];cur.sent=0;clearTimeout(holdT);holdA=null;
+ }else if(cur.k==='pen'||cur.k==='ers'||cur.k==='hl'){
+  cur.sb=null;
   const min=(cur.sm?2:1.5)/view.s;
   evs.forEach(v=>{let p=pos(v);const n=cur.pts.length;
    if(cur.sm){cur.ex+=(p[0]-cur.ex)*.4;cur.ey+=(p[1]-cur.ey)*.4;p=[r2(cur.ex),r2(cur.ey)]} // мышь шагает по пикселю — сглаживаем «лесенку»
@@ -1189,7 +1212,7 @@ cv.addEventListener('pointermove',e=>{
    x=r2(cur.pts[0]+(dx<0?-m:m));y=r2(cur.pts[1]+(dy<0?-m*R:m*R))}
   cur.pts[2]=x;cur.pts[3]=y}
  lastP=pos(e);
- if(cur.k==='pen'&&S.snap){const ha=holdA;if(!ha||Math.hypot(e.clientX-ha[0],e.clientY-ha[1])>5){holdA=[e.clientX,e.clientY];clearTimeout(holdT);holdT=setTimeout(snapNow,650)}}
+ if(cur.k==='pen'&&S.snap&&!e.shiftKey){const ha=holdA;if(!ha||Math.hypot(e.clientX-ha[0],e.clientY-ha[1])>5){holdA=[e.clientX,e.clientY];clearTimeout(holdT);holdT=setTimeout(snapNow,650)}}
  rd();const n=Date.now();
  if(n-lastEmit>35){lastEmit=n;const inc=cur.k==='pen'||cur.k==='hl'||cur.k==='ers';
   // перо/маркер/ластик: шлём только новые точки (и иногда всю линию — на случай потерянного сообщения)
@@ -1240,11 +1263,9 @@ document.addEventListener('keydown',e=>{
  if((editImg||editStroke||msel)&&(e.key==='Enter'||e.key==='Escape')&&tg!=='SELECT'){editImg=null;editStroke=null;msel=null;redraw();e.preventDefault();return}
  if(!e.metaKey&&!e.ctrlKey&&!e.altKey&&e.key==='0'){fit();return}
  const plain=!e.metaKey&&!e.ctrlKey&&!e.altKey&&tg!=='SELECT'&&!viewOnly; // быстрые клавиши (работают в любой раскладке)
- if(plain&&e.code==='KeyE'){setTool(isEr(tool())?'pen':ersTool());return} // E — ластик (ещё раз — обратно перо)
- if(plain&&(e.code==='KeyP'||e.code==='KeyB')){setTool('pen');return} // P или B — перо
- if(plain&&e.code==='KeyH'){setTool(tool()==='hl'?'pen':'hl');return} // H — маркер
- if(plain&&e.code==='KeyL'){setTool(tool()==='laser'?'pen':'laser');return} // L — указка
- if(plain&&e.code==='KeyV'){setTool(tool()==='mv'?'pen':'mv');return} // V — обычная стрелка «Двигать» (ещё раз — перо)
+ if(plain&&hkSet!==null){e.preventDefault();hkCatch(e);return} // в настройках ждём новую клавишу
+ if(plain){const a=HK.find(h=>hk(h.id)===e.code)||(e.code==='KeyB'&&!HK.some(h=>hk(h.id)==='KeyB')?HK[0]:null); // быстрые клавиши — свои у каждого (настройки → «Горячие клавиши»)
+  if(a){a.run();return}}
  if(plain&&(e.key==='Delete'||e.key==='Backspace')&&(editStroke||editImg||msel)){if(delSel())e.preventDefault();return} // удалить выделенное
  const z=e.code==='KeyZ',y=e.code==='KeyY';
  if(!(e.metaKey||e.ctrlKey)||!(z||y))return;
@@ -1299,7 +1320,7 @@ window.addEventListener('message',e=>{
  if(e.origin!==location.origin)return;const d=e.data;if(!d)return;
  if(d.t==='key'){if(!viewOnly)(d.a==='redo'?redoAct:undo)();return}
  if(d.t==='theme'&&['auto','light','dark'].includes(d.v)){S.theme=d.v;$('theme').value=d.v;saveS();applyTheme();return}
- if(d.t==='hotkey'&&/^(Key[VEPBHL]|Delete|Escape)$/.test(d.code)){document.dispatchEvent(new KeyboardEvent('keydown',{code:d.code,key:d.key||''}));return} // клавиша нажата, когда фокус в кабинете
+ if(d.t==='hotkey'&&/^(Key[A-Z]|Digit[1-9]|Delete|Escape)$/.test(d.code)){document.dispatchEvent(new KeyboardEvent('keydown',{code:d.code,key:d.key||''}));return} // клавиша нажата, когда фокус в кабинете
  if(d.t==='side'){document.body.classList.toggle('cabside',!!d.hide);document.body.classList.remove('sideon');setTimeout(resize,30);return} // кабинет в режиме ⛶ / ⤢ прячет и список досок
  if(d.t==='snapnow'){snapAll(true).finally(()=>e.source.postMessage({t:'snapdone'},location.origin));return}
  if(d.t==='pdfreq'){buildPDF(false).then(async r=>{const b=new Uint8Array(await r.blob.arrayBuffer());let s='';for(let i=0;i<b.length;i+=32768)s+=String.fromCharCode.apply(null,b.subarray(i,i+32768));
@@ -2214,7 +2235,31 @@ if(navigator.maxTouchPoints>0){$('fp').hidden=false;const fpT=()=>{$('fp').textC
  try{fingerPan=localStorage.getItem('fingerPan')==='1'}catch(_){}fpT(); // выбор запоминается на этом устройстве
  $('fp').onclick=()=>{fingerPan=!fingerPan;try{localStorage.setItem('fingerPan',fingerPan?'1':'0')}catch(_){}fpT()}}
 // настройки
-$('gear').onclick=()=>{$('set').hidden=!$('set').hidden};
+$('gear').onclick=()=>{$('set').hidden=!$('set').hidden;if($('set').hidden)hkStop()};
+// ---------- горячие клавиши: каждый настраивает под себя (хранятся в этом браузере) ----------
+// клавиши по коду (e.code) — работают в любой раскладке; на одну клавишу — одно действие
+function hkName(c){return !c?'—':/^Key[A-Z]$/.test(c)?c.slice(3):/^Digit\d$/.test(c)?c.slice(5):c}
+function hkRender(){const l=$('hkl');l.innerHTML='';
+ HK.forEach(h=>{const r=document.createElement('div');r.className='hr';const n=document.createElement('span');n.textContent=h.name;
+  const b=document.createElement('button');b.type='button';b.textContent=hkSet===h.id?'нажмите…':hkName(hk(h.id));b.classList.toggle('wait',hkSet===h.id);
+  b.title='Нажмите и затем нужную клавишу. Delete — убрать клавишу, Esc — отмена';
+  b.onclick=()=>{hkSet=hkSet===h.id?null:h.id;hkRender()};r.append(n,b);l.append(r)});
+ hkApply()}
+function hkStop(){if(hkSet!==null){hkSet=null;hkRender()}}
+function hkCatch(e){const id=hkSet;
+ if(e.code==='Escape'){hkStop();return}
+ const m=Object.assign({},S.hk||{});
+ if(e.code==='Delete'||e.code==='Backspace')m[id]='';
+ else if(/^(Key[A-Z]|Digit[1-9])$/.test(e.code)){HK.forEach(h=>{if(h.id!==id&&hk(h.id)===e.code)m[h.id]=''});m[id]=e.code} // клавиша была у другого действия — там её снимаем
+ else{$('st').textContent='Можно букву или цифру 1–9';return}
+ S.hk=m;saveS();hkSet=null;hkRender()}
+function hkApply(){HK.forEach(h=>{const b=$(h.btn);if(!b)return;const k=hkName(hk(h.id));
+ if(b.dataset.base===undefined)b.dataset.base=(b.dataset.tt||b.title).replace(/\s*\([A-Z0-9]\)/,'');
+ const t=b.dataset.base,i=t.indexOf(':');
+ b.title=k==='—'?t:i>0?t.slice(0,i)+' ('+k+')'+t.slice(i):t+' ('+k+')';delete b.dataset.tt;
+ if(k==='—')delete b.dataset.k;else b.dataset.k=k})}
+$('hkr').onclick=()=>{S.hk={};saveS();hkSet=null;hkRender()};
+hkRender();
 document.addEventListener('pointerdown',e=>{
  if(!$('set').hidden&&!$('set').contains(e.target)&&e.target!==$('gear'))$('set').hidden=true;
  if(!$('shp').hidden&&!$('shp').contains(e.target)&&!$('tshape').contains(e.target))$('shp').hidden=true;
@@ -2277,7 +2322,7 @@ document.addEventListener('pointerdown',e=>{const m=$('mmenu');if(!m.hidden&&!m.
 // подсказка при наведении мышью: название и клавиша, без задержки
 (function(){const tip=$('tip');let cur=null;
  const show=b=>{const t=b.dataset.tt||b.title;if(!t)return;b.dataset.tt=t;b.removeAttribute('title');
-  const m=t.match(/^(.*?)\s*\(([^()]*)\)\s*(.*)$/),k=m&&/^([A-Za-zА-Я⌘⇧]{1,4}|Esc.*)$/.test(m[2])?m[2]:'';
+  const m=t.match(/^(.*?)\s*\(([^()]*)\)\s*(.*)$/),k=m&&/^([A-Za-z0-9А-Я⌘⇧]{1,4}|Esc.*)$/.test(m[2])?m[2]:'';
   tip.innerHTML='';tip.append(k?(m[1]+(m[3]?' '+m[3]:'')):t);if(k){const kb=document.createElement('kbd');kb.textContent=k;tip.append(kb)}
   tip.hidden=false;const r=b.getBoundingClientRect(),M=$('main').getBoundingClientRect();
   tip.style.top=(r.bottom-M.top+6)+'px';tip.style.left=Math.max(4,Math.min(r.left-M.left+r.width/2-tip.offsetWidth/2,M.width-tip.offsetWidth-4))+'px'};
