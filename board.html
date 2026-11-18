@@ -318,7 +318,7 @@ const defView=()=>({x:-PM,y:-PM,s:fitS()});
 const doneIds=new Set(); // линии, которые уже пришли целиком: запоздавший «черновик» не должен их дублировать
 function onLive(o){ // черновик чужой линии, пока её рисуют
  const pts=Array.isArray(o.pts)?o.pts:[],L=live[o.from];
- if(!pts.length){delete live[o.from];rd();return}
+ if(!pts.length){delete live[o.from];rd(true);return}
  if(o.id&&doneIds.has(o.id))return;
  const i0=+o.i0||0,pr=Array.isArray(o.pr)?o.pr:null;
  if(L&&o.id&&L.id===o.id&&(o.k==='pen'||o.k==='hl'||o.k==='ers')){ // та же линия: дописываем точки
@@ -327,7 +327,7 @@ function onLive(o){ // черновик чужой линии, пока её р�
   for(let j=0;j<pts.length;j++)L.pts[i0+j]=pts[j];
   if(pr){L.pr=L.pr||[];for(let j=0;j<pr.length;j++)L.pr[i0/2+j]=pr[j]}
  }else{if(i0)return;live[o.from]={id:o.id,page:o.page,k:o.k,c:o.c,w:o.w,pts:pts.slice(),pr:pr?pr.slice():undefined,s:typeof o.s==='string'?o.s:undefined,a:+o.a||0}}
- rd();
+ rd(true);
 }
 const clearLive=()=>send({t:'live',page:page,k:'pen',c:'#000000',w:1,pts:[]});
 const dpr0=window.devicePixelRatio||1;
@@ -488,7 +488,8 @@ function samples0(s){ // контур объекта точками (ласти�
 const smp=s=>s.k==='plot'?samples(s):(s._sm||(s._sm=samples(s)));
 function bbox(sk){if(!sk._bb||sk.k==='plot'){const q=smp(sk);let a=1e12,b=1e12,c=-1e12,d=-1e12;for(let i=0;i<q.length;i+=2){if(q[i]<a)a=q[i];if(q[i]>c)c=q[i];if(q[i+1]<b)b=q[i+1];if(q[i+1]>d)d=q[i+1]}sk._bb=[a,b,c,d]}return sk._bb}
 const inval=s=>{s._my=undefined;s._tb=undefined;s._bb=undefined;s._sm=undefined};
-function rd(){if(rq)return;rq=requestAnimationFrame(()=>{rq=0;redraw()})} // не чаще одного раза за кадр
+let rqFull=false;
+function rd(lo){if(lo!==true)rqFull=true;if(rq)return;rq=requestAnimationFrame(()=>{rq=0;const f=rqFull;rqFull=false;redraw(!f)})} // не чаще одного раза за кадр; rd(true) — только черновик чужой линии
 const objBox=s=>s.k==='text'?textBox(s):axesBox(s);
 function getImg(id,src){
  if(!imgEl[id]||imgEl[id].s!==src){const e=new Image();e.onload=redraw;e.src=src;imgEl[id]={e:e,s:src}}
@@ -581,7 +582,7 @@ function inkLayer(w,h,tf,draw){
  if(hlUsed){hlDirty=true;ictx.save();ictx.setTransform(1,0,0,1,0,0);ictx.globalCompositeOperation='destination-over';ictx.globalAlpha=.42;ictx.drawImage(hlc,0,0);ictx.restore()}
  return ink;
 }
-function redraw(){
+function redraw(lo){ // lo===true — изменились только черновики линий, готовые записи те же
  const n=sheets();clampView(n);totH=n*PS-PG;
  const s=view.s;
  ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=dark?'#12101a':'#e6e2ef';ctx.fillRect(0,0,cv.width,cv.height);
@@ -598,17 +599,18 @@ function redraw(){
  const L=inkLayer(cv.width,cv.height,[dpr*s,0,0,dpr*s,-view.x*s*dpr,-view.y*s*dpr],()=>{ // чернила на отдельном слое: ластик стирает только их
   // пока рисуем линию, уже готовые записи не перерисовываем каждый кадр, а берём их готовой картинкой (iPad не «заедает» на заполненной доске)
   const ckey=page+'|'+view.x+'|'+view.y+'|'+s+'|'+cv.width+'|'+cv.height+'|'+dark,drawing=!!(cur&&cur.pts&&cur.id);
-  if(drawing&&inkC&&inkC.key===ckey&&inkC.cid===cur.id){
+  // то же, когда рисует другой участник: его черновик ложится поверх готовой картинки, а сотни старых линий не перерисовываются 30 раз в секунду
+  if(inkC&&inkC.key===ckey&&(lo===true||(drawing&&inkC.cid===cur.id))){
    ictx.save();ictx.setTransform(1,0,0,1,0,0);ictx.drawImage(inkC.ink,0,0);ictx.restore();
    if(inkC.hl){hctx.save();hctx.setTransform(1,0,0,1,0,0);hctx.drawImage(inkC.hlc,0,0);hctx.restore();hlUsed=true}
   }else{
    for(const id in ps){const sk=ps[id],B=bbox(sk);if(B[2]<vx0||B[0]>vx1||B[3]<vy0||B[1]>vy1)continue;drawStroke(sk)} // за экраном не рисуем
-   if(drawing){ // запоминаем готовые записи на время этой линии
+   { // запоминаем готовые записи картинкой
     const mk=w=>{const c=document.createElement('canvas');c.width=cv.width;c.height=cv.height;return c};
     inkC=inkC&&inkC.ink.width===cv.width&&inkC.ink.height===cv.height?inkC:{ink:mk(),hlc:mk()};
     const a=inkC.ink.getContext('2d'),b=inkC.hlc.getContext('2d');a.clearRect(0,0,cv.width,cv.height);a.drawImage(ink,0,0);
-    b.clearRect(0,0,cv.width,cv.height);if(hlUsed)b.drawImage(hlc,0,0);Object.assign(inkC,{key:ckey,cid:cur.id,hl:hlUsed});
-   }else if(inkC)inkC.key=null;
+    b.clearRect(0,0,cv.width,cv.height);if(hlUsed)b.drawImage(hlc,0,0);Object.assign(inkC,{key:ckey,cid:drawing?cur.id:null,hl:hlUsed});
+   }
   }
   for(const k in live)if(live[k].page===page)drawStroke(live[k]);
   if(cur&&cur.pts)drawStroke(cur);
