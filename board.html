@@ -257,8 +257,36 @@ let rectC=null,rq=0,pendErase=[],pendPage=null,eraseT=0,peersTxt='',msel=null; /
 let curPid=null,curPen=false,curT0=0,curX=0,curY=0,curTr=0,viewOnly=false,dark=false,penSeen=(()=>{try{return localStorage.getItem('penSeen')==='1'}catch(e){return false}})(),myName=null,ptr=null,curTool='pen',lastCur=0,lastCurP=[-9,-9];
 const views={},imgEl={},ptrs=new Map(),cursors={};
 const $=i=>document.getElementById(i),tool=()=>curTool;
-const send=op=>{op.from=me;const h={};if(op.t==='delPage'||op.t==='clear'){try{h['X-Token']=localStorage.getItem('tok')||''}catch(e){}} // удалять и очищать доски сервер разрешает только репетитору
- return fetch('/api/'+room+'/op',{method:'POST',headers:h,body:JSON.stringify(op)}).then(r=>{if(r.status===403)$('st').textContent='Удалять и очищать доски может только преподаватель';return r}).catch(()=>{$('st').textContent='Нет связи с сервером'})};
+const postOp=(op,b)=>{const h={};if(op.t==='delPage'||op.t==='clear'){try{h['X-Token']=localStorage.getItem('tok')||''}catch(e){}} // удалять и очищать доски сервер разрешает только репетитору
+ return fetch('/api/'+room+'/op',{method:'POST',headers:h,body:b})};
+// Изменения доски (линии, стирание, картинки…) уходят на сервер по очереди. Если связь пропала, они ждут в очереди
+// и досылаются, когда связь вернётся, — линия не исчезает. Пролетающие сообщения (живая линия, курсор, лазер) не копим.
+const EPH=['live','cursor','laser','view','rtc'],outQ=[];let outBusy=false,outT=0,outBad=false;
+const send=op=>{op.from=me;
+ if(EPH.includes(op.t))return postOp(op,JSON.stringify(op)).catch(()=>{if(!outQ.length)$('st').textContent='Нет связи с сервером'});
+ if((op.t==='strokeset'||op.t==='imgset')&&outQ.length>1){const q=outQ[outQ.length-1]; // перенос того же объекта: в очереди держим только последнее положение
+  if(q.o.t===op.t&&q.o.id===op.id&&q.o.page===op.page){q.o=op;q.b=JSON.stringify(op);return Promise.resolve()}}
+ outQ.push({o:op,b:JSON.stringify(op)});flushQ();return Promise.resolve()};
+function flushQ(){
+ if(outBusy)return;if(!outQ.length){if(outBad){outBad=false;$('st').textContent=peersTxt||'Связь восстановлена'}return}
+ outBusy=true;const q=outQ[0];
+ postOp(q.o,q.b).then(r=>{
+  if(r.status>=500)throw 0; // сервер перезапускается — повторим
+  if(r.status===403)$('st').textContent='Удалять и очищать доски может только преподаватель';
+  if(outQ[0]===q)outQ.shift();outBusy=false;flushQ()})
+ .catch(()=>{outBusy=false;outBad=true;$('st').textContent='Нет связи — изменений ждут отправки: '+outQ.length;clearTimeout(outT);outT=setTimeout(flushQ,2000)})}
+addEventListener('online',()=>flushQ());
+addEventListener('beforeunload',e=>{if(outQ.length){e.preventDefault();e.returnValue=''}}); // не закрывать вкладку, пока не всё отправлено
+function reapplyQ(){ // доска заново загрузилась с сервера — наши ещё не отправленные изменения кладём поверх, чтобы они не пропали с экрана
+ outQ.forEach(q=>{const o=JSON.parse(q.b),P=o.page,ps=()=>(strokes[P]=strokes[P]||{}),is=()=>(images[P]=images[P]||{});
+  if(o.t==='stroke'&&o.stroke)ps()[o.stroke.id]=o.stroke;
+  else if(o.t==='strokeset'&&ps()[o.id]){const sk=ps()[o.id];sk.pts=o.pts;if(o.a!==undefined){if(+o.a)sk.a=+o.a;else delete sk.a}inval(sk)}
+  else if(o.t==='image'&&o.img){const g=Object.assign({},o.img);delete g.id;is()[o.img.id]=g}
+  else if(o.t==='imgset'&&is()[o.id])Object.assign(is()[o.id],{x:o.x,y:o.y,w:o.w,h:o.h});
+  else if(o.t==='erase')(o.ids||[o.id]).forEach(id=>{delete ps()[id];delete is()[id]});
+  else if(o.t==='clear'){strokes[P]={};images[P]={}}
+  else if(o.t==='addPage'&&!pages.some(p=>p.id===o.id))pages.push({id:o.id,title:o.title});
+  else if(o.t==='title')pages.forEach(p=>{if(p.id===o.id)p.title=o.title})})}
 const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const r2=v=>Math.round(v*100)/100;
 
@@ -678,6 +706,7 @@ function onOp(o){
  if(o.from===me&&(o.t==='strokeset'||o.t==='imgset'||o.t==='stroke'))return; // своё эхо со старым положением заставляло объект дёргаться
  if(o.t==='rtc'){onRtc(o);return}
  if(o.t==='init'){callInit(o.call);myName=o.name||null;$('who').textContent=o.group?'👥 Группа: '+o.group:o.name?'Кабинет: '+o.name:'Доска';document.title=o.group||o.name||'Доска';pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};for(const pg in strokes)for(const id in strokes[pg])strokes[pg][id].id=id; // у загруженных объектов нет поля id — проставляем
+ reapplyQ();flushQ();
  const hp=(location.hash.match(/^#p=([\w-]+)$/)||[])[1];if(hp&&!initDone&&pages.some(p=>p.id===hp))page=hp;initDone=true; // ссылка на конкретную доску (из кабинета ученика)
  if(!page||!pages.some(p=>p.id===page))page=pages[0].id;openPage(page);return}
  if(o.t==='peers'){$('st').textContent=peersTxt='Онлайн: '+o.n+(o.who&&o.who.length?' · '+o.who.join(', '):'');if(lead)sendView(true);return}
@@ -706,6 +735,7 @@ function connectES(){
  es=new EventSource('/api/'+room+'/events?c='+me+(ME?'&u='+ME:'')+(noGz?'&nogz=1':''));
  es.onmessage=e=>onOp(JSON.parse(e.data));
  es.onerror=()=>{$('st').textContent='Переподключение…'};
+ es.onopen=()=>{clearTimeout(outT);flushQ()}; // связь вернулась — сразу досылаем то, что не ушло
  if(!noGz)setTimeout(()=>{if(initDone||noGz)return;noGz=true;try{localStorage.setItem('sseNoGz','1')}catch(e){}
   try{navigator.sendBeacon&&navigator.sendBeacon('/api/log',JSON.stringify({m:'sse-nogz-fallback',u:navigator.userAgent,p:location.pathname}))}catch(e){}
   connectES()},7000);
