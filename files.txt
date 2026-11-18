@@ -15,3 +15,4 @@ three.module.js
 privacy.html
 consent.html
 pd.js
+help.pdf

@@ -968,6 +968,7 @@ http.createServer((req, res) => {
   const md = u.pathname.match(/^\/m\/([A-Za-z0-9]{20})$/);
   if (md && eq(md[1], modelCode())) return PAGE('airport.html')(req, res); // 3D-модель огней — только по секретной ссылке
   if (u.pathname === '/t') return PAGE('admin.html')(req, res);
+  if (u.pathname === '/help') return sendFile(req, res, path.join(__dirname, 'help.pdf'), 'application/pdf'); // инструкция для репетитора (кнопка «Помощь» в кабинете)
   if (u.pathname === '/privacy') return PAGE('privacy.html')(req, res); // политика конфиденциальности (152-ФЗ)
   if (u.pathname === '/consent') return PAGE('consent.html')(req, res); // текст согласия на обработку персональных данных
   if (u.pathname === '/' || u.pathname === '/index.html') return PAGE('index.html')(req, res); // главная страница
