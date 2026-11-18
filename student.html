@@ -216,7 +216,7 @@ function show(id){
   if(t.img){const im=el('img',{src:img(t.img),alt:'Условие задачи',loading:'lazy'});im.onclick=()=>zoom(im.src);c.append(im)}
   const m=mark(h,t);
   if(t.short){
-   const inp=el('input',{value:h.answers[t.id]||'',placeholder:'Ваш ответ',disabled:!edit,inputMode:'decimal',autocomplete:'off'});
+   const inp=el('input',{value:h.answers[t.id]||'',placeholder:'Ваш ответ',disabled:!edit,autocomplete:'off',autocapitalize:'off',spellcheck:false});
    inp.dataset.t=t.id;inp.oninput=()=>{clearTimeout(saveT);saveT=setTimeout(flush,900)};
    const a=el('div',{className:'ans'},el('span',{textContent:'Ответ:'}),inp);
    if(m!==undefined)a.append(el('span',{className:'res '+(m?'ok':'bad'),textContent:m?'✓ верно':'✗ неверно'}));

@@ -2164,7 +2164,7 @@ if(!isTeacher){const mine=ME||room;if(window.pdGate)pdGate(mine);['hwb','hwt'].f
    const list=document.createElement('div');list.className='ls';
    H.tasks.forEach((t,i)=>{if(!t.short)return;const row=document.createElement('label');row.className='rw';
     const s=document.createElement('span');s.textContent='Задача '+(i+1)+(t.num?' (№'+t.num+')':'');
-    const inp=document.createElement('input');inp.dataset.t=t.id;inp.value=(H.answers||{})[t.id]||'';inp.placeholder='ответ';inp.inputMode='decimal';inp.autocomplete='off';
+    const inp=document.createElement('input');inp.dataset.t=t.id;inp.value=(H.answers||{})[t.id]||'';inp.placeholder='ответ';inp.autocomplete='off';inp.autocapitalize='off';inp.spellcheck=false;
     inp.oninput=()=>{box.querySelector('.st').textContent='';clearTimeout(saveT);saveT=setTimeout(save,900)};inp.onblur=()=>{if(saveT)save()};
     inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();inp.blur()}};
     row.append(s,inp);list.appendChild(row)});
