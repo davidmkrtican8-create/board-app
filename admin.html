@@ -135,7 +135,7 @@ body.nosidebar #side{display:none}
   <div class="top"><b>Ученики</b><button id="addS">+ Ученик</button><button id="addG" title="Группа: общие доски для нескольких учеников, у каждого свой кабинет">+ Группа</button></div>
   <div id="list"></div>
   <div id="whoami" style="font-size:12px;color:var(--mut)"></div>
-  <div class="foot"><button id="tch" hidden title="Пригласить репетиторов и управлять их аккаунтами">Репетиторы</button><button id="mdl" hidden title="3D-модель огней аэродрома: ссылка видна только вам">3D-огни</button><button id="hlp" title="Короткая инструкция с картинками: как всё устроено">❓ Помощь</button><button id="chan" title="Telegram-канал УчиДоски: новости и подсказки">📣 Канал</button><button id="tgb" title="Telegram-бот: уведомления и конспекты">Telegram</button><button id="cpw" title="Сменить свой пароль">Пароль</button><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden><button id="lo" title="Выйти из кабинета на этом устройстве">Выйти</button><button id="rb" title="Вернуть учеников и доски из копии, которую кабинет сам сохраняет в вашем браузере">Восстановить из автокопии</button><div id="bkst" style="font-size:12px;color:var(--mut);width:100%"></div></div>
+  <div class="foot"><button id="stt" hidden title="Статистика сайта: репетиторы, уроки, домашки">📈 Статистика</button><button id="tch" hidden title="Пригласить репетиторов и управлять их аккаунтами">Репетиторы</button><button id="mdl" hidden title="3D-модель огней аэродрома: ссылка видна только вам">3D-огни</button><button id="hlp" title="Короткая инструкция с картинками: как всё устроено">❓ Помощь</button><button id="chan" title="Telegram-канал УчиДоски: новости и подсказки">📣 Канал</button><button id="tgb" title="Telegram-бот: уведомления и конспекты">Telegram</button><button id="cpw" title="Сменить свой пароль">Пароль</button><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden><button id="lo" title="Выйти из кабинета на этом устройстве">Выйти</button><button id="rb" title="Вернуть учеников и доски из копии, которую кабинет сам сохраняет в вашем браузере">Восстановить из автокопии</button><div id="bkst" style="font-size:12px;color:var(--mut);width:100%"></div></div>
  </div>
  <div id="main">
   <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk" class="keep">Задачи</button><button id="hwk" class="keep" title="Домашние задания ученика">📚 Домашка<span id="hwkn"></span></button><button id="tgs" title="Отправить конспект урока ученику и родителям в Telegram">📨 Конспект</button><button id="lnk">Ссылка ученика</button><button id="mem" hidden title="Кто занимается в этой группе">👥 Участники</button><button id="ren">Переименовать</button><button id="del">Удалить</button><button id="fs" class="keep" title="Фокус: убрать панели">⛶</button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button><button id="th" class="keep" title="Светлая / тёмная тема">◐</button></div>
@@ -188,7 +188,7 @@ async function load(){
  if(r.status===401){const had=!!tok;tok='';localStorage.removeItem('tok');return showLogin(had?'Вход устарел или пароль сменили. Войдите снова.':'',had)}
  me=await r.json();localStorage.setItem('tlogin',me.login);
  students=await (await api('/api/admin/students')).json();
- $('login').hidden=true;$('app').hidden=false;$('tch').hidden=me.role!=='owner';$('mdl').hidden=me.role!=='owner';$('whoami').textContent='Вы вошли как '+me.name+' ('+me.login+')';render();
+ $('login').hidden=true;$('app').hidden=false;$('tch').hidden=me.role!=='owner';$('stt').hidden=me.role!=='owner';$('mdl').hidden=me.role!=='owner';$('whoami').textContent='Вы вошли как '+me.name+' ('+me.login+')';render();
  const last=localStorage.getItem('last:'+me.login);
  if(!cur&&students.length)pick(students.some(s=>s.id===last)?last:students[0].id);
  chanAsk();
@@ -302,6 +302,37 @@ function chanAsk(){ // один раз приглашаем в Telegram-кана
     el('button',{textContent:'Не сейчас',onclick:close})),
    el('p',{className:'mut',style:'margin:0',textContent:'Ссылка на канал всегда есть внизу слева — кнопка «📣 Канал».'}));
   o.append(b);o.addEventListener('pointerdown',e=>{if(e.target===o)close()});document.body.append(o)},1500)}
+// ---------- статистика сайта (только владельцу) ----------
+$('stt').onclick=async()=>{
+ const d=dlg('📈 Статистика сайта');d.o.firstChild.style.maxWidth='880px';const ld=el('p',{className:'mut',textContent:'Загружаю…'});d.b.append(ld);
+ const r=await api('/api/admin/stats');if(!r.ok){ld.textContent='Не получилось загрузить';return}const S=await r.json();ld.remove();
+ const L=S.days.slice(-7),sum=k=>L.reduce((a,x)=>a+x[k],0),T=S.teachers,act7=T.filter(t=>t.last&&t.last>=S.days[S.days.length-7].day).length;
+ const fmt=k=>{const[y,m,dd]=k.split('-');return dd+'.'+m};
+ const card=(n,t,sub)=>el('div',{style:'flex:1;min-width:120px;background:var(--bg,#f4f1fa);border:1px solid var(--bd);border-radius:12px;padding:10px 12px'},
+  el('div',{style:'font-size:24px;font-weight:800',textContent:n}),el('div',{style:'font-size:13px',textContent:t}),sub?el('div',{className:'mut',style:'font-size:12px',textContent:sub}):'');
+ d.b.append(el('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},
+  card(act7+' / '+T.length,'репетиторов заходили за 7 дней',S.newTeachers7?'новых за неделю: '+S.newTeachers7:''),
+  card(S.students,'учеников',S.groups?'и групп: '+S.groups:''),
+  card(sum('lessons'),'уроков за 7 дней','звонков: '+sum('calls')),
+  card(sum('hw'),'домашек задано за 7 дней','сдано '+sum('sent')+' · проверено '+sum('checked')),
+  card(T.filter(t=>t.tg).length+' / '+T.reduce((a,t)=>a+t.tgStudents,0),'Telegram: репетиторов / учеников')));
+ // график по дням
+ const mx=Math.max(1,...S.days.map(x=>Math.max(x.lessons,x.hw))),ch=el('div',{style:'display:flex;align-items:flex-end;gap:3px;height:130px;padding-top:6px;border-bottom:1px solid var(--bd)'});
+ S.days.forEach(x=>{const col=el('div',{title:fmt(x.day)+': уроков '+(x.has?x.lessons:'— (ещё не считали)')+', репетиторов заходило '+(x.has?x.teachers:'—')+', домашек задано '+x.hw+', сдано '+x.sent+', проверено '+x.checked,style:'flex:1;display:flex;gap:1px;align-items:flex-end;height:100%;cursor:default'});
+  col.append(el('div',{style:'flex:1;border-radius:3px 3px 0 0;background:#6a3fc4;height:'+(x.has?Math.max(2,x.lessons/mx*100):0)+'%'}),el('div',{style:'flex:1;border-radius:3px 3px 0 0;background:#2e9e6b;height:'+Math.max(x.hw?2:0,x.hw/mx*100)+'%'}));ch.append(col)});
+ d.b.append(el('div',{style:'font-weight:700;margin-top:4px',textContent:'По дням (последние 30 дней) — наведите на столбик'}),
+  el('div',{className:'mut',style:'font-size:12px'},el('span',{style:'color:#6a3fc4',textContent:'■ уроки'}),'   ',el('span',{style:'color:#2e9e6b',textContent:'■ домашки заданы'}),'   уроки и входы считаются с '+fmt(S.since)),
+  ch,el('div',{className:'mut',style:'display:flex;justify-content:space-between;font-size:11px'},el('span',{textContent:fmt(S.days[0].day)}),el('span',{textContent:fmt(S.days[S.days.length-1].day)})));
+ // таблица репетиторов
+ const today=S.days[S.days.length-1].day,ago=k=>{if(!k)return 'нет входов с '+fmt(S.since);const n=Math.round((Date.parse(today)-Date.parse(k))/864e5);return n===0?'сегодня':n===1?'вчера':n+' дн. назад'};
+ const tb=el('table',{style:'width:100%;border-collapse:collapse;font-size:13px'}),th=el('tr');
+ ['Репетитор','Учеников','Заходил(а)','Уроков 7 дн.','Домашек 7 дн.','Ждут проверки','Telegram'].forEach(h=>th.append(el('th',{textContent:h,style:'text-align:left;padding:5px 6px;border-bottom:1px solid var(--bd);font-weight:600;color:var(--mut)'})));tb.append(th);
+ T.slice().sort((a,b)=>(b.last||'').localeCompare(a.last||'')||b.students-a.students).forEach(t=>{const tr=el('tr');
+  [t.name+(t.login?' ('+t.login+')':''),t.students+(t.groups?' + '+t.groups+' гр.':''),ago(t.last),t.lessons7,t.hw7,t.pending||'',(t.tg?'✅':'—')+(t.tgStudents?' · уч. '+t.tgStudents:'')].forEach((v,i)=>tr.append(el('td',{textContent:v,style:'padding:5px 6px;border-bottom:1px solid var(--bd);'+(i===0?'font-weight:600':'')})));tb.append(tr)});
+ d.b.append(el('div',{style:'font-weight:700;margin-top:6px',textContent:'Репетиторы'}),el('div',{style:'overflow:auto'},tb),
+  el('p',{className:'mut',style:'font-size:12px;margin:0',textContent:'Урок — день, когда на доске ученика заметно писали или был звонок. «Заходил(а)» — открывал(а) кабинет. Эти данные собираются с '+fmt(S.since)+', домашки — за всё время.'}),
+  el('div',{className:'row',style:'border:0'},el('button',{textContent:'Закрыть',onclick:d.close})));
+};
 $('hlp').onclick=()=>window.open('/help','_blank'); // инструкция с картинками (PDF) в новой вкладке
 $('lo').onclick=()=>{if(confirm('Выйти из кабинета на этом устройстве? Автокопия досок останется.')){localStorage.removeItem('tok');location.reload()}};
 $('addS').onclick=async()=>{const n=prompt('Имя ученика (можно с классом, например «Миша 8кл»):');if(!n||!n.trim())return;

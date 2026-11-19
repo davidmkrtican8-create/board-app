@@ -380,6 +380,25 @@ function hwBoard(sid, h) { // «Решать на доске»: отдельна
 // ---------- Telegram-бот: домашка, напоминания и конспекты ученику и родителям ----------
 // один бот на весь сайт; токен вводит владелец в кабинете («Telegram»), хранится в _tg.json
 const https = require('https');
+// ---------- статистика для владельца сайта: кто заходил, где был урок, звонки (по дням, московское время) ----------
+const STF = path.join(DIR, '_stats.json');
+let STATS = {}; try { STATS = JSON.parse(fs.readFileSync(STF, 'utf8')) || {}; } catch (e) {}
+let stT = 0;
+function stSave() {
+  if (stT) return;
+  stT = setTimeout(() => {
+    stT = 0; const old = dayKey(Date.now() - 120 * 864e5); for (const k in STATS) if (k < old) delete STATS[k]; // храним 4 месяца
+    try { fs.writeFileSync(STF, JSON.stringify(STATS)); } catch (e) {}
+  }, 60e3);
+}
+const dayKey = (t = Date.now()) => new Date(t + 3 * 3600e3).toISOString().slice(0, 10);
+const stDay = () => { const k = dayKey(); return STATS[k] || (STATS[k] = { seen: {}, brd: {}, call: {} }); };
+function statSeen(tid) { const d = stDay(); if (!d.seen[tid]) { d.seen[tid] = 1; stSave(); } }
+function statOp(rid, op) {
+  if (op.t === 'rtc') { if (op.kind === 'hello') { const d = stDay(); if (!d.call[rid]) { d.call[rid] = 1; stSave(); } } return; }
+  if (['live', 'cursor', 'laser', 'view'].includes(op.t)) return;
+  const d = stDay(); d.brd[rid] = (d.brd[rid] || 0) + 1; stSave();
+}
 const TGF = path.join(DIR, '_tg.json');
 let TG = { token: '', bot: '', site: '', offset: 0, subs: {}, tsubs: {} };
 try { TG = Object.assign(TG, JSON.parse(fs.readFileSync(TGF, 'utf8'))); } catch (e) {}
@@ -768,12 +787,46 @@ function dropRoom(id) { // удалить доску ученика целико
     if (SN[id]) { delete SN[id]; saveSN(); } fs.rm(path.join(SND, id), { recursive: true, force: true }, () => {}); fs.rm(path.join(HWD, id), { recursive: true, force: true }, () => {});
   }
 }
+function siteStats() {
+  const N = 30, now = Date.now(), days = [], at = {};
+  for (let i = N - 1; i >= 0; i--) { const k = dayKey(now - i * 864e5); at[k] = days.length; days.push({ day: k, has: !!STATS[k], teachers: 0, lessons: 0, calls: 0, hw: 0, sent: 0, checked: 0 }); }
+  const sts = index.students.filter(s => s.type !== 'group'), ownerOf = {};
+  index.students.forEach(s => { ownerOf[s.id] = s.owner; });
+  const list = [owner(), ...teachersOnly()].map(t => ({ id: t.id, name: t.id === 'owner' ? (t.name || 'Владелец') + ' (вы)' : t.name, login: t.login, created: t.created || 0,
+    students: sts.filter(s => s.owner === t.id).length, groups: index.students.filter(s => s.type === 'group' && s.owner === t.id).length,
+    last: '', lessons7: 0, hw7: 0, pending: 0, tg: !!((TG.tsubs || {})[t.id] || []).length, tgStudents: sts.filter(s => s.owner === t.id && (TG.subs[s.id] || []).length).length }));
+  const byId = Object.fromEntries(list.map(t => [t.id, t])), wk = dayKey(now - 6 * 864e5);
+  for (const k of Object.keys(STATS).sort()) {
+    const d = STATS[k], i = at[k], les = new Set([...Object.keys(d.brd).filter(r => d.brd[r] >= 20), ...Object.keys(d.call)]); // урок: на доске заметно писали или был звонок
+    for (const tid in d.seen) if (byId[tid]) byId[tid].last = k;
+    if (k >= wk) les.forEach(r => { const t = byId[ownerOf[r]]; if (t) t.lessons7++; });
+    if (i !== undefined) { days[i].teachers = Object.keys(d.seen).length; days[i].lessons = les.size; days[i].calls = Object.keys(d.call).length; }
+  }
+  for (const s of sts) {
+    const t = byId[s.owner];
+    for (const h of hwOf(s.id).list || []) {
+      const ix = t => t ? at[dayKey(t)] : undefined, c = ix(h.created), se = ix(h.sentAt), ch = ix(h.checkedAt);
+      if (c !== undefined) days[c].hw++;
+      if (se !== undefined) days[se].sent++;
+      if (ch !== undefined) days[ch].checked++;
+      if (t && h.created && dayKey(h.created) >= wk) t.hw7++;
+      if (t && h.st === 'sent') t.pending++;
+    }
+  }
+  const since = Object.keys(STATS).sort()[0] || dayKey();
+  return { since, days, teachers: list, students: sts.length, groups: index.students.length - sts.length, newTeachers7: teachersOnly().filter(t => t.created && now - t.created < 7 * 864e5).length };
+}
 function admin(req, res, u) {
   const me = auth(req);
   if (!me) { res.writeHead(ADMIN || teachersOnly().length ? 401 : 503); return res.end(); }
   const mine = () => index.students.filter(s => s.owner === me.id);
   const isOwner = me.id === 'owner';
+  statSeen(me.id);
   if (req.method === 'GET' && u.pathname === '/api/admin/me') return json(res, who(me));
+  if (req.method === 'GET' && u.pathname === '/api/admin/stats') { // статистика сайта — только владельцу
+    if (!isOwner) { res.writeHead(403); return res.end(); }
+    return json(res, siteStats());
+  }
   if (req.method === 'GET' && u.pathname === '/api/admin/students') return json(res, mine());
   if (u.pathname === '/api/admin/hw' || u.pathname === '/api/admin/hw-pending' || u.pathname === '/api/admin/hw-rep' || u.pathname === '/api/admin/hw-draft') return hwTeacher(req, res, u, me);
   if (u.pathname === '/api/admin/tg' || u.pathname === '/api/admin/tg-student') return tgAdmin(req, res, u, me);
@@ -948,7 +1001,7 @@ http.createServer((req, res) => {
       }
       if (!apply(r.s, op)) { res.writeHead(400); return res.end(); }
       if (op.t === 'rtc') { if (op.kind === 'hello') r.call.add(op.from); if (op.kind === 'bye') r.call.delete(op.from); }
-      bcast(r, op);
+      bcast(r, op); statOp(m[1], op);
       if (!['live', 'rtc', 'cursor', 'laser', 'view'].includes(op.t)) save(r);
       res.writeHead(204); res.end();
     });
