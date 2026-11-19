@@ -705,7 +705,7 @@ async function delPage(id){ // удалить одну доску ученика
  if(pages.length<=1){await modal('Это единственная доска ученика, её нельзя удалить. Можно очистить: «Файл… → Очистить доску».',{ok:'Понятно'});return}
  id=id||page;const p=pages.find(x=>x.id===id),nm=(p&&p.title)||'Без названия';
  if(!await modal('Удалить доску «'+nm+'» вместе со всем, что на ней? Вернуть нельзя. Остальные доски ученика останутся.',{ok:'Удалить'}))return;
- if(!pages.some(x=>x.id===id)||pages.length<=1)return;send({t:'delPage',id:id});removePage(id);
+ if(!pages.some(x=>x.id===id)||pages.length<=1)return;imgGone(Object.keys(images[id]||{}));send({t:'delPage',id:id});removePage(id);
 }
 function removePage(id){
  pages=pages.filter(x=>x.id!==id);delete strokes[id];delete images[id];delete views[id];
@@ -715,6 +715,7 @@ function openPage(id){page=id;live={};$('newt').hidden=true;jump=null;editImg=nu
  const p=pages.filter(x=>x.id===id)[0];$('title').value=p?p.title:''}
 
 // ---------- сообщения от сервера ----------
+const imgGone=ids=>{if(isTeacher&&ids&&ids.length)try{parent.postMessage({t:'imgGone',ids:ids.map(String)},location.origin)}catch(e){}}; // кабинет убирает из черновика домашки аналоги стёртых задач
 function onOp(o){
  if(o.page&&SNAP_OPS.includes(o.t))snapDirty[o.page]=Date.now(); // доска изменилась — позже сохраним её PDF для вечернего конспекта
  if(inkC&&!['live','cursor','laser','view','rtc'].includes(o.t))inkC.key=null; // чужая правка — картинку готовых записей пересобираем
@@ -734,6 +735,9 @@ function onOp(o){
  if(o.t==='strokeset'&&strokes[o.page]&&strokes[o.page][o.id]){const sk=strokes[o.page][o.id];sk.pts=o.pts;if(o.a!==undefined){if(+o.a)sk.a=+o.a;else delete sk.a}inval(sk)}
  if(o.t==='image'){(images[o.page]=images[o.page]||{})[o.img.id]=o.img;if(o.from!==me&&o.page===page)notifyNew(o.img)}
  if(o.t==='imgset'&&images[o.page]&&images[o.page][o.id]){const g=images[o.page][o.id];g.x=o.x;g.y=o.y;g.w=o.w;g.h=o.h}
+ if(o.t==='erase')imgGone(o.ids||[o.id]); // и свои (эхо с сервера), и чужие
+ if(o.t==='clear')imgGone(Object.keys(images[o.page]||{}));
+ if(o.t==='delPage')imgGone(Object.keys(images[o.id]||{}));
  if(o.t==='erase'){(o.ids||[o.id]).forEach(id=>{if(strokes[o.page])delete strokes[o.page][id];if(images[o.page])delete images[o.page][id]})}
  if(o.t==='clear'){strokes[o.page]={};images[o.page]={}}
  if(o.t==='delPage'){if(o.from!==me&&pages.some(p=>p.id===o.id)&&pages.length>1)removePage(o.id);return}
@@ -1276,7 +1280,7 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('keyup',e=>{if(e.code==='Space'){space=false;setCursor()}});
 
 // ---------- картинки и задачи из сборников ----------
-function placeImage(im,task,gap){
+function placeImage(im,task,gap,fixId){
  let src=null,w=0,h=0;
  // сжимаем: до 1400 px по длинной стороне, из PNG и JPEG берём тот, что легче (PNG — если он почти не тяжелее: текст чётче).
  // Цель — не больше ~260 КБ на картинку, чтобы и 80 картинок на доске открывались быстро.
@@ -1288,7 +1292,7 @@ function placeImage(im,task,gap){
  if(!src){$('st').textContent='Картинка слишком большая';return}
  let dw=task?PW*.88:Math.min(PW*.6,w),dh=dw*h/w;
  const mh=PH*(task?.9:.5);if(dh>mh){dh=mh;dw=dh*w/h}
- const iid=newId();
+ const iid=fixId&&/^[\w-]{6,40}$/.test(fixId)&&!(images[page]||{})[fixId]?fixId:newId(); // id задачи задаёт кабинет — по нему её аналог убирается из домашки, если задачу сотрут
  let x=Math.max(0,Math.min(PW-dw,view.x+cw/view.s/2-dw/2)),y=Math.max(0,view.y+ch/view.s/2-dh/2);
  if(task){ // задачи идут сверху вниз по листам: под последней картинкой и всем написанным, с местом под решение
   const ims=images[page]||{};let ib=-1e12;
@@ -1338,7 +1342,7 @@ window.addEventListener('message',e=>{
   return}
  if(d.t!=='task'||typeof d.src!=='string'||!/^data:image\/(png|jpeg);base64,/.test(d.src))return;
  if(imgFull())return;
- const im=new Image();im.onload=()=>placeImage(im,true,Math.max(0,Math.min(1500,+d.gap||350)));im.src=d.src;
+ const im=new Image();im.onload=()=>placeImage(im,true,Math.max(0,Math.min(1500,+d.gap||350)),typeof d.id==='string'?d.id:null);im.src=d.src;
 });
 function clipImage(dt){ // картинка из буфера обмена (скриншот, из браузера, файл из Finder)
  if(!dt)return null;const it=dt.items||[];
@@ -2154,7 +2158,7 @@ $('fm').onchange=async()=>{
  else if(v==='pdf1')exportPDF(false);
  else if(v==='pdfa')exportPDF(true);
  else if(v==='delp')delPage();
- else if(v==='clr'&&!viewOnly&&await modal('Очистить эту доску для всех? Вернуть нельзя.',{ok:'Очистить'})){strokes[page]={};images[page]={};redraw();send({t:'clear',page:page})}
+ else if(v==='clr'&&!viewOnly&&await modal('Очистить эту доску для всех? Вернуть нельзя.',{ok:'Очистить'})){imgGone(Object.keys(images[page]||{}));strokes[page]={};images[page]={};redraw();send({t:'clear',page:page})}
 };
 // личный кабинет во время звонка открываем поверх доски — страница доски остаётся, звонок не рвётся
 function openCab(url){

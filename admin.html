@@ -500,7 +500,7 @@ async function render(markY){
   const b=document.createElement('button');b.className='plus';b.textContent='+';b.title='Отправить эту задачу на доску';
   b.style.cssText='top:'+fy0*100+'%;left:1%';
   b.onmouseenter=()=>c.classList.add('hot');b.onmouseleave=()=>c.classList.remove('hot');
-  b.onclick=async()=>{await send(fx0-.005,fy0,fx1+.005,fy1,b);autoAnalog(fy0,fy1)};
+  b.onclick=async()=>{const bid=await send(fx0-.005,fy0,fx1+.005,fy1,b);autoAnalog(fy0,fy1,bid)};
   ov.append(c,b);
   if(window.hwDraft){const z=document.createElement('button');z.className='plus hwplus';z.textContent='+ ДЗ';z.title='Добавить эту задачу в домашку';z.style.cssText='top:calc('+fy0*100+'% + 34px);left:1%';
    z.onclick=async()=>{z.textContent='…';try{const [src,info]=await Promise.all([crop(fx0-.005,fy0,fx1+.005,fy1),cardInfo(fy0,fy1).catch(()=>null)]);window.hwAdd(src,info);z.textContent='✓'}catch(e){z.textContent='+ ДЗ'}};ov.append(z)}
@@ -542,9 +542,11 @@ async function send(fx0,fy0,fx1,fy1,btn){
  if(!(f.getAttribute('src')||'').startsWith('/b/')){msg('Сначала выберите ученика слева',4000);return}
  msg('Отправляю…');
  try{
-  f.contentWindow.postMessage({t:'task',src:await crop(fx0,fy0,fx1,fy1),gap:+$('tgap').value},location.origin);
+  const bid='tk'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); // id картинки на доске: сотрут её — уберём и аналог из домашки
+  f.contentWindow.postMessage({t:'task',src:await crop(fx0,fy0,fx1,fy1),gap:+$('tgap').value,id:bid},location.origin);
   msg('✓ Задача на доске',2500);
   if(btn){const o=btn.textContent;btn.textContent='✓';setTimeout(()=>{btn.textContent=o},1500)}
+  return bid;
  }catch(e){msg('Не получилось: '+(e.message||e),4000)}
 }
 // ---------- аналог в домашку ----------
@@ -580,7 +582,7 @@ async function cardAt(p,topY){ // карточка на странице p, у �
  const c=cs.find(([a,b])=>fy>=a-.03&&fy<=b)||cs.sort((x,y)=>Math.abs(x[0]-fy)-Math.abs(y[0]-fy))[0];if(!c)return null;
  return crop(.09,c[0],.91,c[1],p)}
 const usedKey=sid=>'anaUsed:'+book+':'+sid;
-async function autoAnalog(fy0,fy1){
+async function autoAnalog(fy0,fy1,bid){
  if(!$('tanalc').checked||!pdf)return;const sid=window.hwCtx&&window.hwCtx.cur();if(!sid)return;
  try{
   const pg=await pdf.getPage(pageNo),H=pg.getViewport({scale:1}).height,top=H*(1-fy0),bot=H*(1-fy1);
@@ -592,7 +594,7 @@ async function autoAnalog(fy0,fy1){
   let pool=notSelf.filter(a=>!used.includes(id(a)));if(!pool.length)pool=notSelf;if(!pool.length){msg('Других аналогов у этой задачи нет',4000);return}
   const a=pool[Math.floor(Math.random()*pool.length)];
   const [src,info,ans]=await Promise.all([cardAt(a.p,a.top),cardInfo(fy0,fy1).catch(()=>null),ansAt(a.ans)]);if(!src)return;
-  const r=await window.hwAutoAdd(sid,src,{num:info&&info.num,ans:info&&info.ext?'':ans},A.ck+'#'+id(a));
+  const r=await window.hwAutoAdd(sid,src,{num:info&&info.num,ans:info&&info.ext?'':ans},A.ck+'#'+id(a)+(bid?'@'+bid:'')); // @id — какая задача на доске его «породила»
   if(r.dup){msg('Аналог этой задачи уже есть в домашке',3500);return}
   used.push(id(a));try{localStorage.setItem(usedKey(sid),JSON.stringify(used.slice(-400)))}catch(e){}
   msg('🪄 Аналог добавлен в черновик домашки ('+r.n+' зад.)'+(ans&&!(info&&info.ext)?'':' — без ответа, проверите сами'),5000);
@@ -848,6 +850,22 @@ async function loadDraft(sid){
   return{sid,title:j.title||'',due:j.due||'',at:j.at,tasks:j.tasks.map(t=>({src:t.img?'/hwimg/'+sid+'/'+t.img:null,imgName:t.img||null,w:t.w,h:t.h,text:t.text||'',num:t.num||0,ans:t.ans||'',auto:!!t.auto,key:t.key||''}))}}catch(e){return null}
 }
 window.hwDraftOf=loadDraft;
+// задачу из сборника стёрли с доски (или очистили/удалили доску) — её аналог уходит из черновика домашки
+let goneQ=Promise.resolve();
+window.addEventListener('message',e=>{
+ if(e.origin!==location.origin||!e.data||e.data.t!=='imgGone'||!Array.isArray(e.data.ids))return;
+ const fr=document.getElementById('fr');if(!fr||e.source!==fr.contentWindow)return; // только открытая доска (не «спрятанная» со звонком)
+ const ids=new Set(e.data.ids.map(String)),sid=C()&&C().cur();if(!sid)return;
+ const hit=t=>{const m=(t.key||'').match(/@([\w-]+)$/);return !!m&&ids.has(m[1])};
+ goneQ=goneQ.then(async()=>{
+  let d=draft&&draft.sid===sid?draft:null;const mine=!!d;
+  if(!d){await autoQ.catch(()=>{});d=await loadDraft(sid)}
+  if(!d||!d.tasks.some(hit))return;
+  const n=d.tasks.filter(hit).length;d.tasks=d.tasks.filter(t=>!hit(t));
+  if(mine){tray();dirty()}else await saveDraft(d);
+  alert(n===1?'Задачу стёрли с доски — её аналог убран из черновика домашки.':'Задачи стёрли с доски — их аналоги убраны из черновика домашки ('+n+').');
+ }).catch(()=>{});
+});
 // аналог задачи со сборника — сразу в черновик домашки ученика (полоса домашки при этом не открывается)
 let autoQ=Promise.resolve();
 window.hwAutoAdd=(sid,src,info,key)=>(autoQ=autoQ.then(()=>autoAdd(sid,src,info,key),()=>autoAdd(sid,src,info,key)));
