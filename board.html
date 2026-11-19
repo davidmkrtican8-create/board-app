@@ -83,7 +83,12 @@ body.focus #main{padding:4px;gap:4px}
 #edel{position:absolute;z-index:3;background:#d32f2f;color:#fff;border-color:#d32f2f;box-shadow:0 2px 10px rgba(0,0,0,.3)}
 #newt{left:50%;bottom:14px;transform:translateX(-50%)}
 #vbadge{left:12px;bottom:12px}
-#zfit{right:12px;bottom:12px}
+#zfit{right:26px;bottom:12px}
+/* ползунок справа: листать длинную доску вверх-вниз */
+#vsb{position:absolute;right:3px;top:8px;bottom:8px;width:16px;z-index:4;border-radius:8px;touch-action:none;cursor:pointer;transition:background .15s}
+#vsb[hidden]{display:none}#vsb:hover,#vsb.on{background:rgba(127,127,127,.16)}
+#vsbt{position:absolute;left:3px;right:3px;min-height:36px;border-radius:6px;background:rgba(106,63,196,.5);cursor:grab;transition:background .15s}
+#vsb:hover #vsbt,#vsb.on #vsbt{background:rgba(106,63,196,.85)}#vsb.on #vsbt{cursor:grabbing}
 #cabov{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;background:var(--bg)}#cabov[hidden]{display:none}
 #cabov .cbh{display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--bd)}#cabov .cbh span{color:var(--mut);font-size:14px}
 #cabov .cbh button{background:var(--ac);color:#fff;border-color:var(--ac);font-weight:700;padding:8px 14px}
@@ -240,7 +245,7 @@ body.focus #main{padding:4px;gap:4px}
    <p><b>Android:</b> меню браузера ⋮ → «Установить приложение» или «Добавить на главный экран».</p>
   </details>
  </div>
- <div id="wrap"><div id="plots"></div><div id="solidbar" hidden><span id="shint">Тяните внутри фигуры — вращать</span><button id="sletters" title="Подписать вершины буквами">A B C</button><button id="ssec" title="Сечение плоскостью через три точки на рёбрах">✂ Сечение</button><button id="sreset" title="Вернуть исходный вид">↺ Вид</button></div><button id="followb" hidden></button><div id="callbox" hidden><div id="callhd"><span id="callst">Звонок</span><button id="callbig" title="Крупное видео / обычное (или двойной щелчок по видео)">⤢</button><button id="callmin" title="Свернуть/развернуть">–</button></div><div id="tiles"></div><div class="crs se" data-c="se" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs sw" data-c="sw" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs ne" data-c="ne" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs nw" data-c="nw" title="Потяните, чтобы увеличить или уменьшить видео"></div></div><canvas id="cv"></canvas><canvas id="ovl"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edel" hidden title="Удалить выделенное (клавиша Delete)">🗑 Удалить</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button><button id="zfit" hidden>↺ Вернуть масштаб</button><div id="zhint" hidden>Страница приближена в браузере. Вернуть: Ctrl+0 (на Mac ⌘0)</div></div>
+ <div id="wrap"><div id="vsb" hidden title="Тяните, чтобы листать доску вверх и вниз"><div id="vsbt"></div></div><div id="plots"></div><div id="solidbar" hidden><span id="shint">Тяните внутри фигуры — вращать</span><button id="sletters" title="Подписать вершины буквами">A B C</button><button id="ssec" title="Сечение плоскостью через три точки на рёбрах">✂ Сечение</button><button id="sreset" title="Вернуть исходный вид">↺ Вид</button></div><button id="followb" hidden></button><div id="callbox" hidden><div id="callhd"><span id="callst">Звонок</span><button id="callbig" title="Крупное видео / обычное (или двойной щелчок по видео)">⤢</button><button id="callmin" title="Свернуть/развернуть">–</button></div><div id="tiles"></div><div class="crs se" data-c="se" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs sw" data-c="sw" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs ne" data-c="ne" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs nw" data-c="nw" title="Потяните, чтобы увеличить или уменьшить видео"></div></div><canvas id="cv"></canvas><canvas id="ovl"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edel" hidden title="Удалить выделенное (клавиша Delete)">🗑 Удалить</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button><button id="zfit" hidden>↺ Вернуть масштаб</button><div id="zhint" hidden>Страница приближена в браузере. Вернуть: Ctrl+0 (на Mac ⌘0)</div></div>
 </div>
 <script>var errN=0;window.addEventListener('error',function(e){if(/ResizeObserver/.test(e.message||''))return;var s=document.getElementById('st');if(s)s.textContent='Ошибка в скрипте: '+(e.message||'');
  if(errN++<5)try{fetch('/api/log',{method:'POST',body:JSON.stringify({m:String(e.message||'').slice(0,300),l:e.lineno,c:e.colno,s:String(e.error&&e.error.stack||'').slice(0,800),u:navigator.userAgent.slice(0,200),p:location.pathname.slice(0,40)})}).catch(function(){})}catch(_){}})</script>
@@ -568,6 +573,20 @@ function bottomY(){
  return b;
 }
 const sheets=()=>Math.floor(bottomY()/PS)+2;
+// ---------- ползунок справа ----------
+function vsbGeo(){const vh=ch/view.s,tot=totH+2*PM,b=$('vsb'),H=b.clientHeight,th=Math.max(36,H*vh/tot);return{vh,tot,H,th,span:Math.max(1,tot-vh)}}
+function syncVsb(){const b=$('vsb');if(!b)return;const vh=ch/view.s,tot=totH+2*PM;
+ if(vh>=tot-2){if(!b.hidden)b.hidden=true;return}if(b.hidden)b.hidden=false;
+ const g=vsbGeo(),p=Math.max(0,Math.min(1,(view.y+PM)/g.span)),t=$('vsbt');t.style.height=g.th+'px';t.style.top=(p*(g.H-g.th))+'px'}
+(function(){const b=$('vsb'),t=$('vsbt');let drag=null;
+ const setY=y=>{view.y=y;redraw();userView()};
+ b.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();const g=vsbGeo(),r=b.getBoundingClientRect();
+  if(e.target!==t){const want=(e.clientY-r.top-g.th/2)/(g.H-g.th);setY(-PM+Math.max(0,Math.min(1,want))*g.span)} // щелчок мимо ползунка — сразу туда
+  drag={y:e.clientY,v:view.y,k:g.span/Math.max(1,g.H-g.th)};b.classList.add('on');try{b.setPointerCapture(e.pointerId)}catch(err){}});
+ b.addEventListener('pointermove',e=>{if(drag)setY(drag.v+(e.clientY-drag.y)*drag.k)});
+ const up=()=>{drag=null;b.classList.remove('on')};b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);
+ b.addEventListener('wheel',e=>{e.preventDefault();setY(view.y+e.deltaY*(e.deltaMode===1?16:1)/view.s)},{passive:false});
+})();
 function clampView(n){
  const lim=fitS();view.s=Math.max(lim*.6,Math.min(lim*4,view.s));
  const vw=cw/view.s,vh=ch/view.s,tot=n*PS-PG;
@@ -650,7 +669,7 @@ function redraw(lo){ // lo===true — изменились только черн
    ctx.restore();
   }
  }
- placeDone();drawOverlay();syncPlotPanels();placeSolidBar();sendView();
+ placeDone();drawOverlay();syncPlotPanels();placeSolidBar();sendView();syncVsb();
  const zf=view.s>fitS()*1.3;if($('zfit').hidden===zf)$('zfit').hidden=!zf;
 }
 // верхний слой: круглый курсор и курсоры других участников
