@@ -174,7 +174,7 @@ body.focus #main{padding:4px;gap:4px}
 </style>
 </head>
 <body>
-<div id="side"><div id="who"></div><div id="pl"></div><button id="add">+ Доска</button><button id="cp">Копировать ссылку</button><button id="hwb" hidden>🎓 Личный кабинет<span class="hwn" hidden></span></button></div>
+<div id="side"><div id="who"></div><div id="pl"></div><button id="add">+ Доска</button><button id="cpb" hidden title="Скопировать эту доску другому ученику или группе — со всеми задачами и записями">⧉ Копировать доску</button><button id="cp">Копировать ссылку</button><button id="hwb" hidden>🎓 Личный кабинет<span class="hwn" hidden></span></button></div>
 <div id="main">
  <div id="bar">
   <button id="hp" class="ib" title="Список досок">◧</button>
@@ -761,6 +761,7 @@ function onOp(o){
  if(o.t==='clear'){strokes[o.page]={};images[o.page]={}}
  if(o.t==='delPage'){if(o.from!==me&&pages.some(p=>p.id===o.id)&&pages.length>1)removePage(o.id);return}
  if(o.t==='addPage'&&!pages.some(p=>p.id===o.id))pages.push({id:o.id,title:o.title});
+ if(o.t==='pageData'&&o.id&&o.strokes&&typeof o.strokes==='object'){strokes[o.id]=o.strokes;images[o.id]=o.images||{};for(const id in o.strokes)o.strokes[id].id=id} // скопированная доска (кабинет репетитора → «Копировать доску»)
  if(o.t==='title')pages.forEach(p=>{if(p.id===o.id)p.title=o.title});
  if(o.t==='pageOrder'&&Array.isArray(o.ids)&&o.ids.length===pages.length){const by=new Map(pages.map(p=>[p.id,p]));if(o.ids.every(id=>by.has(id)))pages=o.ids.map(id=>by.get(id))}
  renderPages();redraw();
@@ -2229,6 +2230,7 @@ if(!isTeacher){const mine=ME||room;if(window.pdGate)pdGate(mine);['hwb','hwt'].f
   setInterval(()=>check(false),800);
  }
 }
+if(isTeacher){$('cpb').hidden=false;$('cpb').onclick=()=>{const p=pages.find(x=>x.id===page);try{parent.postMessage({t:'copyBoard',page:page,title:(p&&p.title)||'Доска'},location.origin)}catch(e){}}}
 $('cp').onclick=()=>{const t=location.origin+location.pathname;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{$('cp').textContent='Скопировано'},()=>{prompt('Ссылка:',t)});setTimeout(()=>{$('cp').textContent='Копировать ссылку'},1500)};
 function setColor(c){ // выбрать цвет пера (из быстрых кружков или палитры 🎨)
  color=c;if(['er','ers','mv','hand','hl'].includes(tool()))setTool('pen');setCursor();

@@ -333,6 +333,26 @@ $('stt').onclick=async()=>{
   el('p',{className:'mut',style:'font-size:12px;margin:0',textContent:'Урок — день, когда на доске ученика заметно писали или был звонок. «Заходил(а)» — открывал(а) кабинет. Эти данные собираются с '+fmt(S.since)+', домашки — за всё время.'}),
   el('div',{className:'row',style:'border:0'},el('button',{textContent:'Закрыть',onclick:d.close})));
 };
+// ---------- копия доски другому ученику (кнопка «⧉ Копировать доску» под списком досок) ----------
+window.addEventListener('message',e=>{
+ if(e.origin!==location.origin||!e.data||e.data.t!=='copyBoard')return;
+ const fr=document.getElementById('fr');if(!fr||e.source!==fr.contentWindow||!cur)return;
+ const from=cur,page=String(e.data.page||''),title=String(e.data.title||'Доска');
+ const d=dlg('Копировать доску «'+title+'»');
+ d.b.append(el('p',{className:'mut',style:'margin:0',textContent:'Кому? У выбранного ученика появится новая доска с теми же задачами и записями. Эта доска останется как есть.'}));
+ const q=el('input',{placeholder:'Найти ученика…',autocomplete:'off'}),box=el('div',{style:'display:flex;flex-direction:column;gap:4px;max-height:50vh;overflow:auto'});d.b.append(q,box);
+ const draw=()=>{box.innerHTML='';const f=q.value.trim().toLowerCase();
+  students.filter(s=>s.id!==from&&(!f||s.name.toLowerCase().includes(f))).forEach(s=>{
+   const b=el('button',{style:'text-align:left;display:flex;gap:8px;align-items:center;padding:8px 10px',onclick:async()=>{
+    box.querySelectorAll('button').forEach(x=>x.disabled=true);b.textContent='Копирую…';
+    const r=await api('/api/admin/op',{method:'POST',body:JSON.stringify({t:'copyBoard',from,page,to:s.id})}).catch(()=>null),j=r&&r.ok?await r.json().catch(()=>null):null;
+    if(!j||j.error){alert((j&&j.error)||'Не получилось скопировать');d.close();return}
+    d.close();alert('Доска «'+title+'» скопирована: '+(s.type==='group'?'группа ':'')+s.name);}});
+   b.append(el('span',{style:'width:10px;height:10px;border-radius:3px;flex:none;background:'+(s.color||'#888')}),el('span',{textContent:(s.type==='group'?'👥 ':'')+s.name}));box.append(b)});
+  if(!box.children.length)box.append(el('p',{className:'mut',textContent:'Никого не нашлось'}))};
+ q.oninput=draw;draw();setTimeout(()=>q.focus(),50);
+ d.b.append(el('div',{className:'row',style:'border:0'},el('button',{textContent:'Отмена',onclick:d.close})));
+});
 $('hlp').onclick=()=>window.open('/help','_blank'); // инструкция с картинками (PDF) в новой вкладке
 $('lo').onclick=()=>{if(confirm('Выйти из кабинета на этом устройстве? Автокопия досок останется.')){localStorage.removeItem('tok');location.reload()}};
 $('addS').onclick=async()=>{const n=prompt('Имя ученика (можно с классом, например «Миша 8кл»):');if(!n||!n.trim())return;

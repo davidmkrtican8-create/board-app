@@ -891,6 +891,17 @@ function admin(req, res, u) {
       const pos = new Map(j.ids.slice(0, 400).map((id, i) => [String(id), i]));
       const my = index.students.filter(s => s.owner === me.id).map((s, i) => [s, pos.has(s.id) ? pos.get(s.id) : 1e6 + i]).sort((a, b) => a[1] - b[1]).map(x => x[0]);
       let k = 0; index.students = index.students.map(s => s.owner === me.id ? my[k++] : s); saveIndex();
+    } else if (j.t === 'copyBoard') { // копия доски другому своему ученику (или группе): новая доска в его списке
+      const a = own(String(j.from || '')), b = own(String(j.to || ''));
+      if (!a || !b) return json(res, { error: 'Ученик не найден' });
+      const ra = room(a.id), rb = room(b.id), pg = ra && ra.s.pages.find(p => p.id === j.page);
+      if (!pg || !rb) return json(res, { error: 'Доска не найдена' });
+      if (rb.s.pages.length >= 200) return json(res, { error: 'У ученика уже 200 досок' });
+      const nid = 'p' + crypto.randomBytes(5).toString('hex'), title = String(pg.title || 'Доска').slice(0, 80);
+      const st = JSON.parse(JSON.stringify(ra.s.strokes[pg.id] || {})), im = JSON.parse(JSON.stringify(ra.s.images[pg.id] || {}));
+      rb.s.pages.push({ id: nid, title }); rb.s.strokes[nid] = st; rb.s.images[nid] = im; save(rb);
+      bcast(rb, { t: 'addPage', id: nid, title }); bcast(rb, { t: 'pageData', id: nid, strokes: st, images: im }); // открытая у ученика доска получит копию сразу
+      return json(res, { ok: true, page: nid, name: b.name });
     } else if (j.t === 'rename' && nm) {
       const s = own(j.id); if (s) { s.name = nm; saveIndex(); }
     } else if (j.t === 'delete') {
