@@ -1608,6 +1608,10 @@ function volApply(t){
   t._g.gain.value=v;a.muted=true;a.volume=1; // плеер молчит, но продолжает работать — иначе звук не дойдёт до усилителя
  }catch(e){volOff(t);a.volume=Math.min(1,v)}
 }
+function audioPrio(pc){ // голосу — высокий приоритет: при слабом интернете первым урезается видео, а не звук
+ pc.getSenders().forEach(sn=>{if(!sn.track||!sn.getParameters)return;try{const pr=sn.getParameters();if(!pr.encodings||!pr.encodings.length)return;
+  pr.encodings.forEach(en=>{if(sn.track.kind==='audio'){en.priority='high';en.networkPriority='high';en.maxBitrate=48000}else{en.priority='low';en.networkPriority='low';en.maxBitrate=450000}});
+  sn.setParameters(pr).catch(()=>{})}catch(e){}})}
 function peer(id){
  if(call.peers.has(id))return call.peers.get(id);
  const pol=localStorage.getItem('call-relay')==='1'?'relay':'all'; // для проверки ретранслятора
@@ -1619,13 +1623,20 @@ function peer(id){
  pc.onicecandidate=e=>{if(e.candidate)sig(id,'ice',e.candidate)};
  pc.ontrack=e=>{const s=e.streams[0];if(s)p.stream=s;else p.stream.addTrack(e.track);
   const upd=()=>tile(id,call.others.get(id)||'Участник',p.stream);e.track.onunmute=upd;e.track.onmute=upd;e.track.onended=upd;upd()};
- pc.onconnectionstatechange=()=>{if(pc.connectionState==='failed')pc.restartIce();callUI()};
+ pc.onconnectionstatechange=()=>{const st=pc.connectionState;clearTimeout(p.dt);
+  if(st==='connected'){p.fails=0;audioPrio(pc)}
+  if(st==='disconnected')p.dt=setTimeout(()=>{if(pc.connectionState==='disconnected')try{pc.restartIce()}catch(e){}},2500); // связь подвисла на 2,5 с — переподключаемся, не ждём полного обрыва
+  if(st==='failed'){p.fails=(p.fails||0)+1;
+   if(p.fails<=2)try{pc.restartIce()}catch(e){}
+   else if(call.on&&call.peers.get(id)===p){dropPeer(id);sig(null,'hello',{label:myLabel()});peer(id)}} // не помогло дважды — собираем соединение заново
+  callUI()};
  tile(id,call.others.get(id)||'Участник',null);callUI();
  return p;
 }
 async function onRtc(o){
  if(o.from===me)return;
- if(o.kind==='hello'){call.others.set(o.from,String((o.data&&o.data.label)||'Участник').slice(0,40));if(call.on){dropPeer(o.from);peer(o.from)}callUI();return}
+ if(o.kind==='hello'){call.others.set(o.from,String((o.data&&o.data.label)||'Участник').slice(0,40));
+  if(call.on){const q=call.peers.get(o.from);if(!(o.data&&o.data.rejoin&&q&&q.pc.connectionState==='connected')){dropPeer(o.from);peer(o.from)}}callUI();return}
  if(o.kind==='bye'){call.others.delete(o.from);dropPeer(o.from);return}
  if(!call.on||o.to!==me)return;
  if(!call.others.has(o.from))call.others.set(o.from,'Участник');
@@ -1642,12 +1653,14 @@ async function onRtc(o){
 function callInit(list){ // при (пере)подключении к доске: кто уже на звонке
  call.others=new Map([...call.others].filter(([k])=>(list||[]).includes(k)));
  (list||[]).forEach(id=>{if(id!==me&&!call.others.has(id))call.others.set(id,'Участник')});
- if(call.on&&!(list||[]).includes(me)){[...call.peers.keys()].forEach(dropPeer);sig(null,'hello',{label:myLabel()});call.others.forEach((_,id)=>peer(id))}
+ if(call.on&&!(list||[]).includes(me)){ // сервер перезапустился или доска переподключилась: живые соединения не рвём, восстанавливаем только упавшие
+  [...call.peers].forEach(([id,p])=>{if(p.pc.connectionState!=='connected')dropPeer(id)});sig(null,'hello',{label:myLabel(),rejoin:1});call.others.forEach((_,id)=>peer(id))}
  callUI();
 }
 // ---------- шумоподавление: браузерное + свой фильтр против скрипа пера ----------
 // Скрип — резкие высокие звуки (выше ~4 кГц), а речь в основном ниже. Режем высокие и низкие частоты,
 // а когда человек молчит (в полосе речи тихо) — приглушаем микрофон почти до нуля, чтобы скрип не было слышно.
+const GATE_LOW=.08; // «закрытый» шумодав приглушает (примерно −22 дБ), а не выключает: если он ошибся, речь всё равно слышно
 function micFilter(raw){
  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;
  const ac=call.ac||(call.ac=new AC());if(ac.state==='suspended')ac.resume().catch(()=>{});
@@ -1656,7 +1669,7 @@ function micFilter(raw){
  // раньше здесь резали всё выше 3,6 кГц — голос звучал глухо, «как в бочке»; теперь высокие только приглушаем
  const hp=bq('highpass',80),lp1=bq('highshelf',5000),lp2=bq('lowpass',9500,.7),gate=ac.createGain(),dst=ac.createMediaStreamDestination();lp1.gain.value=-9;
  const dl=ac.createDelay(.2);dl.delayTime.value=.09; // звук идёт на 0,09 с позже: успеваем понять, речь это или стук, и не съесть начало слова
- gate.gain.value=.003;src.connect(hp);hp.connect(lp1);lp1.connect(lp2);lp2.connect(dl);dl.connect(gate);gate.connect(dst);
+ gate.gain.value=GATE_LOW;src.connect(hp);hp.connect(lp1);lp1.connect(lp2);lp2.connect(dl);dl.connect(gate);gate.connect(dst);
  const vb=bq('bandpass',1000,.6),va=ac.createAnalyser(),hb=bq('highpass',4500),ha=ac.createAnalyser(),fa=ac.createAnalyser();
  va.fftSize=ha.fftSize=1024;fa.fftSize=2048;fa.smoothingTimeConstant=.3;src.connect(vb);vb.connect(va);src.connect(hb);hb.connect(ha);src.connect(fa);
  const buf=new Float32Array(1024),rms=a=>{a.getFloatTimeDomainData(buf);let q=0;for(let i=0;i<buf.length;i++)q+=buf[i]*buf[i];return Math.sqrt(q/buf.length)};
@@ -1664,15 +1677,17 @@ function micFilter(raw){
  // Меряем «ровность» спектра в полосе 250–2500 Гц: у речи она низкая, у шума высокая.
  const fd=new Float32Array(fa.frequencyBinCount),hz=ac.sampleRate/fa.fftSize,b0=Math.round(250/hz),b1=Math.round(2500/hz);
  const flatness=()=>{fa.getFloatFrequencyData(fd);let lg=0,ar=0,n=0;for(let i=b0;i<=b1;i++){const p=Math.pow(10,Math.max(-140,fd[i])/10)+1e-14;lg+=Math.log(p);ar+=p;n++}return Math.exp(lg/n)/(ar/n)};
- let floor=.002,open=false,last=-1,run=0;
+ let floor=.002,open=false,last=-1,run=0,tick=performance.now();
  const t=setInterval(()=>{
+  const pn=performance.now(),lag=pn-tick;tick=pn;
+  if(lag>150){last=ac.currentTime;if(!open){open=true;gate.gain.setTargetAtTime(1,ac.currentTime,.008)}return} // страница подвисла (тяжёлая доска, слабый iPad) — не гадаем, а пропускаем голос
   const v=rms(va),h=rms(ha),now=ac.currentTime;
   if(v<floor)floor=v;else if(!open&&run===0)floor=Math.min(.006,floor*.995+v*.005); // уровень тишины комнаты: подстраивается только в тишине
   const loud=v>Math.max(.008,floor*4)&&v>h*.35; // громко в полосе голоса, а не только в «шипящей»
   const voice=loud&&flatness()<(open?.5:.36); // похоже на голос: у речи ~0,03–0,26, у шороха 0,42 и выше (пока говорим — порог мягче, чтобы не рвать слова)
   run=voice?run+1:Math.max(0,run-1); // стук и шорох — короткие или «шумные», речь тянется дольше
-  if(run>=5)last=now;const o=last>=0&&now-last<.35; // открываем после ~100 мс голоса, держим 0,35 с, чтобы не обрезать концы слов
-  if(o!==open){open=o;gate.gain.setTargetAtTime(o?1:.003,now,o?.008:.05)}
+  if(run>=4)last=now;const o=last>=0&&now-last<.7; // открываем после ~80 мс голоса, держим 0,7 с — паузы между словами не обрезаются
+  if(o!==open){open=o;gate.gain.setTargetAtTime(o?1:GATE_LOW,now,o?.008:.08)}
  },20);
  const tr=dst.stream.getAudioTracks()[0];
  return{track:tr,close:()=>{clearInterval(t);try{src.disconnect();gate.disconnect()}catch(e){}tr.stop()}};
@@ -1718,7 +1733,7 @@ async function camToggle(){
   call.cam=false;
  }else{
   try{const v=(await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},height:{ideal:480},facingMode:'user'}})).getVideoTracks()[0];
-   call.stream.addTrack(v);call.peers.forEach(p=>p.pc.addTrack(v,call.stream));call.cam=true}
+   call.stream.addTrack(v);call.peers.forEach(p=>{p.pc.addTrack(v,call.stream);setTimeout(()=>audioPrio(p.pc),1500)});call.cam=true}
   catch(e){await modal('Не получилось включить камеру. Проверьте, что браузеру разрешён доступ к камере.',{ok:'Понятно'})}
  }
  tile('me','Вы',call.stream,true);callUI();

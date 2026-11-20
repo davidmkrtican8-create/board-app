@@ -60,6 +60,7 @@ button,input{font:inherit;color:var(--tx);background:var(--panel);border:1px sol
 .card{position:absolute;border:2px solid transparent;border-radius:6px;pointer-events:none}
 .card.hot{border-color:var(--ac);background:rgba(106,63,196,.07)}
 .plus{position:absolute;width:30px;height:30px;border-radius:50%;padding:0;background:#2e7d32;color:#fff;border-color:#2e7d32;font-size:20px;line-height:1;cursor:pointer}
+.plus.busy{background:#f0a020;border-color:#f0a020;cursor:progress;animation:plusp .8s ease-in-out infinite alternate}@keyframes plusp{to{transform:scale(1.15)}}
 .lk{position:absolute;cursor:pointer;border-radius:4px}.lk:hover{outline:2px solid rgba(106,63,196,.55)}
 .mk{position:absolute;left:0;right:0;height:3px;background:#d32f2f;pointer-events:none}
 .sel{position:absolute;border:2px dashed #6a3fc4;background:rgba(106,63,196,.12);pointer-events:none}
@@ -551,10 +552,11 @@ async function render(markY){
   const b=document.createElement('button');b.className='plus';b.textContent='+';b.title='Отправить эту задачу на доску';
   b.style.cssText='top:'+fy0*100+'%;left:1%';
   b.onmouseenter=()=>c.classList.add('hot');b.onmouseleave=()=>c.classList.remove('hot');
-  b.onclick=async()=>{const bid=await send(fx0-.005,fy0,fx1+.005,fy1,b);autoAnalog(fy0,fy1,bid)};
+  b.onclick=async()=>{if(b.dataset.busy)return;b.dataset.busy=1;b.textContent='…';b.classList.add('busy'); // повторные нажатия, пока задача едет на доску, не считаются
+   try{const bid=await send(fx0-.005,fy0,fx1+.005,fy1,b);autoAnalog(fy0,fy1,bid)}finally{setTimeout(()=>{delete b.dataset.busy;b.classList.remove('busy');if(b.textContent==='…')b.textContent='+'},1200)}};
   ov.append(c,b);
   if(window.hwDraft){const z=document.createElement('button');z.className='plus hwplus';z.textContent='+ ДЗ';z.title='Добавить эту задачу в домашку';z.style.cssText='top:calc('+fy0*100+'% + 34px);left:1%';
-   z.onclick=async()=>{z.textContent='…';try{const [src,info]=await Promise.all([crop(fx0-.005,fy0,fx1+.005,fy1),cardInfo(fy0,fy1).catch(()=>null)]);window.hwAdd(src,info);z.textContent='✓'}catch(e){z.textContent='+ ДЗ'}};ov.append(z)}
+   z.onclick=async()=>{if(z.dataset.busy)return;z.dataset.busy=1;z.textContent='…';try{const [src,info]=await Promise.all([crop(fx0-.005,fy0,fx1+.005,fy1),cardInfo(fy0,fy1).catch(()=>null)]);window.hwAdd(src,info);z.textContent='✓'}catch(e){z.textContent='+ ДЗ'}setTimeout(()=>{delete z.dataset.busy;if(z.textContent==='✓')z.textContent='+ ДЗ'},1500)};ov.append(z)}
  });
  for(const a of await page.getAnnotations()){
   if(a.subtype!=='Link'||!a.dest)continue;
@@ -580,11 +582,11 @@ onFr(f=>{f.addEventListener('load',()=>{try{f.contentDocument.addEventListener('
 async function crop(fx0,fy0,fx1,fy1,pn){
  const page=await pdf.getPage(pn||pageNo),base=page.getViewport({scale:1});
  const sc=Math.max(1,Math.min(4,1100/((fx1-fx0)*base.width))),vp=page.getViewport({scale:sc});
- const full=document.createElement('canvas');full.width=Math.round(vp.width);full.height=Math.round(vp.height);
- await page.render({canvasContext:full.getContext('2d'),viewport:vp,intent:'print'}).promise; // «print» — рисуется и в фоновой вкладке
- const x=Math.round(fx0*full.width),y=Math.round(fy0*full.height),w=Math.round((fx1-fx0)*full.width),h=Math.round((fy1-fy0)*full.height);
+ // рисуем только нужный кусок страницы, а не всю страницу целиком — в разы быстрее на тяжёлых сборниках
+ const x=Math.round(fx0*vp.width),y=Math.round(fy0*vp.height),w=Math.max(1,Math.round((fx1-fx0)*vp.width)),h=Math.max(1,Math.round((fy1-fy0)*vp.height));
  const o=document.createElement('canvas');o.width=w;o.height=h;const c=o.getContext('2d');
- c.fillStyle='#fff';c.fillRect(0,0,w,h);c.drawImage(full,x,y,w,h,0,0,w,h);
+ c.fillStyle='#fff';c.fillRect(0,0,w,h);
+ await page.render({canvasContext:c,viewport:page.getViewport({scale:sc,offsetX:-x,offsetY:-y}),intent:'print'}).promise; // «print» — рисуется и в фоновой вкладке
  let s=o.toDataURL('image/png');if(s.length>700000)s=o.toDataURL('image/jpeg',.9);
  return s;
 }
@@ -596,7 +598,7 @@ async function send(fx0,fy0,fx1,fy1,btn){
   const bid='tk'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); // id картинки на доске: сотрут её — уберём и аналог из домашки
   f.contentWindow.postMessage({t:'task',src:await crop(fx0,fy0,fx1,fy1),gap:+$('tgap').value,id:bid},location.origin);
   msg('✓ Задача на доске',2500);
-  if(btn){const o=btn.textContent;btn.textContent='✓';setTimeout(()=>{btn.textContent=o},1500)}
+  if(btn){btn.textContent='✓';setTimeout(()=>{btn.textContent='+'},1500)}
   return bid;
  }catch(e){msg('Не получилось: '+(e.message||e),4000)}
 }
