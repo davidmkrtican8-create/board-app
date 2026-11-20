@@ -16,3 +16,6 @@ privacy.html
 consent.html
 pd.js
 help.pdf
+land-board.jpg
+land-homework.jpg
+land-student.jpg

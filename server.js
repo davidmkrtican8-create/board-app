@@ -1018,6 +1018,8 @@ http.createServer((req, res) => {
     });
   }
   if (u.pathname === '/health') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('ok'); } // для сервиса, который не даёт сайту «засыпать»
+  const lm = u.pathname.match(/^\/(land-[a-z]+\.jpg)$/); // скриншоты для главной страницы
+  if (lm) return sendFile(req, res, path.join(__dirname, lm[1]), 'image/jpeg', 'public, max-age=86400');
   if (u.pathname === '/icon.png' || u.pathname === '/favicon.ico') { // логотип на вкладке браузера
     const f = path.join(__dirname, 'icon.png');
     if (!fs.existsSync(f)) { res.writeHead(404); return res.end(); }
