@@ -535,21 +535,27 @@ function goto(p,y,push=true){
  pageNo=p;$('tnum').value=p;$('tbnum').textContent=p+' / '+pdf.numPages;localStorage.setItem('tpos:'+book,p);render(y);
 }
 function clearSel(){if(sel){if(sel.el)sel.el.remove();if(sel.bar)sel.bar.remove();sel=null}}
-async function render(markY){
+const DET={}; // где на странице карточки задач (от масштаба не зависит — при приближении не ищем заново)
+async function render(markY,keep){ // keep — перерисовка при приближении: прокрутку не трогаем
  const my=++token,page=await pdf.getPage(pageNo);if(my!==token)return;
  const base=page.getViewport({scale:1}),cssW=Math.max(280,$('tview').clientWidth-6)*tz,k=cssW/base.width;
  const vp=page.getViewport({scale:k}),dpr=Math.min(2,window.devicePixelRatio||1,Math.sqrt(9e6/(vp.width*vp.height))); // при сильном приближении — не больше ~9 млн точек (памяти iPad хватает)
  const vpr=page.getViewport({scale:k*dpr}),cv=$('tcv'),ov=$('tov');
- cv.width=Math.round(vpr.width);cv.height=Math.round(vpr.height);cv.style.width=vp.width+'px';cv.style.height=vp.height+'px';
- $('tbox').style.width=vp.width+'px';$('tbox').style.height=vp.height+'px';
- clearSel();ov.innerHTML='';
- await page.render({canvasContext:cv.getContext('2d'),viewport:vpr}).promise;if(my!==token)return;
- const dvp=page.getViewport({scale:500/base.width}),oc=document.createElement('canvas');
- oc.width=Math.round(dvp.width);oc.height=Math.round(dvp.height);
- await page.render({canvasContext:oc.getContext('2d',{willReadFrequently:true}),viewport:dvp}).promise;if(my!==token)return;
- const found=detect(oc),OH=oc.height;oc.width=oc.height=0; // вспомогательная картинка больше не нужна — освобождаем память (важно для iPad); высоту запомнили до этого
- found.forEach(([s,e])=>{
-  const fy0=Math.max(0,(s-2)/OH),fy1=Math.min(1,(e+2)/OH),fx0=.095,fx1=.905;
+ // новую картинку рисуем «за кадром» и подменяем старую одним махом — без пустого мигания
+ const off=document.createElement('canvas');off.width=Math.round(vpr.width);off.height=Math.round(vpr.height);
+ await page.render({canvasContext:off.getContext('2d'),viewport:vpr}).promise;if(my!==token){off.width=off.height=0;return}
+ const dk=book+'#'+pageNo;let fnd=DET[dk];
+ if(!fnd){const dvp=page.getViewport({scale:500/base.width}),oc=document.createElement('canvas');
+  oc.width=Math.round(dvp.width);oc.height=Math.round(dvp.height);
+  await page.render({canvasContext:oc.getContext('2d',{willReadFrequently:true}),viewport:dvp}).promise;if(my!==token){off.width=off.height=0;oc.width=oc.height=0;return}
+  fnd=DET[dk]=detect(oc).map(([s,e])=>[s/oc.height,e/oc.height,2/oc.height]);oc.width=oc.height=0} // освобождаем память (важно для iPad)
+ const sc0=$('tview'),sl=sc0.scrollLeft,st=sc0.scrollTop;
+ cv.width=off.width;cv.height=off.height;cv.getContext('2d').drawImage(off,0,0);off.width=off.height=0;
+ cv.style.width=vp.width+'px';cv.style.height=vp.height+'px';$('tbox').style.width=vp.width+'px';$('tbox').style.height=vp.height+'px';
+ if(keep){sc0.scrollLeft=sl;sc0.scrollTop=st}
+ clearSel();const old=[...ov.childNodes];
+ fnd.forEach(([s,e,pad])=>{
+  const fy0=Math.max(0,s-pad),fy1=Math.min(1,e+pad),fx0=.095,fx1=.905;
   const c=document.createElement('div');c.className='card';
   c.style.cssText='left:'+fx0*100+'%;width:'+(fx1-fx0)*100+'%;top:'+fy0*100+'%;height:'+(fy1-fy0)*100+'%';
   const b=document.createElement('button');b.className='plus';b.textContent='+';b.title='Отправить эту задачу на доску';
@@ -569,7 +575,8 @@ async function render(markY){
   l.onclick=async()=>{const t=await resolveDest(a.dest);if(t)goto(t.page,t.y)};
   ov.appendChild(l);
  }
- const sc=$('tview');
+ old.forEach(n=>n.remove()); // старые кнопки и ссылки убираем только теперь, когда новые уже на месте
+ const sc=$('tview');if(keep)return;
  if(markY!=null){const y=vp.convertToViewportPoint(0,markY)[1],m=document.createElement('div');m.className='mk';m.style.top=y+'px';ov.appendChild(m);sc.scrollTop=Math.max(0,y-70);setTimeout(()=>m.remove(),5000)}
  else sc.scrollTop=0;
 }
@@ -671,7 +678,7 @@ function tzSet(v,cx,cy){ // cx, cy — точка, вокруг которой �
  tz=v;tzShow();try{localStorage.setItem('tzoom',tz)}catch(e){}
  const b=$('tbox'),r=tz/o;b.style.width=parseFloat(b.style.width||0)*r+'px';b.style.height=parseFloat(b.style.height||0)*r+'px';$('tcv').style.width=b.style.width;$('tcv').style.height=b.style.height; // сразу растягиваем картинку, чётко перерисуем следом
  tv.scrollLeft=ax*tv.scrollWidth-tv.clientWidth*(cx??.5);tv.scrollTop=ay*tv.scrollHeight-tv.clientHeight*(cy??.3);
- clearTimeout(tzT);tzT=setTimeout(()=>{if(pdf)render()},180)}
+ clearTimeout(tzT);tzT=setTimeout(()=>{if(pdf)render(null,true)},180)}
 $('tzin').onclick=()=>tzSet(tz+.25);$('tzout').onclick=()=>tzSet(tz-.25);$('tzlbl').onclick=()=>tzSet(1);
 $('tview').addEventListener('wheel',e=>{if(!(e.ctrlKey||e.metaKey))return;e.preventDefault();const r=$('tview').getBoundingClientRect();
  tzSet(tz*Math.exp(-Math.max(-60,Math.min(60,e.deltaY))*.01),(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height)},{passive:false});
