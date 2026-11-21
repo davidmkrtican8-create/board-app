@@ -1660,7 +1660,7 @@ function callInit(list){ // при (пере)подключении к доск�
 // ---------- шумоподавление: браузерное + свой фильтр против скрипа пера ----------
 // Скрип — резкие высокие звуки (выше ~4 кГц), а речь в основном ниже. Режем высокие и низкие частоты,
 // а когда человек молчит (в полосе речи тихо) — приглушаем микрофон почти до нуля, чтобы скрип не было слышно.
-const GATE_LOW=.08; // «закрытый» шумодав приглушает (примерно −22 дБ), а не выключает: если он ошибся, речь всё равно слышно
+const GATE_LOW=.015; // «закрытый» шумодав приглушает примерно на −36 дБ: шорохи и клавиатуру почти не слышно, но и полной «мёртвой» тишины нет
 function micFilter(raw){
  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;
  const ac=call.ac||(call.ac=new AC());if(ac.state==='suspended')ac.resume().catch(()=>{});
@@ -1677,20 +1677,26 @@ function micFilter(raw){
  // Меряем «ровность» спектра в полосе 250–2500 Гц: у речи она низкая, у шума высокая.
  const fd=new Float32Array(fa.frequencyBinCount),hz=ac.sampleRate/fa.fftSize,b0=Math.round(250/hz),b1=Math.round(2500/hz);
  const flatness=()=>{fa.getFloatFrequencyData(fd);let lg=0,ar=0,n=0;for(let i=b0;i<=b1;i++){const p=Math.pow(10,Math.max(-140,fd[i])/10)+1e-14;lg+=Math.log(p);ar+=p;n++}return Math.exp(lg/n)/(ar/n)};
- let floor=.002,open=false,last=-1,run=0,tick=performance.now();
+ let floor=.002,open=false,last=-1,run=0,tick=performance.now(),said=false;
+ // стук клавиш и щелчки мыши: страница знает момент нажатия, а звук идёт с задержкой 0,09 с — успеваем приглушить именно щелчок.
+ // Если в этот момент человек говорит, не трогаем — иначе резало бы речь.
+ const click=e=>{if(e.type==='pointerdown'&&e.pointerType!=='mouse')return;if(said)return;const n=ac.currentTime;
+  gate.gain.cancelScheduledValues(n);gate.gain.setValueAtTime(Math.min(gate.gain.value,GATE_LOW),n+.02);gate.gain.setValueAtTime(GATE_LOW,n+.2);if(open)gate.gain.setTargetAtTime(1,n+.2,.01)};
+ const docs=[document];try{if(parent!==window&&parent.document)docs.push(parent.document)}catch(e){} // и в кабинете преподавателя (там печатают домашку)
+ docs.forEach(d=>{d.addEventListener('keydown',click,true);d.addEventListener('pointerdown',click,true)});
  const t=setInterval(()=>{
   const pn=performance.now(),lag=pn-tick;tick=pn;
   if(lag>150){last=ac.currentTime;if(!open){open=true;gate.gain.setTargetAtTime(1,ac.currentTime,.008)}return} // страница подвисла (тяжёлая доска, слабый iPad) — не гадаем, а пропускаем голос
   const v=rms(va),h=rms(ha),now=ac.currentTime;
   if(v<floor)floor=v;else if(!open&&run===0)floor=Math.min(.006,floor*.995+v*.005); // уровень тишины комнаты: подстраивается только в тишине
   const loud=v>Math.max(.008,floor*4)&&v>h*.35; // громко в полосе голоса, а не только в «шипящей»
-  const voice=loud&&flatness()<(open?.5:.36); // похоже на голос: у речи ~0,03–0,26, у шороха 0,42 и выше (пока говорим — порог мягче, чтобы не рвать слова)
+  const voice=loud&&flatness()<(open?.5:.36);said=voice; // похоже на голос: у речи ~0,03–0,26, у шороха 0,42 и выше (пока говорим — порог мягче, чтобы не рвать слова)
   run=voice?run+1:Math.max(0,run-1); // стук и шорох — короткие или «шумные», речь тянется дольше
-  if(run>=4)last=now;const o=last>=0&&now-last<.7; // открываем после ~80 мс голоса, держим 0,7 с — паузы между словами не обрезаются
+  if(run>=4)last=now;const o=last>=0&&now-last<.5; // открываем после ~80 мс голоса, держим 0,5 с — паузы между словами не обрезаются
   if(o!==open){open=o;gate.gain.setTargetAtTime(o?1:GATE_LOW,now,o?.008:.08)}
  },20);
  const tr=dst.stream.getAudioTracks()[0];
- return{track:tr,close:()=>{clearInterval(t);try{src.disconnect();gate.disconnect()}catch(e){}tr.stop()}};
+ return{track:tr,close:()=>{clearInterval(t);docs.forEach(d=>{try{d.removeEventListener('keydown',click,true);d.removeEventListener('pointerdown',click,true)}catch(e){}});try{src.disconnect();gate.disconnect()}catch(e){}tr.stop()}};
 }
 async function micMode(){ // применить выбранный режим (и посреди звонка — без переподключения)
  if(!call.on||!call.raw)return;

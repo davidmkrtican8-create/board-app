@@ -52,6 +52,7 @@ button,input{font:inherit;color:var(--tx);background:var(--panel);border:1px sol
 #tview{flex:1;min-height:0;overflow:auto;background:#cfc9de;padding:3px}
 #tbox{position:relative;margin:0 auto;background:#fff}
 #tcv{display:block}
+.tz{display:inline-flex;gap:2px}.tz button{min-width:30px;padding-left:6px;padding-right:6px}#tzlbl{min-width:52px;font-variant-numeric:tabular-nums}
 #tbot{display:flex;gap:10px;align-items:center;justify-content:center;padding:10px 4px 14px}#tbot button{font-size:14px;padding:7px 14px}#tbnum{font-size:12px;color:#555}
 #tbmid{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px}
 #tocpop{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);width:min(380px,80vw);max-height:60vh;overflow:auto;background:var(--panel,#fff);border:1px solid var(--bd,#ccc);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:6px;z-index:20}
@@ -144,7 +145,7 @@ body.nosidebar #side{display:none}
    <iframe id="fr" allow="microphone; camera; autoplay; clipboard-write"></iframe>
    <div id="tasks" hidden>
     <div class="tr"><select id="tbook"></select><button id="tadd">+ Сборник</button><button id="tdel" title="Убрать сборник из списка">Убрать</button><input type="file" id="tfile" accept=".pdf,application/pdf" multiple hidden><button id="tclose" style="margin-left:auto">✕</button></div>
-    <div class="tr"><button id="tback" title="Назад">↩</button><button id="tprev">←</button><input id="tnum" type="number" min="1"><span id="tcnt"></span><button id="tnext">→</button><select id="tol"><option value="">Оглавление…</option></select></div>
+    <div class="tr"><button id="tback" title="Назад">↩</button><button id="tprev">←</button><input id="tnum" type="number" min="1"><span id="tcnt"></span><button id="tnext">→</button><span class="tz"><button id="tzout" title="Отдалить (или ⌘ + колесо мыши, щипок на тачпаде/iPad)">−</button><button id="tzlbl" title="Вернуть 100%">100%</button><button id="tzin" title="Приблизить (или ⌘ + колесо мыши, щипок на тачпаде/iPad)">+</button></span><select id="tol"><option value="">Оглавление…</option></select></div>
     <div class="tr"><input id="tq" placeholder="Номер задачи, например 4.19" style="flex:1;min-width:120px"><button id="tfind">Найти</button><button id="tpage">Страница целиком → на доску</button></div>
     <div class="tr" style="padding-top:0"><select id="tgap" title="Сколько свободного места оставлять под решением между задачами"><option value="120">Место под решение: мало</option><option value="350">Место под решение: среднее</option><option value="600">Место под решение: много</option></select><label id="tanal" title="Когда отправляете задачу из сборника на доску, её аналог (случайный, ещё не задававшийся этому ученику) сам добавляется в черновик домашки. В конце урока: «Домашка» → «Продолжить черновик» → «Отправить»." style="display:inline-flex;gap:5px;align-items:center;font-size:13px;white-space:nowrap;cursor:pointer"><input type="checkbox" id="tanalc"> 🪄 Аналог в домашку</label><span id="tmsg" style="font-size:12px;color:var(--mut)"></span></div>
     <div id="tview"><div id="tbox"><canvas id="tcv"></canvas><div id="tov"></div></div><div id="tbot"><button id="tbprev">← Предыдущая</button><div id="tbmid"><button id="tbtoc">☰ Оглавление</button><span id="tbnum"></span><div id="tocpop" hidden></div></div><button id="tbnext">Следующая →</button></div></div>
@@ -536,8 +537,9 @@ function goto(p,y,push=true){
 function clearSel(){if(sel){if(sel.el)sel.el.remove();if(sel.bar)sel.bar.remove();sel=null}}
 async function render(markY){
  const my=++token,page=await pdf.getPage(pageNo);if(my!==token)return;
- const base=page.getViewport({scale:1}),cssW=Math.max(280,$('tview').clientWidth-6),k=cssW/base.width,dpr=Math.min(2,window.devicePixelRatio||1);
- const vp=page.getViewport({scale:k}),vpr=page.getViewport({scale:k*dpr}),cv=$('tcv'),ov=$('tov');
+ const base=page.getViewport({scale:1}),cssW=Math.max(280,$('tview').clientWidth-6)*tz,k=cssW/base.width;
+ const vp=page.getViewport({scale:k}),dpr=Math.min(2,window.devicePixelRatio||1,Math.sqrt(9e6/(vp.width*vp.height))); // при сильном приближении — не больше ~9 млн точек (памяти iPad хватает)
+ const vpr=page.getViewport({scale:k*dpr}),cv=$('tcv'),ov=$('tov');
  cv.width=Math.round(vpr.width);cv.height=Math.round(vpr.height);cv.style.width=vp.width+'px';cv.style.height=vp.height+'px';
  $('tbox').style.width=vp.width+'px';$('tbox').style.height=vp.height+'px';
  clearSel();ov.innerHTML='';
@@ -660,6 +662,20 @@ async function autoAnalog(fy0,fy1,bid){
  }catch(e){logAna(String(e&&e.message||e));msg('Аналог не добавился: '+(e.message||e),6000)}
 }
 function logAna(m){try{navigator.sendBeacon&&navigator.sendBeacon('/api/log',JSON.stringify({m:'autoAnalog: '+String(m).slice(0,200),u:navigator.userAgent,p:location.pathname}))}catch(e){}}
+// ---------- приближение сборника: кнопки − 100% +, ⌘/Ctrl + колесо, щипок на тачпаде и iPad ----------
+let tz=(()=>{const v=+localStorage.getItem('tzoom');return v>=1&&v<=3?v:1})(),tzT=0;
+const tzShow=()=>{$('tzlbl').textContent=Math.round(tz*100)+'%'};tzShow();
+function tzSet(v,cx,cy){ // cx, cy — точка, вокруг которой приближаем (доля ширины и высоты окна сборника)
+ v=Math.round(Math.max(1,Math.min(3,v))*100)/100;if(v===tz)return;const tv=$('tview'),o=tz;
+ const ax=(tv.scrollLeft+tv.clientWidth*(cx??.5))/Math.max(1,tv.scrollWidth),ay=(tv.scrollTop+tv.clientHeight*(cy??.3))/Math.max(1,tv.scrollHeight);
+ tz=v;tzShow();try{localStorage.setItem('tzoom',tz)}catch(e){}
+ const b=$('tbox'),r=tz/o;b.style.width=parseFloat(b.style.width||0)*r+'px';b.style.height=parseFloat(b.style.height||0)*r+'px';$('tcv').style.width=b.style.width;$('tcv').style.height=b.style.height; // сразу растягиваем картинку, чётко перерисуем следом
+ tv.scrollLeft=ax*tv.scrollWidth-tv.clientWidth*(cx??.5);tv.scrollTop=ay*tv.scrollHeight-tv.clientHeight*(cy??.3);
+ clearTimeout(tzT);tzT=setTimeout(()=>{if(pdf)render()},180)}
+$('tzin').onclick=()=>tzSet(tz+.25);$('tzout').onclick=()=>tzSet(tz-.25);$('tzlbl').onclick=()=>tzSet(1);
+$('tview').addEventListener('wheel',e=>{if(!(e.ctrlKey||e.metaKey))return;e.preventDefault();const r=$('tview').getBoundingClientRect();
+ tzSet(tz*Math.exp(-Math.max(-60,Math.min(60,e.deltaY))*.01),(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height)},{passive:false});
+let tzg=1;$('tview').addEventListener('gesturestart',e=>{e.preventDefault();tzg=tz});$('tview').addEventListener('gesturechange',e=>{e.preventDefault();tzSet(tzg*e.scale)}); // щипок в Safari (Mac и iPad)
 $('tanalc').checked=localStorage.getItem('autoAna')!=='0';$('tanalc').onchange=()=>localStorage.setItem('autoAna',$('tanalc').checked?'1':'0');
 async function openBook(name){
  msg('Открываю сборник…');
