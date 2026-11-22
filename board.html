@@ -353,10 +353,13 @@ function chkZoom(){ // браузерное приближение (Ctrl +) мо
  const z=Math.abs((window.devicePixelRatio||1)/dpr0-1)>.12||!!(window.visualViewport&&window.visualViewport.scale>1.08);
  $('zhint').hidden=!z;
 }
+let OV=0; // запас холста сверху и снизу экрана, CSS-пиксели
 function resize(){
  rectC=null;chkZoom();
  dpr=window.devicePixelRatio||1;cw=Math.max(1,wrap.clientWidth);ch=Math.max(1,wrap.clientHeight);
- cv.width=rg.width=Math.round(cw*dpr);cv.height=rg.height=Math.round(ch*dpr);
+ OV=Math.round(ch*.6); // запас сверху и снизу: доска заранее нарисована и там, поэтому при прокрутке всё видно сразу
+ cv.width=rg.width=Math.round(cw*dpr);cv.height=Math.round((ch+2*OV)*dpr);rg.height=Math.round(ch*dpr);
+ cv.style.cssText+=';position:absolute;left:0;top:'+(-OV)+'px;width:'+cw+'px;height:'+(ch+2*OV)+'px'; // вне потока: высокий холст не распирает рамку доски
  rg.style.width=cw+'px';rg.style.height=ch+'px';redraw();drawOverlay();
 }
 
@@ -642,8 +645,9 @@ function drawPaper(){
 function moveFrame(){
  const n=sheets();clampView(n);totH=n*PS-PG;
  if(!mvV){redraw();return}
- const k=view.s/mvV.s,tx=(mvV.x-view.x)*view.s,ty=(mvV.y-view.y)*view.s,gap=Math.max(Math.abs(tx)/cw,Math.abs(ty)/ch)+(k<1?1-k:0);
- if(gap>.3||k>1.8||performance.now()-mvT>700){redraw();return} // открылось много пустого или сильно приблизили — рисуем начисто
+ const k=view.s/mvV.s,tx=(mvV.x-view.x)*view.s,dy=(mvV.y-view.y)*view.s,ty=dy+OV*(1-k); // холст выше экрана на OV сверху и снизу
+ const outY=Math.abs(dy)+(k<1?(1-k)*(ch/2+OV):0)>OV*.9,outX=Math.abs(tx)/cw+(k<1?1-k:0)>.3;
+ if(outY||outX||k>1.8||performance.now()-mvT>1500){redraw();return} // пролистали дальше запаса или сильно приблизили — рисуем начисто
  drawPaper(); // под сдвинутым холстом — пустые листы в клетку, а не сиреневая подложка
  cv.style.transformOrigin='0 0';cv.style.transform='translate('+tx+'px,'+ty+'px) scale('+k+')';
  placeDone();drawOverlay();syncPlotPanels();placeSolidBar();sendView();syncVsb();
@@ -654,17 +658,18 @@ function redraw(lo){ // lo===true — изменились только черн
  const n=sheets();clampView(n);totH=n*PS-PG;
  const s=view.s;
  ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=dark?'#12101a':'#e6e2ef';ctx.fillRect(0,0,cv.width,cv.height);
- ctx.setTransform(dpr*s,0,0,dpr*s,-view.x*s*dpr,-view.y*s*dpr);
+ const ty=(OV-view.y*s)*dpr,ya=view.y-OV/s,yb=view.y+(ch+OV)/s; // видимая часть вместе с запасом
+ ctx.setTransform(dpr*s,0,0,dpr*s,-view.x*s*dpr,ty);
  ctx.imageSmoothingQuality='high';
- const vis=[];for(let k=0;k<n;k++){const y0=k*PS;if(y0+PH>=view.y&&y0<=view.y+ch/s)vis.push(y0)}
+ const vis=[];for(let k=0;k<n;k++){const y0=k*PS;if(y0+PH>=ya&&y0<=yb)vis.push(y0)}
  vis.forEach(y0=>{ctx.fillStyle=dark?'#1e1a2a':'#fff';ctx.fillRect(0,y0,PW,PH);
-  sheetGrid(y0,s,{xa:Math.max(0,view.x),xb:Math.min(PW,view.x+cw/s),ya:Math.max(y0,view.y),yb:Math.min(y0+PH,view.y+ch/s)});
+  sheetGrid(y0,s,{xa:Math.max(0,view.x),xb:Math.min(PW,view.x+cw/s),ya:Math.max(y0,ya),yb:Math.min(y0+PH,yb)});
   ctx.strokeStyle=dark?'#3a3450':'#cfc8e0';ctx.lineWidth=1/s;ctx.strokeRect(0,y0,PW,PH)});
  ctx.save();ctx.beginPath();vis.forEach(y0=>ctx.rect(0,y0,PW,PH));ctx.clip(); // чернила видны только на листах
  const ims=images[page]||{};
  for(const id in ims){const g=ims[id],e=getImg(id,g.src);if(e.complete&&e.naturalWidth)ctx.drawImage(e,g.x,g.y,g.w,g.h)}
- const ps=strokes[page]||{},vx0=view.x-60,vx1=view.x+cw/s+60,vy0=view.y-60,vy1=view.y+ch/s+60;
- const L=inkLayer(cv.width,cv.height,[dpr*s,0,0,dpr*s,-view.x*s*dpr,-view.y*s*dpr],()=>{ // чернила на отдельном слое: ластик стирает только их
+ const ps=strokes[page]||{},vx0=view.x-60,vx1=view.x+cw/s+60,vy0=ya-60,vy1=yb+60;
+ const L=inkLayer(cv.width,cv.height,[dpr*s,0,0,dpr*s,-view.x*s*dpr,ty],()=>{ // чернила на отдельном слое: ластик стирает только их
   // пока рисуем линию, уже готовые записи не перерисовываем каждый кадр, а берём их готовой картинкой (iPad не «заедает» на заполненной доске)
   const ckey=page+'|'+view.x+'|'+view.y+'|'+s+'|'+cv.width+'|'+cv.height+'|'+dark,drawing=!!(cur&&cur.pts&&cur.id);
   // то же, когда рисует другой участник: его черновик ложится поверх готовой картинки, а сотни старых линий не перерисовываются 30 раз в секунду
