@@ -155,6 +155,10 @@ body.nosidebar #side{display:none}
  </div>
 </div>
 <script>
+// Safari (iPad, Mac) не умеет перебирать поток ReadableStream через «for await», а pdf.js так читает текст PDF
+// (ответы и номера задач в сборниках) — без этой заплатки на iPad аналоги не добавлялись в домашку
+if(window.ReadableStream&&!ReadableStream.prototype[Symbol.asyncIterator])ReadableStream.prototype[Symbol.asyncIterator]=async function*(){
+ const r=this.getReader();try{for(;;){const{done,value}=await r.read();if(done)return;yield value}}finally{r.releaseLock()}};
 // Сообщения кабинета показываем плашкой внизу, а не окном браузера alert(): окно браузера выкидывает из полноэкранного режима
 (function(){
  const st=document.createElement('style');st.textContent='#toasts{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:2147483000;display:flex;flex-direction:column;gap:8px;align-items:center;width:max-content;max-width:min(560px,calc(100vw - 24px));pointer-events:none}'
@@ -659,7 +663,7 @@ async function autoAnalog(fy0,fy1,bid){
   const id=a=>a.p+':'+Math.round(a.top),notSelf=A.list.filter(a=>!(A.self&&a.p===A.self.p&&Math.abs(a.top-A.self.y)<6));
   let pool=notSelf.filter(a=>!used.includes(id(a)));if(!pool.length)pool=notSelf;if(!pool.length){msg('Других аналогов у этой задачи нет',4000);return}
   const a=pool[Math.floor(Math.random()*pool.length)];
-  let [src,info,ans]=await Promise.all([cardAt(a.p,a.top).catch(()=>null),cardInfo(fy0,fy1).catch(()=>null),ansAt(a.ans)]);
+  let [src,info,ans]=await Promise.all([cardAt(a.p,a.top).catch(()=>null),cardInfo(fy0,fy1).catch(()=>null),ansAt(a.ans).catch(e=>{logAna('ansAt '+(e&&e.message||e));return ''})]); // не прочитался ответ — аналог всё равно добавляем, без ответа
   if(!src){await new Promise(z=>setTimeout(z,400));src=await cardAt(a.p,a.top,.6).catch(()=>null)} // вторая попытка — картинка помельче
   if(!src){logAna('cardAt-empty p'+a.p);msg('Аналог не добавился: не получилось вырезать картинку. Попробуйте ещё раз или добавьте задачу кнопкой «+ ДЗ».',6000);return}
   const r=await window.hwAutoAdd(sid,src,{num:info&&info.num,ans:info&&info.ext?'':ans},A.ck+'#'+id(a)+(bid?'@'+bid:'')); // @id — какая задача на доске его «породила»
