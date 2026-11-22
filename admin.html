@@ -140,11 +140,11 @@ body.nosidebar #side{display:none}
   <div class="foot"><button id="stt" hidden title="Статистика сайта: репетиторы, уроки, домашки">📈 Статистика</button><button id="tch" hidden title="Пригласить репетиторов и управлять их аккаунтами">Репетиторы</button><button id="mdl" hidden title="3D-модель огней аэродрома: ссылка видна только вам">3D-огни</button><button id="hlp" title="Короткая инструкция с картинками: как всё устроено">❓ Помощь</button><button id="chan" title="Telegram-канал УчиДоски: новости и подсказки">📣 Канал</button><button id="tgb" title="Telegram-бот: уведомления и конспекты">Telegram</button><button id="cpw" title="Сменить свой пароль">Пароль</button><button id="bk">Скачать копию</button><button id="rs">Загрузить копию</button><input type="file" id="rf" accept=".json" hidden><button id="lo" title="Выйти из кабинета на этом устройстве">Выйти</button><button id="rb" title="Вернуть учеников и доски из копии, которую кабинет сам сохраняет в вашем браузере">Восстановить из автокопии</button><div id="bkst" style="font-size:12px;color:var(--mut);width:100%"></div></div>
  </div>
  <div id="main">
-  <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk" class="keep">Задачи</button><button id="hwk" class="keep" title="Домашние задания ученика">📚 Домашка<span id="hwkn"></span></button><button id="tgs" title="Отправить конспект урока ученику и родителям в Telegram">📨 Конспект</button><button id="lnk">Ссылка ученика</button><button id="mem" hidden title="Кто занимается в этой группе">👥 Участники</button><button id="ren">Переименовать</button><button id="del">Удалить</button><button id="fs" class="keep" title="Фокус: убрать панели">⛶</button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button><button id="th" class="keep" title="Светлая / тёмная тема">◐</button></div>
+  <div id="bar"><button id="hs" title="Скрыть или показать список учеников">◧</button><b id="nm">Выберите ученика</b><button id="tk" class="keep">Задачи</button><button id="hwk" class="keep" title="Домашние задания ученика">📚 Домашка<span id="hwkn"></span></button><button id="trn" hidden title="Тренажёр ученика: включить, посмотреть прогресс и ошибки">🎯 Тренажёр</button><button id="tgs" title="Отправить конспект урока ученику и родителям в Telegram">📨 Конспект</button><button id="lnk">Ссылка ученика</button><button id="mem" hidden title="Кто занимается в этой группе">👥 Участники</button><button id="ren">Переименовать</button><button id="del">Удалить</button><button id="fs" class="keep" title="Фокус: убрать панели">⛶</button><button id="fsb" class="keep" title="Во весь экран (Esc — выйти)">⤢</button><button id="th" class="keep" title="Светлая / тёмная тема">◐</button></div>
   <div id="work">
    <iframe id="fr" allow="microphone; camera; autoplay; clipboard-write"></iframe>
    <div id="tasks" hidden>
-    <div class="tr"><select id="tbook"></select><button id="tadd">+ Сборник</button><button id="tdel" title="Убрать сборник из списка">Убрать</button><input type="file" id="tfile" accept=".pdf,application/pdf" multiple hidden><button id="tclose" style="margin-left:auto">✕</button></div>
+    <div class="tr"><select id="tbook"></select><button id="tadd">+ Сборник</button><button id="tdel" title="Убрать сборник из списка">Убрать</button><button id="ttrn" hidden title="Отправить задачи этого сборника (с ответами) в тренажёр учеников">🎯 В тренажёр</button><input type="file" id="tfile" accept=".pdf,application/pdf" multiple hidden><button id="tclose" style="margin-left:auto">✕</button></div>
     <div class="tr"><button id="tback" title="Назад">↩</button><button id="tprev">←</button><input id="tnum" type="number" min="1"><span id="tcnt"></span><button id="tnext">→</button><span class="tz"><button id="tzout" title="Отдалить (или ⌘ + колесо мыши, щипок на тачпаде/iPad)">−</button><button id="tzlbl" title="Вернуть 100%">100%</button><button id="tzin" title="Приблизить (или ⌘ + колесо мыши, щипок на тачпаде/iPad)">+</button></span><select id="tol"><option value="">Оглавление…</option></select></div>
     <div class="tr"><input id="tq" placeholder="Номер задачи, например 4.19" style="flex:1;min-width:120px"><button id="tfind">Найти</button><button id="tpage">Страница целиком → на доску</button></div>
     <div class="tr" style="padding-top:0"><select id="tgap" title="Сколько свободного места оставлять под решением между задачами"><option value="120">Место под решение: мало</option><option value="350">Место под решение: среднее</option><option value="600">Место под решение: много</option></select><label id="tanal" title="Когда отправляете задачу из сборника на доску, её аналог (случайный, ещё не задававшийся этому ученику) сам добавляется в черновик домашки. В конце урока: «Домашка» → «Продолжить черновик» → «Отправить»." style="display:inline-flex;gap:5px;align-items:center;font-size:13px;white-space:nowrap;cursor:pointer"><input type="checkbox" id="tanalc"> 🪄 Аналог в домашку</label><span id="tmsg" style="font-size:12px;color:var(--mut)"></span></div>
@@ -194,7 +194,7 @@ async function load(){
  if(r.status===401){const had=!!tok;tok='';localStorage.removeItem('tok');return showLogin(had?'Вход устарел или пароль сменили. Войдите снова.':'',had)}
  me=await r.json();localStorage.setItem('tlogin',me.login);
  students=await (await api('/api/admin/students')).json();
- $('login').hidden=true;$('app').hidden=false;$('tch').hidden=me.role!=='owner';$('stt').hidden=me.role!=='owner';$('mdl').hidden=me.role!=='owner';$('whoami').textContent='Вы вошли как '+me.name+' ('+me.login+')';render();
+ $('login').hidden=true;$('app').hidden=false;$('tch').hidden=me.role!=='owner';$('stt').hidden=me.role!=='owner';$('mdl').hidden=me.role!=='owner';$('trn').hidden=$('ttrn').hidden=me.role!=='owner';$('whoami').textContent='Вы вошли как '+me.name+' ('+me.login+')';render();
  const last=localStorage.getItem('last:'+me.login);
  if(!cur&&students.length)pick(students.some(s=>s.id===last)?last:students[0].id);
  chanAsk();
@@ -512,7 +512,7 @@ function detect(oc){
   if(HDR[y]){const s=y;while(y<ymax&&(HDR[y]||anyH(y,y+4)))y++;if(y-s>=minh)bands.push([s,y])}else y++;
  }
  const cards=[];let last=-1;
- for(const [s,e] of bands){if(s<last)continue;let y=e;while(y<ymax&&!allB(y,y+gapn))y++;cards.push([s,y]);last=y}
+ for(const [s,e] of bands){if(s<last)continue;let y=e;while(y<ymax&&!allB(y,y+gapn))y++;cards.push([s,y,e]);last=y} // третье число — где кончается цветная шапка карточки
  return cards;
 }
 async function resolveDest(d){
@@ -799,6 +799,65 @@ $('tback').onclick=()=>{if(hist.length)goto(hist.pop(),null,false)};
 $('tol').onchange=async()=>{const v=$('tol').value;if(v==='')return;const t=await resolveDest(ol[+v].d);if(t)goto(t.page,t.y);$('tol').value=''};
 $('tfind').onclick=findTask;$('tq').onkeydown=e=>{if(e.key==='Enter')findTask()};
 $('tpage').onclick=()=>send(.04,.04,.96,.91,null);
+// ---------- выгрузка сборника в тренажёр (только владелец): все карточки с ответом → картинка условия, номер, ответ, группа ----------
+async function numAt(p,row,items){ // номер задания: из имени ссылки «ans::4.19», из шапки «Задача 4.19.», иначе по разделу оглавления (как cardInfo)
+ const m=typeof row.right==='string'&&row.right.match(/^ans::(\d+)\./);if(m)return{num:+m[1]};
+ const tx=items.find(i=>/^(Задача|Аналог|Прототип)\s+\d+\./.test(i.str)&&i.transform[5]<=row.top+8&&i.transform[5]>=row.y-10);
+ const L=await bookLeaves(),lastP=Math.max(0,...L.map(l=>l.p||0));let leafPage=p;
+ if(p>lastP+20&&row.left){const pr=await dpos(row.left);if(pr)leafPage=pr.p}
+ let li=-1;L.forEach((l,k)=>{if(l.p&&l.p<=leafPage)li=k});
+ const ext=li>=0&&/РАЗВ[ЁЕ]РНУТ/i.test(L[li].top),prac=l=>/ПРАКТИЧ/i.test(l.top),hasPr=L.some(prac);
+ if(tx)return{num:+tx.str.match(/(\d+)\./)[1],ext};
+ if(li>=0&&!prac(L[li]))return{num:L.slice(0,li).filter(l=>!prac(l)).length+(hasPr?6:1),ext};
+ return{ext}}
+window.trBook=()=>book;
+function trimImg(src){return new Promise(ok=>{ // обрезаем пустые поля вокруг условия — на телефоне задача выйдет крупнее
+ const im=new Image();im.onload=()=>{try{
+  const w=im.width,h=im.height,c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d',{willReadFrequently:true});g.drawImage(im,0,0);
+  const d=g.getImageData(0,0,w,h).data,m=Math.round(w*.03);let x0=w,x1=-1,y0=h,y1=-1;
+  for(let y=0;y<h;y++)for(let x=m;x<w-m;x++){const i=(y*w+x)*4;if(Math.max(d[i],d[i+1],d[i+2])<140){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}}
+  if(x1<0){c.width=0;return ok(src)}
+  const p=Math.round(w*.025),row=y=>{for(let x=m;x<w-m;x++){const i=(y*w+x)*4;if(Math.min(d[i],d[i+1],d[i+2])<235)return true}return false};
+  let yb=y1;while(yb<Math.min(h-1,y1+p)&&!row(yb+1))yb++; // поле снизу — но без серой подписи «Банк ФИПИ · …»
+  x0=Math.max(0,x0-p);y0=Math.max(0,y0-p);x1=Math.min(w-1,x1+p);y1=yb;
+  const o=document.createElement('canvas');o.width=x1-x0+1;o.height=y1-y0+1;const og=o.getContext('2d');og.fillStyle='#fff';og.fillRect(0,0,o.width,o.height);
+  og.drawImage(c,x0,y0,o.width,o.height,0,0,o.width,o.height);let r=o.toDataURL('image/png');if(r.length>700000)r=o.toDataURL('image/jpeg',.9);
+  c.width=o.width=0;ok(r)}catch(e){ok(src)}};im.onerror=()=>ok(src);im.src=src})}
+window.trExport=async(name,exam,prog,stopped,why)=>{ // why — куда записывать причины пропуска (для проверки)
+ if(!pdf)throw Error('Сначала откройте сборник');
+ const post=async o=>{for(let i=0;i<4;i++){const r=await window.boardApi('/api/admin/trn',{method:'POST',body:JSON.stringify(o)}).catch(()=>null);if(r&&r.ok)return r.json();await new Promise(z=>setTimeout(z,1500))}throw Error('нет связи с сервером')};
+ const {id}=await post({t:'src-new',name,exam});let buf=[],n=0,skip=0;const by={};
+ const flush=async()=>{if(buf.length){await post({t:'src-add',id,tasks:buf});buf=[]}};
+ for(let p=1;p<=pdf.numPages;p++){
+  if(stopped()){await post({t:'src-del',id});throw Error('Остановлено')}
+  prog(p,pdf.numPages,n);
+  const rows=(await hdrRows(p)).filter(r=>r.right);if(!rows.length)continue; // одна ссылка в шапке — прототип без аналогов («Аналогов нет»)
+  const page=await pdf.getPage(p),base=page.getViewport({scale:1}),H=base.height,items=(await page.getTextContent()).items;
+  const dvp=page.getViewport({scale:500/base.width}),oc=document.createElement('canvas');oc.width=Math.round(dvp.width);oc.height=Math.round(dvp.height);
+  await page.render({canvasContext:oc.getContext('2d',{willReadFrequently:true}),viewport:dvp,intent:'print'}).promise;
+  const ch=oc.height,cw=oc.width,cs=detect(oc).map(([s,e,he])=>[s/ch,e/ch,(he||s)/ch]),PX=oc.getContext('2d').getImageData(0,0,cw,ch).data;oc.width=oc.height=0;
+  const hdrEnd=y0=>{ // низ цветной шапки: идём вниз от кнопок, пока строка не станет почти вся белой (начало условия)
+   for(let y=Math.max(0,y0);y<Math.min(ch,y0+40);y++){let w=0;for(let k=0;k<30;k++){const i=(y*cw+Math.floor(cw*(.12+k*.76/29)))*4;if(Math.min(PX[i],PX[i+1],PX[i+2])>=245)w++}if(w>=27)return y/ch}
+   return null};
+  for(const row of rows){
+   try{
+    // шапка должна быть внутри карточки (у одиночной ссылки — прямо в цветной шапке, иначе это строка страницы ответов)
+    const fy=1-row.top/H,c=cs.find(([s,e,he])=>fy>=s-.03&&(row.left?fy<=e:fy<=he+.01))||null;if(!c){why&&why.push([p,'card',Math.round(row.top)]);continue} // не карточка (оглавление, страница ответов) — не считаем
+    const a=await ansAt(row.right);if(!a){skip++;why&&why.push([p,'ans',Math.round(row.top)]);continue} // без простого ответа (развёрнутые) — не берём
+    const ni=await numAt(p,row,items);if(ni.ext||!(ni.num>=1&&ni.num<=30)){skip++;why&&why.push([p,'num',Math.round(row.top)]);continue}
+    const L=row.left&&await dpos(row.left);let g=p+':'+Math.round(row.top);
+    if(L&&L.p<=p){const rL=(await hdrRows(L.p)).filter(r=>r.left).sort((x,y)=>Math.abs(x.top-(L.y??x.top))-Math.abs(y.top-(L.y??y.top)))[0];if(rL)g=L.p+':'+Math.round(rL.top)}
+    const hb=hdrEnd(Math.round((1-row.y/H)*ch))??(1-(row.y-6)/H); // шапку с кнопками «Аналоги/Ответ» ученику не показываем
+    let img=await crop(.09,Math.min(c[1]-.01,Math.max(c[2]+.002,hb+.0015)),.91,c[1],p);
+    if(img)img=await trimImg(img);
+    if(!img||img.length<2500){skip++;why&&why.push([p,'img',Math.round(row.top)]);continue}
+    buf.push({n:ni.num,a,g,img});n++;why&&why.push([p,'ok',Math.round(row.top),ni.num,a,why.img?img:0]);by[ni.num]=(by[ni.num]||0)+1;
+    if(buf.length>=8)await flush();
+   }catch(e){skip++;why&&why.push([p,'err '+(e&&e.message),Math.round(row.top)])}
+  }
+ }
+ await flush();await post({t:'src-done',id});prog(pdf.numPages,pdf.numPages,n);
+ return{n,skip,by}};
 })();
 </script>
 
@@ -1321,6 +1380,65 @@ $('tgs').onclick=async()=>{
   const b=e.target.closest&&e.target.closest('button,label,a,[role=button]');if(b!==p.b)return;
   let ok=false;const on=()=>{ok=true};b.addEventListener('click',on,{once:true,capture:true});
   setTimeout(()=>{b.removeEventListener('click',on,true);if(!ok&&document.contains(b)&&!b.disabled)b.click()},150)},true);
+})();
+</script>
+<script>
+// Тренажёр (пока только владелец): сборники в тренажёре, включение ученику, прогресс и ошибки ученика
+(function(){
+const $=i=>document.getElementById(i),api=(p,o)=>window.boardApi(p,o),EX={ege:'ЕГЭ',oge:'ОГЭ'};
+const el=(tag,props,...kids)=>{const e=Object.assign(document.createElement(tag),props||{});kids.forEach(k=>k!=null&&e.append(k));return e};
+function dlg(title){const o=el('div',{className:'dlg'}),b=el('div');b.append(el('h2',{textContent:title}));o.append(b);o.addEventListener('pointerdown',e=>{if(e.target===o&&!o.dataset.busy)o.remove()});document.body.append(o);return{o,b,close:()=>o.remove()}}
+const post=async o=>{const r=await api('/api/admin/trn',{method:'POST',body:JSON.stringify(o)}).catch(()=>null);return r&&r.ok?r.json():null};
+const numsTxt=N=>Object.keys(N||{}).map(Number).sort((a,b)=>a-b).map(n=>'№'+n+': '+N[n]).join(', ');
+function srcList(box,src,again){ // сборники в тренажёре с кнопкой «Удалить»
+ box.innerHTML='';const L=src.filter(x=>x.done);
+ if(!L.length){box.append(el('div',{className:'mut',textContent:'В тренажёре пока нет сборников. Откройте сборник в «Задачи» и нажмите «🎯 В тренажёр».'}));return}
+ L.forEach(x=>{const n=Object.values(x.nums).reduce((a,b)=>a+b,0);
+  box.append(el('div',{className:'row'},el('div',{className:'grow'},el('b',{textContent:EX[x.exam]+' · '+x.name}),el('div',{className:'mut',textContent:n+' задач — '+numsTxt(x.nums)})),
+   el('button',{textContent:'Удалить',onclick:async()=>{if(!confirm('Убрать сборник «'+x.name+'» из тренажёра? Ученики перестанут получать его задачи.'))return;await post({t:'src-del',id:x.id});again()}})))})}
+// --- «🎯 В тренажёр» в панели сборников ---
+$('ttrn').onclick=async()=>{
+ const bk=window.trBook&&window.trBook();if(!bk){alert('Сначала откройте сборник');return}
+ const d=dlg('Сборник в тренажёр');
+ d.b.append(el('div',{className:'mut',textContent:'Кабинет пройдёт по всему сборнику и возьмёт задачи с кнопкой «Ответ» и простым числовым ответом (тестовая часть). Номер задания определится сам. Ученики увидят только условие — ответов и решений не увидят.'}));
+ const nm=el('input',{value:bk.replace(/\.pdf$/i,'')}),ex=el('select',null,el('option',{value:'ege',textContent:'ЕГЭ'}),el('option',{value:'oge',textContent:'ОГЭ'}));
+ if(/ОГЭ|oge/i.test(bk))ex.value='oge';
+ d.b.append(el('div',{className:'row'},el('span',{textContent:'Название'}),el('div',{className:'grow'},nm)),el('div',{className:'row'},el('span',{textContent:'Экзамен'}),ex));
+ const st=el('div',{className:'mut'}),go=el('button',{className:'pri',textContent:'Отправить в тренажёр'}),stop=el('button',{textContent:'Остановить',hidden:true}),lst=el('div');
+ d.b.append(el('div',{style:'display:flex;gap:8px'},go,stop),st,el('h2',{textContent:'Уже в тренажёре',style:'font-size:15px;margin-top:8px'}),lst);
+ const loadL=async()=>{const r=await api('/api/admin/trn');if(r.ok)srcList(lst,(await r.json()).src,loadL)};loadL();
+ let halt=false;stop.onclick=()=>{halt=true;stop.disabled=true};
+ go.onclick=async()=>{go.disabled=true;stop.hidden=false;d.o.dataset.busy=1;nm.disabled=ex.disabled=true;
+  try{const r=await window.trExport(nm.value.trim()||bk,ex.value,(p,P,n)=>{st.textContent='Страница '+p+' из '+P+' · задач найдено: '+n+'. Не закрывайте окно.'},()=>halt);
+   st.textContent='✓ Готово: '+r.n+' задач в тренажёре ('+numsTxt(r.by)+')'+(r.skip?'. Пропущено задач без числового ответа или без номера: '+r.skip:'')+'.';
+   if(!r.n)st.textContent='В этом сборнике не нашлось задач с кнопкой «Ответ» и числовым ответом — в тренажёр ничего не добавлено.'}
+  catch(e){st.textContent='Не получилось: '+(e.message||e)}
+  delete d.o.dataset.busy;stop.hidden=true;loadL()}};
+// --- «🎯 Тренажёр» ученика ---
+$('trn').onclick=async()=>{
+ const C=window.hwCtx,sid=C&&C.cur();
+ if(!sid){alert('Выберите ученика слева');return}
+ if(C.isGroup(sid)){alert('Тренажёр включается отдельно каждому ученику группы — выберите ученика под группой.');return}
+ const d=dlg('🎯 Тренажёр');const body=el('div');d.b.append(body);
+ const draw=async()=>{
+  const r=await api('/api/admin/trn?sid='+sid);if(!r.ok){body.textContent='Не получилось загрузить';return}
+  const j=await r.json(),S=j.st;body.innerHTML='';
+  const on=el('input',{type:'checkbox',checked:S.on,style:'width:auto'}),ex=el('select',null,el('option',{value:'ege',textContent:'ЕГЭ'}),el('option',{value:'oge',textContent:'ОГЭ'}));ex.value=S.exam;
+  const save=async()=>{await post({t:'student',sid,on:on.checked,exam:ex.value});draw()};on.onchange=save;ex.onchange=save;
+  body.append(el('div',{className:'row'},el('label',{style:'display:flex;gap:8px;align-items:center;cursor:pointer'},on,el('b',{textContent:'Тренажёр включён'})),el('span',{className:'mut',textContent:'экзамен:'}),ex),
+   el('div',{className:'mut',style:'padding:6px 0',textContent:'Ученик выбирает номер и решает случайные задачи из сборников этого экзамена. Цель — '+S.goal+' верных подряд. Ответов и решений ученик не видит. Неверно — вторая попытка; снова неверно — задача уходит в «Работу над ошибками», и чтобы её закрыть, нужно решить аналог.'}));
+  if(!S.nums.length)body.append(el('div',{className:'mut',textContent:'Для '+EX[S.exam]+' в тренажёре ещё нет задач.'}));
+  else{const t=el('div',{style:'display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px'});
+   S.nums.forEach(x=>t.append(el('div',{style:'border:1px solid var(--bd);border-radius:10px;padding:7px 9px;font-size:13px'+(x.done?';border-color:#2f7d4f':'')},
+    el('b',{textContent:'№'+x.n+(x.done?' ✅':'')}),el('div',{className:'mut',textContent:'серия '+x.streak+' (лучшая '+x.best+')'}),el('div',{className:'mut',textContent:x.all?'верно '+x.ok+' из '+x.all:'ещё не решал'}))));
+   body.append(el('h2',{textContent:'Прогресс по номерам',style:'font-size:15px;margin-top:8px'}),t)}
+  body.append(el('h2',{textContent:'Работа над ошибками: '+S.errs+(S.fixed?' · исправлено '+S.fixed:''),style:'font-size:15px;margin-top:10px'}));
+  if(S.errList&&S.errList.length){const g=el('div',{style:'display:flex;flex-direction:column;gap:8px'});
+   S.errList.forEach(e=>g.append(el('div',null,el('div',{className:'mut',textContent:'№'+e.n+' · '+new Date(e.at).toLocaleDateString('ru-RU',{day:'numeric',month:'long'})}),el('img',{src:e.img,style:'max-width:100%;background:#fff;border-radius:8px;border:1px solid var(--bd)'}))));body.append(g)}
+  else body.append(el('div',{className:'mut',textContent:'Ошибок нет.'}));
+  const lst=el('div');body.append(el('h2',{textContent:'Сборники в тренажёре',style:'font-size:15px;margin-top:10px'}),lst);srcList(lst,j.src,draw);
+  body.append(el('div',{style:'display:flex;gap:8px;margin-top:10px'},el('button',{textContent:'Сбросить прогресс ученика',onclick:async()=>{if(confirm('Обнулить серии, статистику и ошибки тренажёра у этого ученика?')){await post({t:'reset',sid});draw()}}}),el('button',{textContent:'Закрыть',style:'margin-left:auto',onclick:d.close})));
+ };draw()};
 })();
 </script>
 </body>

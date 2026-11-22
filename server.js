@@ -758,7 +758,7 @@ function hwStudent(req, res, sid) { // /api/<id>/hw — открывается �
   const H = hwOf(sid);
   const out = () => {
     const r = room(sid), t = byId(s.owner);
-    json(res, { name: s.name, teacher: t ? t.name : '', groups: groupsOf(sid).map(g => ({ id: g.id, name: g.name })), rep: { fixed: H.fixed || 0, left: (H.mis || []).length }, list: H.list.map(hwPublic), pages: r ? r.s.pages.map(p => ({ id: p.id, title: p.title })) : [], tg: TG.token ? { s: tgLink('s' + sid), p: tgLink('p' + sid), on: (TG.subs[sid] || []).some(x => x.who === 's') } : null });
+    json(res, { name: s.name, teacher: t ? t.name : '', groups: groupsOf(sid).map(g => ({ id: g.id, name: g.name })), trn: s.trn && s.trn.on ? trExam(s) : null, rep: { fixed: H.fixed || 0, left: (H.mis || []).length }, list: H.list.map(hwPublic), pages: r ? r.s.pages.map(p => ({ id: p.id, title: p.title })) : [], tg: TG.token ? { s: tgLink('s' + sid), p: tgLink('p' + sid), on: (TG.subs[sid] || []).some(x => x.who === 's') } : null });
   };
   if (req.method === 'GET') return out();
   if (req.method !== 'POST') { res.writeHead(405); return res.end(); }
@@ -791,11 +791,158 @@ function hwStudent(req, res, sid) { // /api/<id>/hw — открывается �
   });
 }
 
+// ---------- тренажёр: ученик сам решает случайные задачи тестовой части (ЕГЭ/ОГЭ) ----------
+// Задачи и ответы владелец выгружает из своих сборников в кабинете («🎯 В тренажёр»): trainer/<сборник>/tasks.json + картинки.
+// Ответы ученику не отдаём никогда — проверка только здесь. Цель по номеру — 10 верных подряд.
+// Ошибка: вторая попытка; вторая неверная — задача в «Работу над ошибками», закрыть её можно, решив аналог (та же группа g).
+const TRD = path.join(DIR, 'trainer'), TRST = path.join(TRD, 'st'), TRSF = path.join(TRD, '_src.json'), TR_GOAL = 10;
+try { fs.mkdirSync(TRST, { recursive: true }); } catch (e) {}
+let TRS = { list: [] }; try { TRS = JSON.parse(fs.readFileSync(TRSF, 'utf8')); } catch (e) {}
+const trSrcSave = () => fs.writeFileSync(TRSF, JSON.stringify(TRS));
+const TRT = {}; // задачи сборников в памяти: id → [{k, n, g, a, f}]
+function trTasks(id) {
+  if (!TRT[id]) { try { TRT[id] = JSON.parse(fs.readFileSync(path.join(TRD, id, 'tasks.json'), 'utf8')); } catch (e) { TRT[id] = []; } }
+  return TRT[id];
+}
+const TRC = {};
+function trOf(sid) {
+  if (!TRC[sid]) { try { TRC[sid] = JSON.parse(fs.readFileSync(path.join(TRST, sid + '.json'), 'utf8')); } catch (e) { TRC[sid] = {}; } }
+  const P = TRC[sid]; P.nums = P.nums || {}; P.errs = P.errs || []; P.cur = P.cur || {}; P.fixed = P.fixed || 0;
+  return P;
+}
+const trSave = sid => fs.writeFileSync(path.join(TRST, sid + '.json'), JSON.stringify(TRC[sid]));
+const trExam = s => s && s.trn && s.trn.exam === 'oge' ? 'oge' : 'ege';
+function trPool(exam) { // все задачи сборников этого экзамена: [{t:'src:k', n, g, src, f}]
+  const out = [];
+  for (const S of TRS.list) if (S.exam === exam && S.done) for (const x of trTasks(S.id)) out.push({ t: S.id + ':' + x.k, n: x.n, g: S.id + ':' + x.g, f: '/trnimg/' + S.id + '/' + x.f, a: x.a });
+  return out;
+}
+const trFind = t => { const [s, k] = String(t).split(':'); const x = trTasks(s).find(y => y.k === k); return x ? { t, n: x.n, g: s + ':' + x.g, f: '/trnimg/' + s + '/' + x.f, a: x.a } : null; };
+const trRight = (ans, a) => { if (right(ans, a)) return true; const x = parseFloat(norm(ans)), y = parseFloat(norm(a)); return /^-?\d+(\.\d+)?$/.test(norm(a)) && isFinite(x) && Math.abs(x - y) < 1e-9; };
+const trRand = L => L[Math.floor(Math.random() * L.length)];
+function trSummary(s, P, full) { // что видит ученик (и преподаватель — с ошибками и картинками)
+  const pool = trPool(trExam(s)), by = {};
+  pool.forEach(x => { by[x.n] = (by[x.n] || 0) + 1; });
+  const nums = Object.keys(by).map(Number).sort((a, b) => a - b).map(n => { const q = P.nums[n] || {}; return { n, total: by[n], streak: q.streak || 0, best: q.best || 0, ok: q.ok || 0, all: q.all || 0, done: (q.best || 0) >= TR_GOAL }; });
+  const o = { exam: trExam(s), goal: TR_GOAL, nums, errs: P.errs.length, fixed: P.fixed };
+  if (full) o.errList = P.errs.map(e => { const x = trFind(e.t); return x && { n: x.n, img: x.f, at: e.at }; }).filter(Boolean);
+  return o;
+}
+function trView(c) { const x = trFind(c.t); return x ? { n: x.n, img: x.f, err: !!c.err, tries: c.tries || 0 } : null; }
+function trStudent(req, res, sid) { // /api/<id>/trn
+  const s = index.students.find(x => x.id === sid);
+  if (!s || s.type === 'group' || !(s.trn && s.trn.on)) { res.writeHead(404); return res.end(); }
+  const P = trOf(sid);
+  if (req.method === 'GET') return json(res, trSummary(s, P));
+  if (req.method !== 'POST') { res.writeHead(405); return res.end(); }
+  body(req, res, 2000, j => {
+    const pool = trPool(trExam(s));
+    if (j.t === 'next') { // задача по номеру (незаконченная возвращается та же — пропустить нельзя)
+      const n = +j.n; const key = 'n' + n;
+      if (P.cur[key] && trFind(P.cur[key].t)) return json(res, { task: trView(P.cur[key]) });
+      const q = P.nums[n] = P.nums[n] || {}; q.seen = q.seen || [];
+      const busy = new Set(P.errs.map(e => e.t));
+      let L = pool.filter(x => x.n === n && !busy.has(x.t));
+      if (!L.length) return json(res, { error: 'Задач этого номера пока нет' });
+      let F = L.filter(x => !q.seen.includes(x.t)); if (!F.length) { q.seen = []; F = L; }
+      const x = trRand(F); q.seen.push(x.t); if (q.seen.length > 3000) q.seen = q.seen.slice(-3000);
+      P.cur[key] = { t: x.t, n, tries: 0 }; trSave(sid);
+      return json(res, { task: trView(P.cur[key]) });
+    }
+    if (j.t === 'err') { // работа над ошибками: аналог самой старой ошибки
+      if (P.cur.err && trFind(P.cur.err.t)) return json(res, { task: trView(P.cur.err) });
+      const e = P.errs[0]; if (!e) return json(res, { error: 'Ошибок нет 🎉' });
+      const o = trFind(e.t); if (!o) { P.errs.shift(); trSave(sid); return json(res, { error: 'Задача больше недоступна — ошибка снята' }); }
+      const A = pool.filter(x => x.g === o.g && x.t !== o.t);
+      const x = A.length ? trRand(A) : o;
+      P.cur.err = { t: x.t, n: o.n, tries: 0, err: e.t }; trSave(sid);
+      return json(res, { task: trView(P.cur.err) });
+    }
+    if (j.t === 'ans') { // проверка ответа
+      const key = j.err ? 'err' : 'n' + (+j.n), c = P.cur[key];
+      if (!c) return json(res, { error: 'Задача уже закрыта — откройте следующую' });
+      const x = trFind(c.t); if (!x) { delete P.cur[key]; trSave(sid); return json(res, { error: 'Задача больше недоступна' }); }
+      const a = String(j.a || '').trim().slice(0, 40); if (!a) return json(res, { error: 'Впишите ответ' });
+      const ok = trRight(x.a, a), q = P.nums[x.n] = P.nums[x.n] || {}, r = { ok };
+      if (!c.err) { q.all = (q.all || 0) + (c.tries ? 0 : 1); }
+      if (ok) {
+        delete P.cur[key];
+        if (c.err) { P.errs = P.errs.filter(e => e.t !== c.err); P.fixed++; r.fixed = true; }
+        else {
+          if (!c.tries) q.ok = (q.ok || 0) + 1;
+          const was = q.best || 0; q.streak = c.tries ? 0 : (q.streak || 0) + 1; q.best = Math.max(was, q.streak);
+          if (q.best >= TR_GOAL && was < TR_GOAL) { r.mastered = true; tgTeacher(s.owner, '🎯 ' + s.name + ' — ' + TR_GOAL + ' верных подряд в тренажёре, №' + x.n + ' освоен.'); }
+        }
+      } else if (!c.tries) { c.tries = 1; r.again = true; if (!c.err) q.streak = 0; }
+      else {
+        delete P.cur[key]; r.again = false;
+        if (!c.err) { q.streak = 0; if (!P.errs.some(e => e.t === c.t) && P.errs.length < 300) { P.errs.push({ t: c.t, at: Date.now() }); r.toErr = true; } }
+        else { const e = P.errs.find(y => y.t === c.err); if (e) { P.errs = P.errs.filter(y => y !== e); P.errs.push(e); } } // ошибка остаётся — в конец очереди
+      }
+      if (!c.err) r.streak = q.streak || 0;
+      trSave(sid); r.sum = trSummary(s, P);
+      return json(res, r);
+    }
+    res.writeHead(400); res.end();
+  });
+}
+function trAdmin(req, res, u, me) { // /api/admin/trn — только владелец
+  if (me.id !== 'owner') { res.writeHead(403); return res.end(); }
+  const own = id => index.students.find(x => x.id === id && x.owner === me.id && x.type !== 'group');
+  if (req.method === 'GET') {
+    const sid = u.searchParams.get('sid'), s = sid && own(sid);
+    return json(res, { src: TRS.list.map(S => ({ id: S.id, name: S.name, exam: S.exam, at: S.at, done: !!S.done, nums: S.nums || {} })), st: s ? Object.assign({ on: !!(s.trn && s.trn.on) }, trSummary(s, trOf(s.id), true)) : null });
+  }
+  body(req, res, 15e6, j => {
+    if (j.t === 'src-new') {
+      const name = String(j.name || '').trim().slice(0, 80) || 'Сборник', exam = j.exam === 'oge' ? 'oge' : 'ege';
+      const id = crypto.randomBytes(5).toString('hex');
+      fs.mkdirSync(path.join(TRD, id), { recursive: true }); TRT[id] = [];
+      TRS.list.push({ id, name, exam, at: Date.now(), done: false }); trSrcSave();
+      return json(res, { id });
+    }
+    const S = TRS.list.find(x => x.id === j.id);
+    if (j.t === 'src-add' && S && !S.done) {
+      const L = trTasks(S.id);
+      for (const t of (Array.isArray(j.tasks) ? j.tasks : []).slice(0, 40)) {
+        const n = +t.n, a = String(t.a || '').trim().slice(0, 40), m = HIMG.exec(String(t.img || ''));
+        if (!(n >= 1 && n <= 30) || !a || !m) continue;
+        const k = 't' + L.length.toString(36), f = k + '.' + (m[1] === 'jpeg' ? 'jpg' : m[1]);
+        fs.writeFileSync(path.join(TRD, S.id, f), Buffer.from(m[2], 'base64'));
+        L.push({ k, n, g: String(t.g || k).slice(0, 40), a, f });
+      }
+      fs.writeFileSync(path.join(TRD, S.id, 'tasks.json'), JSON.stringify(L));
+      return json(res, { n: L.length });
+    }
+    if (j.t === 'src-done' && S) {
+      S.done = true; S.nums = {}; trTasks(S.id).forEach(x => { S.nums[x.n] = (S.nums[x.n] || 0) + 1; });
+      if (!trTasks(S.id).length) { TRS.list = TRS.list.filter(x => x !== S); fs.rm(path.join(TRD, S.id), { recursive: true, force: true }, () => {}); }
+      trSrcSave(); return json(res, { ok: true });
+    }
+    if (j.t === 'src-del' && S) {
+      TRS.list = TRS.list.filter(x => x !== S); delete TRT[S.id]; trSrcSave();
+      fs.rm(path.join(TRD, S.id), { recursive: true, force: true }, () => {});
+      return json(res, { ok: true });
+    }
+    if (j.t === 'student') {
+      const s = own(j.sid); if (!s) { res.writeHead(404); return res.end(); }
+      s.trn = { on: !!j.on, exam: j.exam === 'oge' ? 'oge' : 'ege' }; saveIndex();
+      return json(res, { ok: true });
+    }
+    if (j.t === 'reset') {
+      const s = own(j.sid); if (!s) { res.writeHead(404); return res.end(); }
+      TRC[s.id] = {}; trSave(s.id); return json(res, { ok: true });
+    }
+    res.writeHead(400); res.end();
+  });
+}
+
 function dropRoom(id) { // удалить доску ученика целиком
   const r = rooms[id]; if (r) { r.clients.forEach(c => c.end()); delete rooms[id]; }
   if (RID.test(String(id))) {
     fs.unlink(path.join(DIR, id + '.json'), () => {});
     delete hwc[id]; fs.unlink(path.join(HWD, id + '.json'), () => {});
+    delete TRC[id]; fs.unlink(path.join(TRST, id + '.json'), () => {});
     if (SN[id]) { delete SN[id]; saveSN(); } fs.rm(path.join(SND, id), { recursive: true, force: true }, () => {}); fs.rm(path.join(HWD, id), { recursive: true, force: true }, () => {});
   }
 }
@@ -848,6 +995,7 @@ function admin(req, res, u) {
   if (req.method === 'GET' && u.pathname === '/api/admin/students') return json(res, mine());
   if (u.pathname === '/api/admin/hw' || u.pathname === '/api/admin/hw-pending' || u.pathname === '/api/admin/hw-rep' || u.pathname === '/api/admin/hw-draft') return hwTeacher(req, res, u, me);
   if (u.pathname === '/api/admin/tg' || u.pathname === '/api/admin/tg-student') return tgAdmin(req, res, u, me);
+  if (u.pathname === '/api/admin/trn') return trAdmin(req, res, u, me);
   if (req.method === 'GET' && u.pathname === '/api/admin/backup') {
     const all = {}; mine().forEach(s => { const r = room(s.id); if (r) all[s.id] = r.s; });
     return json(res, { index: { students: mine() }, rooms: all });
@@ -985,6 +1133,15 @@ http.createServer((req, res) => {
   }
   const hm = u.pathname.match(/^\/api\/([a-z0-9]{4,32})\/hw$/);
   if (hm) return hwStudent(req, res, hm[1]);
+  const trm = u.pathname.match(/^\/api\/([a-z0-9]{4,32})\/trn$/);
+  if (trm) return trStudent(req, res, trm[1]);
+  const tri = u.pathname.match(/^\/trnimg\/([a-f0-9]{10})\/(t[a-z0-9]{1,8}\.(jpg|png|webp))$/);
+  if (tri) { // картинки задач тренажёра (условия без ответов)
+    const f = path.join(TRD, tri[1], tri[2]);
+    if (!fs.existsSync(f)) { res.writeHead(404); return res.end(); }
+    res.writeHead(200, { 'Content-Type': 'image/' + (tri[3] === 'jpg' ? 'jpeg' : tri[3]), 'Cache-Control': 'public, max-age=604800' });
+    return fs.createReadStream(f).pipe(res);
+  }
   const hi = u.pathname.match(/^\/hwimg\/([a-z0-9]{4,32})\/([a-f0-9]{16}\.(jpg|png|webp))$/);
   if (hi) { // картинки задач и фото тетрадей
     const f = path.join(HWD, hi[1], hi[2]);
