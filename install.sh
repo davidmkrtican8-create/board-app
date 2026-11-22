@@ -155,6 +155,15 @@ cat > /etc/cron.d/board <<EOF
 */5 * * * * root /usr/local/bin/board-update >/dev/null 2>&1
 0 4 * * * root tar czf /var/backups/board/board-\$(date +\%F).tgz -C /var/lib board && find /var/backups/board -name 'board-*.tgz' -mtime +14 -delete
 EOF
+# Сторож: раз в 5 минут проверяет сайт, звонки, память, диск, сертификат и ошибки у пользователей
+# и пишет владельцу в Telegram (бот подключается в кабинете). Проверка: board-alert --test
+if curl -4 -fsS --retry 4 --retry-delay 3 --retry-all-errors --connect-timeout 15 --max-time 60 \
+     "https://raw.githubusercontent.com/davidmkrtican8-create/board-app/main/board-alert?t=$(date +%s)" -o /usr/local/bin/board-alert; then
+  chmod +x /usr/local/bin/board-alert
+  echo '*/5 * * * * root /usr/local/bin/board-alert >/dev/null 2>&1' > /etc/cron.d/board-alert
+else
+  echo "ВНИМАНИЕ: сторож board-alert не скачался — сайт работает и без него; можно запустить установку ещё раз позже."
+fi
 systemctl daemon-reload
 systemctl enable --now board
 systemctl restart board

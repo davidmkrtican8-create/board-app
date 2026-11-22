@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+# Сторож УчиДоски: раз в 5 минут (cron /etc/cron.d/board-alert) проверяет сервер и пишет владельцу в Telegram,
+# если что-то не так. Бот и чат владельца берутся из /var/lib/board/_tg.json (бот подключается в кабинете).
+# Проверки: сайт отвечает (изнутри и по https), звонки (coturn), память, диск, сертификат, падения доски,
+# ошибки у пользователей. Об одной и той же проблеме напоминает не чаще раза в 3 часа, о починке сообщает.
+# Запуск вручную: board-alert --test (пробное сообщение), board-alert --dry (только показать, без отправки).
+import json, os, re, ssl, socket, subprocess, sys, time, urllib.request
+
+TGF = '/var/lib/board/_tg.json'
+ST = '/var/lib/board-alert.json'
+DOMAIN = os.environ.get('DOMAIN') or 'uchidoska.ru'
+REPEAT = 3 * 3600          # напоминать о том же не чаще
+DRY = '--dry' in sys.argv
+
+
+def sh(cmd, t=30):
+    try: return subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=t).stdout
+    except Exception: return ''
+
+
+def load(p, d):
+    try: return json.load(open(p))
+    except Exception: return d
+
+
+def send(text):
+    if DRY: print('---\n' + text); return True
+    tg = load(TGF, {})
+    tok, chats = tg.get('token'), (tg.get('tsubs') or {}).get('owner') or []
+    if not tok or not chats: return False
+    ok = False
+    for c in chats:
+        for _ in range(4):   # связь с Telegram из России рвётся — пробуем несколько раз
+            try:
+                b = json.dumps({'chat_id': c, 'text': text, 'disable_web_page_preview': True}).encode()
+                rq = urllib.request.Request(f'https://api.telegram.org/bot{tok}/sendMessage', b, {'Content-Type': 'application/json'})
+                if json.load(urllib.request.urlopen(rq, timeout=15)).get('ok'): ok = True; break
+            except Exception: time.sleep(3)
+    return ok
+
+
+def http_ok(url, resolve=False):
+    for _ in range(3):
+        r = sh(f"curl -s -o /dev/null -w '%{{http_code}}' -m 10 {'--resolve ' + DOMAIN + ':443:127.0.0.1' if resolve else ''} {url}", 20)
+        if r.strip() in ('200', '204', '301', '302'): return True
+        time.sleep(5)
+    return False
+
+
+def cert_days():
+    try:
+        ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
+        with socket.create_connection(('127.0.0.1', 443), timeout=10) as s, ctx.wrap_socket(s, server_hostname=DOMAIN) as x:
+            der = x.getpeercert(True)
+        out = subprocess.run(['openssl', 'x509', '-inform', 'DER', '-noout', '-enddate'], input=der, capture_output=True).stdout.decode()
+        end = time.mktime(time.strptime(out.split('=', 1)[1].strip(), '%b %d %H:%M:%S %Y %Z'))
+        return int((end - time.time()) // 86400)
+    except Exception: return None
+
+
+# ---------- проверки: ключ → текст проблемы (или None, если всё хорошо) ----------
+P = {}
+P['site'] = None if http_ok('http://127.0.0.1:3000/health') else '🔴 Сайт не отвечает: доска (программа на сервере) не работает. Ученики не могут зайти.'
+if not P['site']:
+    P['https'] = None if http_ok(f'https://{DOMAIN}/t', True) else '🔴 Сайт не открывается по https (доска работает, но не отвечает Caddy или сертификат).'
+P['turn'] = None if sh('systemctl is-active coturn').strip() == 'active' else '🟠 Не работает ретранслятор звонков (coturn): звонки у части учеников могут не соединяться.'
+mem = sh("free -m | awk '/^Mem:/{print $7} /^Swap:/{print $3}'").split()
+if len(mem) == 2:
+    avail, swap = int(mem[0]), int(mem[1])
+    P['mem'] = f'🟠 Мало памяти на сервере: свободно {avail} МБ, в запасной памяти на диске {swap} МБ. Сайт может начать тормозить.' if avail < 120 or swap > 600 else None
+disk = sh("df -P / | awk 'NR==2{print $5}'").strip().rstrip('%')
+if disk.isdigit(): P['disk'] = f'🟠 Диск сервера заполнен на {disk}%.' if int(disk) >= 85 else None
+d = cert_days()
+P['cert'] = f'🟠 Сертификат сайта (https) истекает через {d} дн., а должен был продлиться сам.' if d is not None and d < 20 else None
+crash = sh("journalctl -u board --since '-6 min' --no-pager | grep -E 'Main process exited|Failed with result|Out of memory|oom-kill' | head -3")
+P['crash'] = ('🔴 Доска упала и перезапустилась сама. Последние строки журнала:\n' + crash.strip()[:600]) if crash.strip() else None
+
+# ---------- ошибки у пользователей (страницы присылают их на сервер) ----------
+BENIGN = ('sse-nogz-fallback',)   # не ошибка: Safari просто выбрал запасной способ связи
+errs = {}
+for line in sh("journalctl -u board --since '-5 min' --no-pager | grep client-error").splitlines():
+    try: j = json.loads(line.split('client-error', 1)[1])
+    except Exception: continue
+    m = str(j.get('m', ''))[:160]
+    if not m or any(b in m for b in BENIGN): continue
+    ua = str(j.get('u', ''))
+    br = 'iPad/iPhone' if re.search(r'iPad|iPhone', ua) else 'Android' if 'Android' in ua else 'Яндекс' if 'YaBrowser' in ua else 'Safari' if 'Safari' in ua and 'Chrome' not in ua else 'Chrome' if 'Chrome' in ua else 'браузер'
+    k = re.sub(r'\d+', '#', m)[:80]
+    e = errs.setdefault(k, {'m': m, 'n': 0, 'where': set()})
+    e['n'] += 1; e['where'].add(f"{j.get('p', '')} ({br})")
+
+# ---------- отправка ----------
+now = time.time()
+S = load(ST, {})
+out = []
+for k, txt in P.items():
+    s = S.get(k)
+    if txt:
+        if not s or now - s.get('sent', 0) > REPEAT:
+            out.append(txt); S[k] = {'since': (s or {}).get('since', now), 'sent': now}
+    elif s:
+        out.append('🟢 Снова в порядке: ' + {'site': 'сайт отвечает', 'https': 'сайт открывается по https', 'turn': 'звонки (coturn) работают',
+                   'mem': 'память', 'disk': 'диск', 'cert': 'сертификат', 'crash': 'доска работает'}.get(k, k)
+                   + f" (проблема была ~{max(1, round((now - s['since']) / 60))} мин)")
+        S.pop(k)
+E = S.setdefault('errs', {})
+for k, e in errs.items():
+    if now - E.get(k, 0) > 6 * 3600:     # одну и ту же ошибку — не чаще раза в 6 часов
+        out.append(f"⚠️ Ошибка у пользователя (за 5 мин повторилась {e['n']} р.): {e['m']}\nГде: {', '.join(sorted(e['where']))[:300]}")
+        E[k] = now
+S['errs'] = {k: t for k, t in E.items() if now - t < 86400}
+if '--test' in sys.argv: out = ['✅ Сторож УчиДоски подключён: если с сайтом что-то случится, я напишу сюда.']
+
+if out:
+    text = 'УчиДоска · сервер\n\n' + '\n\n'.join(out)
+    if not send(text) and not DRY:
+        sys.exit(1)   # не дошло — состояние не сохраняем, попробуем через 5 минут
+if not DRY: json.dump(S, open(ST, 'w'))
