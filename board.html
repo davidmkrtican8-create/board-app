@@ -614,7 +614,27 @@ function inkLayer(w,h,tf,draw){
  if(hlUsed){hlDirty=true;ictx.save();ictx.setTransform(1,0,0,1,0,0);ictx.globalCompositeOperation='destination-over';ictx.globalAlpha=.42;ictx.drawImage(hlc,0,0);ictx.restore()}
  return ink;
 }
+// Плавная прокрутка и масштаб (iPad): пока доску двигают пальцами, колесом или вслед за преподавателем,
+// не перерисовываем линии и картинки, а сдвигаем и растягиваем сам холст средствами экрана (это делает видеочип — без задержек).
+// Начисто перерисовываем, когда открылось много пустого места, и сразу после остановки.
+let mvV=null,mvT=0,mvEnd=0,mvRaf=0,mvUntil=0;
+const moving=()=>performance.now()<mvUntil;
+function viewMoved(){ // вместо redraw() при каждом движении камеры
+ mvUntil=performance.now()+160;clearTimeout(mvEnd);mvEnd=setTimeout(()=>{mvV=null;redraw()},170);
+ if(!mvRaf)mvRaf=requestAnimationFrame(()=>{mvRaf=0;moveFrame()});
+}
+function moveFrame(){
+ const n=sheets();clampView(n);totH=n*PS-PG;
+ if(!mvV){redraw();return}
+ const k=view.s/mvV.s,tx=(mvV.x-view.x)*view.s,ty=(mvV.y-view.y)*view.s,gap=Math.max(Math.abs(tx)/cw,Math.abs(ty)/ch)+(k<1?1-k:0);
+ if(gap>.3||k>1.8||performance.now()-mvT>700){redraw();return} // открылось много пустого или сильно приблизили — рисуем начисто
+ cv.style.transformOrigin='0 0';cv.style.transform='translate('+tx+'px,'+ty+'px) scale('+k+')';
+ wrap.style.background=dark?'#12101a':'#e6e2ef';
+ placeDone();drawOverlay();syncPlotPanels();placeSolidBar();sendView();syncVsb();
+}
 function redraw(lo){ // lo===true — изменились только черновики линий, готовые записи те же
+ if(mvRaf&&!moving()){cancelAnimationFrame(mvRaf);mvRaf=0}
+ if(cv.style.transform){cv.style.transform='';wrap.style.background=''} // холст снова на месте — рисуем по-настоящему
  const n=sheets();clampView(n);totH=n*PS-PG;
  const s=view.s;
  ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=dark?'#12101a':'#e6e2ef';ctx.fillRect(0,0,cv.width,cv.height);
@@ -637,7 +657,7 @@ function redraw(lo){ // lo===true — изменились только черн
    if(inkC.hl){hctx.save();hctx.setTransform(1,0,0,1,0,0);hctx.drawImage(inkC.hlc,0,0);hctx.restore();hlUsed=true}
   }else{
    for(const id in ps){const sk=ps[id],B=bbox(sk);if(B[2]<vx0||B[0]>vx1||B[3]<vy0||B[1]>vy1)continue;drawStroke(sk)} // за экраном не рисуем
-   { // запоминаем готовые записи картинкой
+   if(!moving()){ // запоминаем готовые записи картинкой (пока доску двигают, это бесполезно — вид меняется каждый кадр)
     const mk=w=>{const c=document.createElement('canvas');c.width=cv.width;c.height=cv.height;return c};
     inkC=inkC&&inkC.ink.width===cv.width&&inkC.ink.height===cv.height?inkC:{ink:mk(),hlc:mk()};
     const a=inkC.ink.getContext('2d'),b=inkC.hlc.getContext('2d');a.clearRect(0,0,cv.width,cv.height);a.drawImage(ink,0,0);
@@ -669,6 +689,9 @@ function redraw(lo){ // lo===true — изменились только черн
    ctx.restore();
   }
  }
+ if(moving()){ // доску сейчас двигают — запоминаем, какой вид сейчас нарисован; следующие кадры — сдвигом холста
+  mvV={x:view.x,y:view.y,s:view.s};mvT=performance.now();
+ }else mvV=null;
  placeDone();drawOverlay();syncPlotPanels();placeSolidBar();sendView();syncVsb();
  const zf=view.s>fitS()*1.3;if($('zfit').hidden===zf)$('zfit').hidden=!zf;
 }
@@ -681,7 +704,7 @@ function drawOverlay(){
   for(const id in cursors){const o=cursors[id];
    if(now-o.t>3500){delete cursors[id];continue}
    if(o.page!==page)continue;
-   const sx=(o.x-view.x)*view.s,sy=(o.y-view.y)*view.s;if(sx<-30||sy<-30||sx>cw+30||sy>ch+30)continue;
+   const sx=((o.dx??o.x)-view.x)*view.s,sy=((o.dy??o.y)-view.y)*view.s;if(sx<-30||sy<-30||sx>cw+30||sy>ch+30)continue;
    c.fillStyle=o.color;c.strokeStyle='#fff';c.lineWidth=1.5;c.beginPath();c.moveTo(sx,sy);c.lineTo(sx+3,sy+16);c.lineTo(sx+7,sy+11.5);c.lineTo(sx+13,sy+14);c.closePath();c.fill();c.stroke();
    c.font='12px '+FONT;const tw=c.measureText(o.label).width+12;
    c.fillStyle=o.color;c.beginPath();c.rect(sx+12,sy+14,tw,18);c.fill();
@@ -748,7 +771,8 @@ function onOp(o){
  if(o.t==='laser'){if(o.from!==me&&Array.isArray(o.pts)){const l=(lasers[o.from]=lasers[o.from]||{page:o.page,pts:[]}),n0=performance.now();l.page=o.page;
   for(let i=0;i+1<o.pts.length;i+=2)l.pts.push({x:+o.pts[i],y:+o.pts[i+1],t:n0+i*4});laserLoop()}return}
  if(o.t==='view'){if(o.from===me)return;if(o.stop){leaderView=null;detached=false}else{leaderView={page:o.page,x:+o.x,y:+o.y,w:+o.w,h:+o.h};applyLeader()}followUI();return}
- if(o.t==='cursor'){if(o.from!==me){cursors[o.from]={x:o.x,y:o.y,page:o.page,label:String(o.label||'Участник'),color:/^#[0-9a-f]{6}$/i.test(o.color)?o.color:'#0e9f8e',t:Date.now()};drawOverlay()}return}
+ if(o.t==='cursor'){if(o.from!==me){const old=cursors[o.from],x=+o.x,y=+o.y,jump=!old||old.page!==o.page||Date.now()-old.t>1500; // новый или давно стоявший курсор ставим сразу, остальное — плавно доводим
+  cursors[o.from]={x,y,dx:jump?x:old.dx,dy:jump?y:old.dy,page:o.page,label:String(o.label||'Участник'),color:/^#[0-9a-f]{6}$/i.test(o.color)?o.color:'#0e9f8e',t:Date.now()};curAnim()}return}
  if(o.t==='live'){if(o.from!==me)onLive(o);return}
  if(o.t==='stroke'){(strokes[o.page]=strokes[o.page]||{})[o.stroke.id]=o.stroke;inval(o.stroke);delete live[o.from];doneIds.add(o.stroke.id)}
  if(o.t==='strokeset'&&strokes[o.page]&&strokes[o.page][o.id]){const sk=strokes[o.page][o.id];sk.pts=o.pts;if(o.a!==undefined){if(+o.a)sk.a=+o.a;else delete sk.a}inval(sk)}
@@ -781,36 +805,46 @@ function connectES(){
 }
 connectES();
 setInterval(()=>{if(Object.keys(cursors).length)drawOverlay()},1000);
+// плавное движение чужих курсоров: каждый кадр подтягиваем видимое положение к последнему присланному
+let curRaf=0,curLast=0;
+function curAnim(){if(!curRaf){curLast=performance.now();curRaf=requestAnimationFrame(curStep)}}
+function curStep(ts){
+ curRaf=0;const k=1-Math.pow(.0005,Math.min(50,ts-curLast)/1000*4);curLast=ts;let moving=false; // ~95% пути за 100 мс независимо от частоты кадров
+ for(const id in cursors){const o=cursors[id];if(o.dx===undefined){o.dx=o.x;o.dy=o.y}
+  o.dx+=(o.x-o.dx)*k;o.dy+=(o.y-o.dy)*k;
+  if(Math.abs(o.x-o.dx)+Math.abs(o.y-o.dy)>.3)moving=true;else{o.dx=o.x;o.dy=o.y}}
+ drawOverlay();if(moving)curRaf=requestAnimationFrame(curStep);
+}
 
 // ---------- камера ----------
 function zoomAt(px,py,f){
  const lim=fitS(),ns=Math.min(lim*4,Math.max(lim*.6,view.s*f)),wx=px/view.s+view.x,wy=py/view.s+view.y;
- view.s=ns;view.x=wx-px/ns;view.y=wy-py/ns;redraw();userView();
+ view.s=ns;view.x=wx-px/ns;view.y=wy-py/ns;viewMoved();userView();
 }
 function fit(){view.s=fitS();redraw();userView()} // «По ширине»
 function beginGesture(){
- const a=[...ptrs.values()],r=cv.getBoundingClientRect(),mx=(a[0].x+a[1].x)/2-r.left,my=(a[0].y+a[1].y)/2-r.top;
+ const a=[...ptrs.values()],r=rg.getBoundingClientRect(),mx=(a[0].x+a[1].x)/2-r.left,my=(a[0].y+a[1].y)/2-r.top;
  gest={d:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)||1,s:view.s,wx:mx/view.s+view.x,wy:my/view.s+view.y};
 }
 function doGesture(){
- const a=[...ptrs.values()],r=cv.getBoundingClientRect(),mx=(a[0].x+a[1].x)/2-r.left,my=(a[0].y+a[1].y)/2-r.top,d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)||1;
- const lim=fitS(),ns=Math.min(lim*4,Math.max(lim*.6,gest.s*d/gest.d));view.s=ns;view.x=gest.wx-mx/ns;view.y=gest.wy-my/ns;redraw();userView();
+ const a=[...ptrs.values()],r=rg.getBoundingClientRect(),mx=(a[0].x+a[1].x)/2-r.left,my=(a[0].y+a[1].y)/2-r.top,d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)||1;
+ const lim=fitS(),ns=Math.min(lim*4,Math.max(lim*.6,gest.s*d/gest.d));view.s=ns;view.x=gest.wx-mx/ns;view.y=gest.wy-my/ns;viewMoved();userView();
 }
 cv.addEventListener('wheel',e=>{
- e.preventDefault();const r=cv.getBoundingClientRect(),m=e.deltaMode===1?16:1,dy=e.deltaY*m,dx=e.deltaX*m;
+ e.preventDefault();const r=rg.getBoundingClientRect(),m=e.deltaMode===1?16:1,dy=e.deltaY*m,dx=e.deltaX*m;
  if(e.ctrlKey||e.metaKey){ // щелчок колеса мыши = +12%, щипок на тачпаде = плавно
   const f=Math.abs(dy)>=50?(dy<0?1.12:1/1.12):Math.exp(-Math.max(-25,Math.min(25,dy))*.012);
   zoomAt(e.clientX-r.left,e.clientY-r.top,f)}
- else{view.x+=dx/view.s;view.y+=dy/view.s;redraw();userView()}
+ else{view.x+=dx/view.s;view.y+=dy/view.s;viewMoved();userView()}
 },{passive:false});
 if(!('ontouchstart' in window)){ // щипок на трекпаде Safari
  let gs=1;
  cv.addEventListener('gesturestart',e=>{e.preventDefault();gs=1});
- cv.addEventListener('gesturechange',e=>{e.preventDefault();const r=cv.getBoundingClientRect();zoomAt(e.clientX-r.left,e.clientY-r.top,e.scale/gs);gs=e.scale});
+ cv.addEventListener('gesturechange',e=>{e.preventDefault();const r=rg.getBoundingClientRect();zoomAt(e.clientX-r.left,e.clientY-r.top,e.scale/gs);gs=e.scale});
 }
 
 // ---------- ровные фигуры: удержите перо в конце линии ----------
-const pos=e=>{const r=rectC||(rectC=cv.getBoundingClientRect());return[r2(Math.max(0,Math.min(PW,(e.clientX-r.left)/view.s+view.x))),r2(Math.max(0,Math.min(totH,(e.clientY-r.top)/view.s+view.y)))]};
+const pos=e=>{const r=rectC||(rectC=rg.getBoundingClientRect());return[r2(Math.max(0,Math.min(PW,(e.clientX-r.left)/view.s+view.x))),r2(Math.max(0,Math.min(totH,(e.clientY-r.top)/view.s+view.y)))]};
 function segDist(q,a,b){const dx=b[0]-a[0],dy=b[1]-a[1],l=dx*dx+dy*dy;let t=l?((q[0]-a[0])*dx+(q[1]-a[1])*dy)/l:0;t=Math.max(0,Math.min(1,t));return Math.hypot(a[0]+t*dx-q[0],a[1]+t*dy-q[1])}
 function rdp(p,eps){
  if(p.length<3)return p.slice();
@@ -1086,10 +1120,17 @@ function closeText(){if(tbox)tbox.commit()}
 
 // ---------- ввод пером, мышью и пальцем ----------
 const pn=e=>Math.max(.05,Math.min(1,e.pressure||.5));
+// курсор шлём не чаще раза в 40 мс; если движение пришлось на паузу — последнее положение досылаем, чтобы чужой курсор не застывал раньше времени
+let curTm=0,curPend=null;
 function sendCursor(e){
- if(!S.showme||!page)return;const n=Date.now();if(n-lastCur<90)return;
- const p=pos(e);if(Math.abs(p[0]-lastCurP[0])+Math.abs(p[1]-lastCurP[1])<2)return;
- lastCur=n;lastCurP=p;send({t:'cursor',page:page,x:p[0],y:p[1],label:isTeacher?'Преподаватель':(myName||'Ученик'),color:isTeacher?'#6a3fc4':'#0e9f8e'});
+ if(!S.showme||!page)return;
+ const p=pos(e);if(Math.abs(p[0]-lastCurP[0])+Math.abs(p[1]-lastCurP[1])<1.5)return;
+ curPend={page:page,x:p[0],y:p[1]};const w=40-(Date.now()-lastCur);
+ if(w<=0)flushCursor();else if(!curTm)curTm=setTimeout(flushCursor,w);
+}
+function flushCursor(){
+ clearTimeout(curTm);curTm=0;const p=curPend;if(!p)return;curPend=null;lastCur=Date.now();lastCurP=[p.x,p.y];
+ send({t:'cursor',page:p.page,x:r2(p.x),y:r2(p.y),label:isTeacher?'Преподаватель':(myName||'Ученик'),color:isTeacher?'#6a3fc4':'#0e9f8e'});
 }
 cv.addEventListener('pointerdown',e=>{
  rectC=null;e.preventDefault();
@@ -1169,12 +1210,12 @@ cv.addEventListener('pointerdown',e=>{
  redraw();
 });
 cv.addEventListener('pointermove',e=>{
- if(e.pointerType!=='touch'){const r=cv.getBoundingClientRect();ptr={x:e.clientX-r.left,y:e.clientY-r.top};if(!cur||cur.erasing||cur.k==='pen'||cur.k==='ers'||cur.k==='hl')drawOverlay();sendCursor(e)}
+ if(e.pointerType!=='touch'){const r=rg.getBoundingClientRect();ptr={x:e.clientX-r.left,y:e.clientY-r.top};if(!cur||cur.erasing||cur.k==='pen'||cur.k==='ers'||cur.k==='hl')drawOverlay();sendCursor(e)}
  if(e.pointerType==='touch'&&ptrs.has(e.pointerId)){
   ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(gest&&ptrs.size>=2){doGesture();return}
  }
- if(pan&&pan.id===e.pointerId){view.x=pan.vx-(e.clientX-pan.x)/view.s;view.y=pan.vy-(e.clientY-pan.y)/view.s;redraw();userView();return}
+ if(pan&&pan.id===e.pointerId){view.x=pan.vx-(e.clientX-pan.x)/view.s;view.y=pan.vy-(e.clientY-pan.y)/view.s;viewMoved();userView();return}
  if(cur&&curPid!==null&&e.pointerId!==curPid)return; // чужое касание (ладонь) не дорисовывает линию
  if(cur&&e.pointerId===curPid){curTr+=Math.hypot(e.clientX-curX,e.clientY-curY);curX=e.clientX;curY=e.clientY}
  if(!cur&&editStroke&&e.pointerType!=='touch'&&!space){
@@ -1812,8 +1853,8 @@ function sendView(force){
 }
 function applyLeader(){
  const v=leaderView;if(!v||detached)return;applyingView=true;
- try{if(v.page!==page&&pages.some(p=>p.id===v.page))openPage(v.page);
-  view.s=Math.max(.05,cw/Math.max(1,v.w));view.x=v.x;view.y=v.y;redraw()}finally{applyingView=false}
+ try{const sw=v.page!==page&&pages.some(p=>p.id===v.page);if(sw)openPage(v.page);
+  view.s=Math.max(.05,cw/Math.max(1,v.w));view.x=v.x;view.y=v.y;if(!sw&&v.page===page)viewMoved();else redraw()}finally{applyingView=false} // вслед за преподавателем — тоже плавно
 }
 function userView(){ // ученик сам подвинул доску — отходим от преподавателя
  if(applyingView)return;
