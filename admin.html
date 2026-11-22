@@ -652,13 +652,15 @@ async function cardAt(p,topY,k){ // карточка на странице p, у
  const src=await crop(.09,c[0],.91,c[1],p,k);
  return src&&src.length>3000?src:null} // почти пустая картинка — не вышло нарисовать (так бывает на iPad, когда кончается память)
 const usedKey=sid=>'anaUsed:'+book+':'+sid;
-async function autoAnalog(fy0,fy1,bid){
- if(!$('tanalc').checked||!pdf)return;const sid=window.hwCtx&&window.hwCtx.cur();if(!sid)return;
+async function autoAnalog(fy0,fy1,bid,fromSel){
+ if(!$('tanalc').checked)return;if(!pdf){logAna('skip: no pdf');return}
+ const sid=window.hwCtx&&window.hwCtx.cur();if(!sid){logAna('skip: no student');msg('Аналог не добавлен: выберите ученика слева',4500);return}
  try{
-  const pg=await pdf.getPage(pageNo),H=pg.getViewport({scale:1}).height,top=H*(1-fy0),bot=H*(1-fy1);
-  const me=(await hdrRows(pageNo)).find(r=>r.y<=top+4&&r.y>=bot-4&&r.left);
-  if(!me){msg('Аналогов у этой задачи в сборнике нет — в домашку ничего не добавлено',4500);return}
-  const A=await analogsOf(pageNo,me);if(!A||!A.list.length){msg('Аналогов у этой задачи в сборнике нет — в домашку ничего не добавлено',4500);return}
+  const pg=await pdf.getPage(pageNo),H=pg.getViewport({scale:1}).height,top=H*(1-fy0),bot=H*(1-fy1),rows=(await hdrRows(pageNo)).filter(r=>r.left);
+  let me=rows.find(r=>r.y<=top+4&&r.y>=bot-4);
+  if(!me&&fromSel)me=rows.filter(r=>r.y>=bot-4).sort((a,b)=>a.y-b.y)[0]; // выделили кусок задачи без шапки — берём карточку, в которой выделение
+  if(!me){logAna('skip: no header p'+pageNo+(fromSel?' sel':''));if(!fromSel)msg('Аналогов у этой задачи в сборнике нет — в домашку ничего не добавлено',4500);return} // своё выделение в сборнике без карточек — молча
+  const A=await analogsOf(pageNo,me);if(!A||!A.list.length){logAna('skip: no analogs p'+pageNo);msg('Аналогов у этой задачи в сборнике нет — в домашку ничего не добавлено',4500);return}
   let used=[];try{used=JSON.parse(localStorage.getItem(usedKey(sid))||'[]')}catch(e){}
   const id=a=>a.p+':'+Math.round(a.top),notSelf=A.list.filter(a=>!(A.self&&a.p===A.self.p&&Math.abs(a.top-A.self.y)<6));
   let pool=notSelf.filter(a=>!used.includes(id(a)));if(!pool.length)pool=notSelf;if(!pool.length){msg('Других аналогов у этой задачи нет',4000);return}
@@ -735,7 +737,7 @@ ov.addEventListener('pointerup',()=>{
  const bar=document.createElement('div');bar.className='selbar';bar.style.left=x0+'px';bar.style.top=Math.min(y1+4,sel.r.height-36)+'px';
  const ok=document.createElement('button'),no=document.createElement('button');
  ok.textContent='→ На доску';no.textContent='✕';
- ok.onclick=()=>{const w=sel.r.width,h=sel.r.height;send(x0/w,y0/h,x1/w,y1/h,null);clearSel()};
+ ok.onclick=async()=>{const w=sel.r.width,h=sel.r.height;clearSel();const bid=await send(x0/w,y0/h,x1/w,y1/h,null);if(bid)autoAnalog(y0/h,y1/h,bid,true)}; // выделение пером (iPad) тоже добавляет аналог
  no.onclick=clearSel;bar.append(ok);
  if(window.hwDraft){const z=document.createElement('button');z.textContent='→ В домашку';z.onclick=async()=>{const w=sel.r.width,h=sel.r.height;clearSel();const [src,info]=await Promise.all([crop(x0/w,y0/h,x1/w,y1/h),cardInfo(y0/h,y1/h).catch(()=>null)]);window.hwAdd(src,info)};bar.append(z)}
  bar.append(no);bar.onpointerdown=e=>e.stopPropagation();ov.appendChild(bar);sel.bar=bar;
