@@ -623,18 +623,34 @@ function viewMoved(){ // вместо redraw() при каждом движен�
  mvUntil=performance.now()+160;clearTimeout(mvEnd);mvEnd=setTimeout(()=>{mvV=null;redraw()},170);
  if(!mvRaf)mvRaf=requestAnimationFrame(()=>{mvRaf=0;moveFrame()});
 }
+// «бумага» под холстом: листы и клетка без записей — рисуется за доли миллисекунды, видна только на краю во время прокрутки
+const paper=document.createElement('canvas'),pctx=paper.getContext('2d');
+paper.style.cssText='position:absolute;left:0;top:0;z-index:-1;pointer-events:none';wrap.style.isolation='isolate';wrap.insertBefore(paper,cv);
+function drawPaper(){
+ const q=Math.min(dpr,1.5),w=Math.round(cw*q),h=Math.round(ch*q),s=view.s;
+ if(paper.width!==w||paper.height!==h){paper.width=w;paper.height=h;paper.style.width=cw+'px';paper.style.height=ch+'px'}
+ const keep=ctx;ctx=pctx;
+ try{
+  ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=dark?'#12101a':'#e6e2ef';ctx.fillRect(0,0,w,h);
+  ctx.setTransform(q*s,0,0,q*s,-view.x*s*q,-view.y*s*q);
+  for(let k=0,n=sheets();k<n;k++){const y0=k*PS;if(y0+PH<view.y||y0>view.y+ch/s)continue;
+   ctx.fillStyle=dark?'#1e1a2a':'#fff';ctx.fillRect(0,y0,PW,PH);
+   sheetGrid(y0,s,{xa:Math.max(0,view.x),xb:Math.min(PW,view.x+cw/s),ya:Math.max(y0,view.y),yb:Math.min(y0+PH,view.y+ch/s)});
+   ctx.strokeStyle=dark?'#3a3450':'#cfc8e0';ctx.lineWidth=1/s;ctx.strokeRect(0,y0,PW,PH)}
+ }finally{ctx=keep}
+}
 function moveFrame(){
  const n=sheets();clampView(n);totH=n*PS-PG;
  if(!mvV){redraw();return}
  const k=view.s/mvV.s,tx=(mvV.x-view.x)*view.s,ty=(mvV.y-view.y)*view.s,gap=Math.max(Math.abs(tx)/cw,Math.abs(ty)/ch)+(k<1?1-k:0);
  if(gap>.3||k>1.8||performance.now()-mvT>700){redraw();return} // открылось много пустого или сильно приблизили — рисуем начисто
+ drawPaper(); // под сдвинутым холстом — пустые листы в клетку, а не сиреневая подложка
  cv.style.transformOrigin='0 0';cv.style.transform='translate('+tx+'px,'+ty+'px) scale('+k+')';
- wrap.style.background=dark?'#12101a':'#e6e2ef';
  placeDone();drawOverlay();syncPlotPanels();placeSolidBar();sendView();syncVsb();
 }
 function redraw(lo){ // lo===true — изменились только черновики линий, готовые записи те же
  if(mvRaf&&!moving()){cancelAnimationFrame(mvRaf);mvRaf=0}
- if(cv.style.transform){cv.style.transform='';wrap.style.background=''} // холст снова на месте — рисуем по-настоящему
+ if(cv.style.transform)cv.style.transform=''; // холст снова на месте — рисуем по-настоящему
  const n=sheets();clampView(n);totH=n*PS-PG;
  const s=view.s;
  ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=dark?'#12101a':'#e6e2ef';ctx.fillRect(0,0,cv.width,cv.height);
