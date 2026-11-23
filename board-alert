@@ -76,7 +76,8 @@ crash = sh("journalctl -u board --since '-6 min' --no-pager | grep -E 'Main proc
 P['crash'] = ('🔴 Доска упала и перезапустилась сама. Последние строки журнала:\n' + crash.strip()[:600]) if crash.strip() else None
 
 # ---------- ошибки у пользователей (страницы присылают их на сервер) ----------
-BENIGN = ('sse-nogz-fallback',)   # не ошибка: Safari просто выбрал запасной способ связи
+BENIGN = ('sse-nogz-fallback',   # не ошибка: Safari просто выбрал запасной способ связи
+          'autoAnalog: skip')   # не ошибка: у задачи в сборнике нет кнопки «Аналоги» — аналог просто не добавляется
 errs = {}
 for line in sh("journalctl -u board --since '-5 min' --no-pager | grep client-error").splitlines():
     try: j = json.loads(line.split('client-error', 1)[1])
