@@ -657,6 +657,10 @@ function moveFrame(){
 // С графическим планшетом (сотни точек с нажимом в секунду) иначе линия «буксует» и отстаёт от пера.
 const FASTPEN=(()=>{try{return localStorage.getItem('nofastpen')!=='1'}catch(e){return true}})();
 let pf=null; // {key, n: сколько точек линии уже на холсте, vis: листы на экране}
+let drawn=null; // что сейчас на холсте после полной перерисовки: {key (вид доски), vis}
+const baseKey=()=>page+'|'+view.x+'|'+view.y+'|'+view.s+'|'+cv.width+'|'+cv.height+'|'+dark;
+// холст показывает доску как есть: нет ожидающей перерисовки, вид не менялся — можно начинать/заканчивать линию без полной перерисовки
+const canvasCurrent=()=>FASTPEN&&drawn&&drawn.key===baseKey()&&(!rq||!rqFull)&&!mvRaf&&!cv.style.transform&&!moving();
 const pfKey=()=>page+'|'+view.x+'|'+view.y+'|'+view.s+'|'+cv.width+'|'+cv.height+'|'+dark+'|'+(cur&&cur.id);
 const pfOk=()=>FASTPEN&&cur&&cur.k==='pen'&&cur.id&&cur.pts&&!cur.nofast&&!cur.snapped&&!msel&&!Object.keys(live).some(k=>live[k].page===page);
 // кусочек линии пером начиная с точки i0 — те же кривые и толщина, что в drawPen, но уже нарисованное не трогаем
@@ -740,6 +744,7 @@ function redraw(lo){ // lo===true — изменились только черн
   }
  }
  if(pfOk()&&!moving())pf={key:pfKey(),n:cur.pts.length/2,vis}; // линия пером нарисована целиком — дальше только новые кусочки
+ drawn=moving()?null:{key:baseKey(),vis};
  if(moving()){ // доску сейчас двигают — запоминаем, какой вид сейчас нарисован; следующие кадры — сдвигом холста
   mvV={x:view.x,y:view.y,s:view.s};mvT=performance.now();
  }else mvV=null;
@@ -1259,6 +1264,7 @@ cv.addEventListener('pointerdown',e=>{
     :t.startsWith('sh:')?{id:newId(),k:'shape',s:t.slice(3),pts:[p[0],p[1],p[0],p[1]],c:color,w:w}
     :t.startsWith('3d:')?{id:newId(),k:'solid',s:JSON.stringify({t:t.slice(3),y:-.6,p:.35,l:0}),pts:[p[0],p[1],p[0],p[1]],c:color,w:w}
               :{id:newId(),k:t,pts:[p[0],p[1],p[0],p[1]],c:color,w:w};
+ if(cur.k==='pen'&&pfOk()&&canvasCurrent()){pf={key:pfKey(),n:0,vis:drawn.vis};drawOverlay();return} // касание пером: доска уже нарисована — не перерисовываем её целиком (при приближении это и «заедало»)
  redraw();
 });
 cv.addEventListener('pointermove',e=>{
@@ -1368,6 +1374,15 @@ function end(e){
  else if(!s.snapped&&(Math.abs(s.pts[2]-s.pts[0])+Math.abs(s.pts[3]-s.pts[1]))*view.s<4){clearLive();redraw();return}
  const o={id:s.id,k:s.k,pts:s.pts,c:s.c,w:s.w};if(s.pr)o.pr=s.pr;if(s.s)o.s=s.s;if(s.a)o.a=s.a;
  if(s.snapped||canRot(o)||o.k==='solid')editStroke=s.id; // новую фигуру сразу можно двигать и вращать
+ // отрыв пера: вся линия, кроме кончика, уже на холсте — дорисовываем кончик вместо полной перерисовки доски
+ const fk=page+'|'+view.x+'|'+view.y+'|'+view.s+'|'+cv.width+'|'+cv.height+'|'+dark+'|'+s.id;
+ if(o.k==='pen'&&!s.snapped&&!s.nofast&&pf&&pf.key===fk&&canvasCurrent()&&!msel&&!Object.keys(live).some(k=>live[k].page===page)){
+  const sc=view.s;ctx.save();ctx.setTransform(dpr*sc,0,0,dpr*sc,-view.x*sc*dpr,(OV-view.y*sc)*dpr);ctx.beginPath();pf.vis.forEach(y0=>ctx.rect(0,y0,PW,PH));ctx.clip();
+  try{penPiece(o.pts.length>=6?o:s,o.pts.length>=6?Math.max(0,pf.n-1):0,false)}finally{ctx.restore()}
+  if(rq&&!rqFull){cancelAnimationFrame(rq);rq=0} // ждал кадр быстрого пера — он больше не нужен
+  pf=null;(strokes[page]=strokes[page]||{})[o.id]=o;mine.push({page:page,id:o.id});redo=[];send({t:'stroke',page:page,stroke:clean(o)});
+  if(inkC)inkC.key=null; // готовые записи в памяти устарели — при следующей полной перерисовке соберём заново
+  drawOverlay();return}
  addObj(o);
 }
 cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
