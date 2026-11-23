@@ -811,6 +811,12 @@ function trOf(sid) {
   return P;
 }
 const trSave = sid => fs.writeFileSync(path.join(TRST, sid + '.json'), JSON.stringify(TRC[sid]));
+// темы номеров (как в сборниках) — ученику подписываем, про что номер
+const TR_TOP = {
+  ege: { 1: 'Планиметрия', 2: 'Векторы', 3: 'Стереометрия', 4: 'Начала теории вероятностей', 5: 'Вероятности сложных событий', 6: 'Простейшие уравнения', 7: 'Вычисления и преобразования', 8: 'Производная', 9: 'Задачи с прикладным содержанием', 10: 'Текстовые задачи', 11: 'Графики функций', 12: 'Наибольшее и наименьшее значение функции' },
+  oge: { 6: 'Действия с дробями', 7: 'Числа на координатной прямой', 8: 'Степени и корни', 9: 'Уравнения', 10: 'Теория вероятностей', 11: 'Графики функций', 12: 'Расчёты по формулам', 13: 'Неравенства', 14: 'Прогрессии', 15: 'Треугольники', 16: 'Окружность', 17: 'Четырёхугольники', 18: 'Фигуры на клетчатой бумаге', 19: 'Верные и неверные утверждения' }
+};
+const trTop = (exam, n) => (TR_TOP[exam] || {})[n] || '';
 const trExam = s => s && s.trn && s.trn.exam === 'oge' ? 'oge' : 'ege';
 function trPool(exam) { // все задачи сборников этого экзамена: [{t:'src:k', n, g, src, f}]
   const out = [];
@@ -823,9 +829,9 @@ const trRand = L => L[Math.floor(Math.random() * L.length)];
 function trSummary(s, P, full) { // что видит ученик (и преподаватель — с ошибками и картинками)
   const pool = trPool(trExam(s)), by = {};
   pool.forEach(x => { by[x.n] = (by[x.n] || 0) + 1; });
-  const nums = Object.keys(by).map(Number).sort((a, b) => a - b).map(n => { const q = P.nums[n] || {}; return { n, total: by[n], streak: q.streak || 0, best: q.best || 0, ok: q.ok || 0, all: q.all || 0, done: (q.best || 0) >= TR_GOAL }; });
+  const nums = Object.keys(by).map(Number).sort((a, b) => a - b).map(n => { const q = P.nums[n] || {}; return { n, top: trTop(trExam(s), n), total: by[n], streak: q.streak || 0, best: q.best || 0, ok: q.ok || 0, all: q.all || 0, done: (q.best || 0) >= TR_GOAL }; });
   const o = { exam: trExam(s), goal: TR_GOAL, nums, errs: P.errs.length, fixed: P.fixed };
-  if (full) o.errList = P.errs.map(e => { const x = trFind(e.t); return x && { n: x.n, img: x.f, at: e.at }; }).filter(Boolean);
+  if (full) o.errList = P.errs.map(e => { const x = trFind(e.t); return x && { n: x.n, top: trTop(trExam(s), x.n), img: x.f, at: e.at }; }).filter(Boolean);
   return o;
 }
 function trView(c) { const x = trFind(c.t); return x ? { n: x.n, img: x.f, err: !!c.err, tries: c.tries || 0 } : null; }

@@ -825,18 +825,6 @@ async function numAt(p,row,items){ // номер задания: из имени
  if(li>=0&&!prac(L[li]))return{num:L.slice(0,li).filter(l=>!prac(l)).length+(hasPr?6:1),ext};
  return{ext}}
 window.trBook=()=>book;
-function trimImg(src){return new Promise(ok=>{ // обрезаем пустые поля вокруг условия — на телефоне задача выйдет крупнее
- const im=new Image();im.onload=()=>{try{
-  const w=im.width,h=im.height,c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d',{willReadFrequently:true});g.drawImage(im,0,0);
-  const d=g.getImageData(0,0,w,h).data,m=Math.round(w*.03);let x0=w,x1=-1,y0=h,y1=-1;
-  for(let y=0;y<h;y++)for(let x=m;x<w-m;x++){const i=(y*w+x)*4;if(Math.max(d[i],d[i+1],d[i+2])<140){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}}
-  if(x1<0){c.width=0;return ok(src)}
-  const p=Math.round(w*.025),row=y=>{for(let x=m;x<w-m;x++){const i=(y*w+x)*4;if(Math.min(d[i],d[i+1],d[i+2])<235)return true}return false};
-  let yb=y1;while(yb<Math.min(h-1,y1+p)&&!row(yb+1))yb++; // поле снизу — но без серой подписи «Банк ФИПИ · …»
-  x0=Math.max(0,x0-p);y0=Math.max(0,y0-p);x1=Math.min(w-1,x1+p);y1=yb;
-  const o=document.createElement('canvas');o.width=x1-x0+1;o.height=y1-y0+1;const og=o.getContext('2d');og.fillStyle='#fff';og.fillRect(0,0,o.width,o.height);
-  og.drawImage(c,x0,y0,o.width,o.height,0,0,o.width,o.height);let r=o.toDataURL('image/png');if(r.length>700000)r=o.toDataURL('image/jpeg',.9);
-  c.width=o.width=0;ok(r)}catch(e){ok(src)}};im.onerror=()=>ok(src);im.src=src})}
 window.trExport=async(name,exam,prog,stopped,why)=>{ // why — куда записывать причины пропуска (для проверки)
  if(!pdf)throw Error('Сначала откройте сборник');
  const post=async o=>{for(let i=0;i<4;i++){const r=await window.boardApi('/api/admin/trn',{method:'POST',body:JSON.stringify(o)}).catch(()=>null);if(r&&r.ok)return r.json();await new Promise(z=>setTimeout(z,1500))}throw Error('нет связи с сервером')};
@@ -849,10 +837,7 @@ window.trExport=async(name,exam,prog,stopped,why)=>{ // why — куда зап�
   const page=await pdf.getPage(p),base=page.getViewport({scale:1}),H=base.height,items=(await page.getTextContent()).items;
   const dvp=page.getViewport({scale:500/base.width}),oc=document.createElement('canvas');oc.width=Math.round(dvp.width);oc.height=Math.round(dvp.height);
   await page.render({canvasContext:oc.getContext('2d',{willReadFrequently:true}),viewport:dvp,intent:'print'}).promise;
-  const ch=oc.height,cw=oc.width,cs=detect(oc).map(([s,e,he])=>[s/ch,e/ch,(he||s)/ch]),PX=oc.getContext('2d').getImageData(0,0,cw,ch).data;oc.width=oc.height=0;
-  const hdrEnd=y0=>{ // низ цветной шапки: идём вниз от кнопок, пока строка не станет почти вся белой (начало условия)
-   for(let y=Math.max(0,y0);y<Math.min(ch,y0+40);y++){let w=0;for(let k=0;k<30;k++){const i=(y*cw+Math.floor(cw*(.12+k*.76/29)))*4;if(Math.min(PX[i],PX[i+1],PX[i+2])>=245)w++}if(w>=27)return y/ch}
-   return null};
+  const ch=oc.height,cw=oc.width,cs=detect(oc).map(([s,e,he])=>[s/ch,e/ch,(he||s)/ch]);oc.width=oc.height=0;
   for(const row of rows){
    try{
     // шапка должна быть внутри карточки (у одиночной ссылки — прямо в цветной шапке, иначе это строка страницы ответов)
@@ -861,9 +846,8 @@ window.trExport=async(name,exam,prog,stopped,why)=>{ // why — куда зап�
     const ni=await numAt(p,row,items);if(ni.ext||!(ni.num>=1&&ni.num<=30)){skip++;why&&why.push([p,'num',Math.round(row.top)]);continue}
     const L=row.left&&await dpos(row.left);let g=p+':'+Math.round(row.top);
     if(L&&L.p<=p){const rL=(await hdrRows(L.p)).filter(r=>r.left).sort((x,y)=>Math.abs(x.top-(L.y??x.top))-Math.abs(y.top-(L.y??y.top)))[0];if(rL)g=L.p+':'+Math.round(rL.top)}
-    const hb=hdrEnd(Math.round((1-row.y/H)*ch))??(1-(row.y-6)/H); // шапку с кнопками «Аналоги/Ответ» ученику не показываем
-    let img=await crop(.09,Math.min(c[1]-.01,Math.max(c[2]+.002,hb+.0015)),.91,c[1],p);
-    if(img)img=await trimImg(img);
+    // карточка целиком, как при «+» на доску: с шапкой и номером задачи, условие не подрезаем
+    const pd=2/ch,img=await crop(.09,Math.max(0,c[0]-pd),.91,Math.min(1,c[1]+pd),p);
     if(!img||img.length<2500){skip++;why&&why.push([p,'img',Math.round(row.top)]);continue}
     buf.push({n:ni.num,a,g,img});n++;why&&why.push([p,'ok',Math.round(row.top),ni.num,a,why.img?img:0]);by[ni.num]=(by[ni.num]||0)+1;
     if(buf.length>=8)await flush();
@@ -1444,11 +1428,11 @@ $('trn').onclick=async()=>{
   if(!S.nums.length)body.append(el('div',{className:'mut',textContent:'Для '+EX[S.exam]+' в тренажёре ещё нет задач.'}));
   else{const t=el('div',{style:'display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px'});
    S.nums.forEach(x=>t.append(el('div',{style:'border:1px solid var(--bd);border-radius:10px;padding:7px 9px;font-size:13px'+(x.done?';border-color:#2f7d4f':'')},
-    el('b',{textContent:'№'+x.n+(x.done?' ✅':'')}),el('div',{className:'mut',textContent:'серия '+x.streak+' (лучшая '+x.best+')'}),el('div',{className:'mut',textContent:x.all?'верно '+x.ok+' из '+x.all:'ещё не решал'}))));
+    el('b',{textContent:'№'+x.n+(x.done?' ✅':'')}),x.top?el('div',{style:'font-weight:600;font-size:12.5px;line-height:1.25',textContent:x.top}):null,el('div',{className:'mut',textContent:'серия '+x.streak+' (лучшая '+x.best+')'}),el('div',{className:'mut',textContent:x.all?'верно '+x.ok+' из '+x.all:'ещё не решал'}))));
    body.append(el('h2',{textContent:'Прогресс по номерам',style:'font-size:15px;margin-top:8px'}),t)}
   body.append(el('h2',{textContent:'Работа над ошибками: '+S.errs+(S.fixed?' · исправлено '+S.fixed:''),style:'font-size:15px;margin-top:10px'}));
   if(S.errList&&S.errList.length){const g=el('div',{style:'display:flex;flex-direction:column;gap:8px'});
-   S.errList.forEach(e=>g.append(el('div',null,el('div',{className:'mut',textContent:'№'+e.n+' · '+new Date(e.at).toLocaleDateString('ru-RU',{day:'numeric',month:'long'})}),el('img',{src:e.img,style:'max-width:100%;background:#fff;border-radius:8px;border:1px solid var(--bd)'}))));body.append(g)}
+   S.errList.forEach(e=>g.append(el('div',null,el('div',{className:'mut',textContent:'№'+e.n+(e.top?' ('+e.top+')':'')+' · '+new Date(e.at).toLocaleDateString('ru-RU',{day:'numeric',month:'long'})}),el('img',{src:e.img,style:'max-width:100%;background:#fff;border-radius:8px;border:1px solid var(--bd)'}))));body.append(g)}
   else body.append(el('div',{className:'mut',textContent:'Ошибок нет.'}));
   const lst=el('div');body.append(el('h2',{textContent:'Сборники в тренажёре',style:'font-size:15px;margin-top:10px'}),lst);srcList(lst,j.src,draw);
   body.append(el('div',{style:'display:flex;gap:8px;margin-top:10px'},el('button',{textContent:'Сбросить прогресс ученика',onclick:async()=>{if(confirm('Обнулить серии, статистику и ошибки тренажёра у этого ученика?')){await post({t:'reset',sid});draw()}}}),el('button',{textContent:'Закрыть',style:'margin-left:auto',onclick:d.close})));
