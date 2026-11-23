@@ -260,7 +260,7 @@ const ME=(new URLSearchParams(location.search).get('u')||'').replace(/[^a-z0-9]/
 addEventListener('hashchange',()=>{const hp=(location.hash.match(/^#p=([\w-]+)$/)||[])[1];if(hp&&pages.some(p=>p.id===hp))openPage(hp)});
 let pages=[],strokes={},images={},page=null,live={},color='#1a1a1a',bg='grid',cur=null,lastEmit=0,mine=[],redo=[];
 let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,lastP=[0,0],editImg=null,editStroke=null,jump=null,fingerPan=false;
-let rectC=null,rq=0,pendErase=[],pendPage=null,eraseT=0,peersTxt='',msel=null; // msel — выделение рамкой: {ids,imgs,box}
+let ovRaf=0,rectO=null,lastAct=0,rectC=null,rq=0,pendErase=[],pendPage=null,eraseT=0,peersTxt='',msel=null; // msel — выделение рамкой: {ids,imgs,box}
 let curPid=null,curPen=false,curT0=0,curX=0,curY=0,curTr=0,viewOnly=false,dark=false,penSeen=(()=>{try{return localStorage.getItem('penSeen')==='1'}catch(e){return false}})(),myName=null,ptr=null,curTool='pen',lastCur=0,lastCurP=[-9,-9];
 const views={},imgEl={},ptrs=new Map(),cursors={};
 const $=i=>document.getElementById(i),tool=()=>curTool;
@@ -354,7 +354,7 @@ function chkZoom(){ // браузерное приближение (Ctrl +) мо
  $('zhint').hidden=!z;
 }
 function resize(){
- rectC=null;chkZoom();
+ rectC=rectO=null;chkZoom();
  dpr=window.devicePixelRatio||1;cw=Math.max(1,wrap.clientWidth);ch=Math.max(1,wrap.clientHeight);
  cv.width=rg.width=Math.round(cw*dpr);cv.height=rg.height=Math.round(ch*dpr);
  rg.style.width=cw+'px';rg.style.height=ch+'px';redraw();drawOverlay();
@@ -643,13 +643,29 @@ function moveFrame(){
  const n=sheets();clampView(n);totH=n*PS-PG;
  if(!mvV){redraw();return}
  const k=view.s/mvV.s,tx=(mvV.x-view.x)*view.s,ty=(mvV.y-view.y)*view.s,gap=Math.max(Math.abs(tx)/cw,Math.abs(ty)/ch)+(k<1?1-k:0);
- if(gap>.3||k>1.8||performance.now()-mvT>700){redraw();return} // открылось много пустого или сильно приблизили — рисуем начисто
+ if(gap>.1||k>1.8||performance.now()-mvT>700){redraw();return} // открылась полоса шире 10% экрана — сразу дорисовываем (иначе задача видна наполовину) // открылось много пустого или сильно приблизили — рисуем начисто
  drawPaper(); // под сдвинутым холстом — пустые листы в клетку, а не сиреневая подложка
  cv.style.transformOrigin='0 0';cv.style.transform='translate('+tx+'px,'+ty+'px) scale('+k+')';
  placeDone();drawOverlay();syncPlotPanels();placeSolidBar();sendView();syncVsb();
 }
+// Быстрое перо: пока ведём линию, доска уже нарисована целиком, а линия только растёт — поэтому каждый кадр
+// дорисовываем поверх лишь её новый кусочек, а не всю доску (клетку, картинки задач, записи и всю линию заново).
+// С графическим планшетом (сотни точек с нажимом в секунду) иначе линия «буксует» и отстаёт от пера.
+const FASTPEN=(()=>{try{return localStorage.getItem('nofastpen')!=='1'}catch(e){return true}})();
+let pf=null; // {key, n: сколько точек линии уже на холсте, vis: листы на экране}
+const pfKey=()=>page+'|'+view.x+'|'+view.y+'|'+view.s+'|'+cv.width+'|'+cv.height+'|'+dark+'|'+(cur&&cur.id);
+const pfOk=()=>FASTPEN&&cur&&cur.k==='pen'&&cur.id&&cur.pts&&!cur.nofast&&!cur.snapped&&!msel&&!Object.keys(live).some(k=>live[k].page===page);
+function penFast(){
+ const n=cur.pts.length/2,a=Math.max(0,pf.n-3),s=view.s;if(n<=pf.n&&n>1)return drawOverlay();
+ const sub=a?{k:'pen',c:cur.c,w:cur.w,pts:cur.pts.slice(2*a),pr:cur.pr&&cur.pr.length===n?cur.pr.slice(a):undefined}:cur;
+ ctx.save();ctx.setTransform(dpr*s,0,0,dpr*s,-view.x*s*dpr,-view.y*s*dpr);ctx.beginPath();pf.vis.forEach(y0=>ctx.rect(0,y0,PW,PH));ctx.clip();
+ try{drawStroke(sub)}finally{ctx.restore()}
+ pf.n=n;drawOverlay();
+}
 function redraw(lo){ // lo===true — изменились только черновики линий, готовые записи те же
  if(mvRaf&&!moving()){cancelAnimationFrame(mvRaf);mvRaf=0}
+ if(lo===true&&!cv.style.transform&&pf&&pfOk()&&pf.key===pfKey()){penFast();return}
+ pf=null;
  if(cv.style.transform)cv.style.transform=''; // холст снова на месте — рисуем по-настоящему
  const n=sheets();clampView(n);totH=n*PS-PG;
  const s=view.s;
@@ -705,6 +721,7 @@ function redraw(lo){ // lo===true — изменились только черн
    ctx.restore();
   }
  }
+ if(pfOk()&&!moving())pf={key:pfKey(),n:cur.pts.length/2,vis}; // линия пером нарисована целиком — дальше только новые кусочки
  if(moving()){ // доску сейчас двигают — запоминаем, какой вид сейчас нарисован; следующие кадры — сдвигом холста
   mvV={x:view.x,y:view.y,s:view.s};mvT=performance.now();
  }else mvV=null;
@@ -1138,6 +1155,7 @@ function closeText(){if(tbox)tbox.commit()}
 const pn=e=>Math.max(.05,Math.min(1,e.pressure||.5));
 // курсор шлём не чаще раза в 40 мс; если движение пришлось на паузу — последнее положение досылаем, чтобы чужой курсор не застывал раньше времени
 let curTm=0,curPend=null;
+function ovRq(){if(!ovRaf)ovRaf=requestAnimationFrame(()=>{ovRaf=0;drawOverlay()})}
 function sendCursor(e){
  if(!S.showme||!page)return;
  const p=pos(e);if(Math.abs(p[0]-lastCurP[0])+Math.abs(p[1]-lastCurP[1])<1.5)return;
@@ -1149,7 +1167,7 @@ function flushCursor(){
  send({t:'cursor',page:p.page,x:r2(p.x),y:r2(p.y),label:isTeacher?'Преподаватель':(myName||'Ученик'),color:isTeacher?'#6a3fc4':'#0e9f8e'});
 }
 cv.addEventListener('pointerdown',e=>{
- rectC=null;e.preventDefault();
+ rectC=rectO=null;e.preventDefault();
  if(e.pointerType==='mouse'&&e.button===2)return;
  if(tbox&&e.target===cv)closeText();
  try{cv.setPointerCapture(e.pointerId)}catch(_){}
@@ -1226,7 +1244,8 @@ cv.addEventListener('pointerdown',e=>{
  redraw();
 });
 cv.addEventListener('pointermove',e=>{
- if(e.pointerType!=='touch'){const r=rg.getBoundingClientRect();ptr={x:e.clientX-r.left,y:e.clientY-r.top};if(!cur||cur.erasing||cur.k==='pen'||cur.k==='ers'||cur.k==='hl')drawOverlay();sendCursor(e)}
+ lastAct=Date.now();
+ if(e.pointerType!=='touch'){const r=rectO||(rectO=rg.getBoundingClientRect());ptr={x:e.clientX-r.left,y:e.clientY-r.top};if(!cur||cur.erasing||cur.k==='pen'||cur.k==='ers'||cur.k==='hl')ovRq();sendCursor(e)} // кружок-курсор — раз за кадр, а не на каждую из сотен точек пера
  if(e.pointerType==='touch'&&ptrs.has(e.pointerId)){
   ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(gest&&ptrs.size>=2){doGesture();return}
@@ -1281,7 +1300,7 @@ cv.addEventListener('pointermove',e=>{
   const n=cur.sb.length,x0=cur.sb[n-2],y0=cur.sb[n-1];let p=pos(e);
   const dx=p[0]-x0,dy=p[1]-y0,L=Math.hypot(dx,dy),a=Math.atan2(dy,dx),q=Math.round(a/(Math.PI/4))*(Math.PI/4);
   if(L&&Math.abs(a-q)<4*DEG)p=[r2(x0+L*Math.cos(q)),r2(y0+L*Math.sin(q))]; // почти ровно по горизонтали, вертикали или 45° — выравниваем
-  cur.pts=cur.sb.concat(p);if(cur.sbp)cur.pr=cur.sbp.concat(pn(e));cur.ex=p[0];cur.ey=p[1];cur.sent=0;clearTimeout(holdT);holdA=null;cur.sl=[e.clientX,e.clientY];
+  cur.nofast=1;cur.pts=cur.sb.concat(p);if(cur.sbp)cur.pr=cur.sbp.concat(pn(e));cur.ex=p[0];cur.ey=p[1];cur.sent=0;clearTimeout(holdT);holdA=null;cur.sl=[e.clientX,e.clientY];
  }else if(cur.k==='pen'||cur.k==='ers'||cur.k==='hl'){
   // Shift отпустили чуть раньше, чем перо: пока перо почти на месте, линию не трогаем — иначе в конце «крючок»
   if(cur.sb&&cur.sl&&Math.hypot(e.clientX-cur.sl[0],e.clientY-cur.sl[1])<18)return;
@@ -1296,7 +1315,7 @@ cv.addEventListener('pointermove',e=>{
   cur.pts[2]=x;cur.pts[3]=y}
  lastP=pos(e);
  if(cur.k==='pen'&&S.snap&&!e.shiftKey){const ha=holdA;if(!ha||Math.hypot(e.clientX-ha[0],e.clientY-ha[1])>5){holdA=[e.clientX,e.clientY];clearTimeout(holdT);holdT=setTimeout(snapNow,650)}}
- rd();const n=Date.now();
+ rd(cur.k==='pen'&&!cur.nofast&&!cur.snapped?true:undefined);const n=Date.now(); // перо: дорисовываем только новый кусочек линии (penFast)
  if(n-lastEmit>35){lastEmit=n;const inc=cur.k==='pen'||cur.k==='hl'||cur.k==='ers';
   // перо/маркер/ластик: шлём только новые точки (и иногда всю линию — на случай потерянного сообщения)
   cur.ns=(cur.ns||0)+1;const i0=inc&&cur.sent&&cur.ns%10?Math.max(0,cur.sent-2):0;cur.sent=cur.pts.length;
@@ -1567,6 +1586,7 @@ async function snapPage(pid){
 async function snapAll(force){
  if(!isTeacher||!tTok())return;
  for(let i=0;snapBusy&&i<50;i++)await new Promise(r=>setTimeout(r,200));if(snapBusy)return;snapBusy=true;
+ if(!force&&Date.now()-lastAct<90000){snapBusy=false;return} // снимок для конспекта подвешивает браузер на долю секунды — делаем, только когда полторы минуты никто не водит пером
  try{for(const pid of Object.keys(snapDirty))if(force||Date.now()-snapDirty[pid]>40000){try{await snapPage(pid)}catch(e){}}}finally{snapBusy=false}
 }
 setInterval(()=>snapAll(false),15000);
