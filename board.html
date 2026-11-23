@@ -659,11 +659,24 @@ const FASTPEN=(()=>{try{return localStorage.getItem('nofastpen')!=='1'}catch(e){
 let pf=null; // {key, n: сколько точек линии уже на холсте, vis: листы на экране}
 const pfKey=()=>page+'|'+view.x+'|'+view.y+'|'+view.s+'|'+cv.width+'|'+cv.height+'|'+dark+'|'+(cur&&cur.id);
 const pfOk=()=>FASTPEN&&cur&&cur.k==='pen'&&cur.id&&cur.pts&&!cur.nofast&&!cur.snapped&&!msel&&!Object.keys(live).some(k=>live[k].page===page);
+// кусочек линии пером начиная с точки i0 — те же кривые и толщина, что в drawPen, но уже нарисованное не трогаем
+// (если рисовать заново последние отрезки, на стыках выходят утолщения — «точки» на быстрой линии)
+function penPiece(s,i0,noTail){ // noTail — без прямого «хвостика» до последней точки: на быстрой линии он торчал бы шипом на поворотах
+ const p=s.pts,n=p.length/2,pr=s.pr,M=i=>[(p[2*i-2]+p[2*i])/2,(p[2*i-1]+p[2*i+1])/2];
+ ctx.strokeStyle=inkCol(s.c);ctx.lineCap='round';ctx.lineJoin='round';
+ if(n<3){if(!noTail)drawPen(s,inkCol(s.c));return} // из двух точек выйдет только прямая, которая потом торчит «крючком» — ждём третью
+ if(pr&&pr.length===n){
+  const W=i=>{let a=0,c=0;for(let j=Math.max(0,i-3);j<=Math.min(n-1,i+3);j++){a+=pr[j];c++}return s.w*(.7+.6*a/c)};
+  if(i0<=1){const m=M(1);ctx.lineWidth=W(0);ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(m[0],m[1]);ctx.stroke()}
+  for(let i=Math.max(1,i0);i<n-1;i++){const a=M(i),b=M(i+1);ctx.lineWidth=W(i);ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.quadraticCurveTo(p[2*i],p[2*i+1],b[0],b[1]);ctx.stroke()}
+  if(!noTail){const a=M(n-1);ctx.lineWidth=W(n-1);ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(p[2*n-2],p[2*n-1]);ctx.stroke()}return}
+ const st=Math.max(1,i0),a=st===1?[p[0],p[1]]:M(st);ctx.lineWidth=s.w;ctx.beginPath();ctx.moveTo(a[0],a[1]);
+ for(let i=st;i<n-1;i++){const b=M(i+1);ctx.quadraticCurveTo(p[2*i],p[2*i+1],b[0],b[1])}
+ if(!noTail)ctx.lineTo(p[2*n-2],p[2*n-1]);ctx.stroke()}
 function penFast(){
- const n=cur.pts.length/2,a=Math.max(0,pf.n-3),s=view.s;if(n<=pf.n&&n>1)return drawOverlay();
- const sub=a?{k:'pen',c:cur.c,w:cur.w,pts:cur.pts.slice(2*a),pr:cur.pr&&cur.pr.length===n?cur.pr.slice(a):undefined}:cur;
+ const n=cur.pts.length/2,s=view.s;if(n<=pf.n&&n>1)return drawOverlay();
  ctx.save();ctx.setTransform(dpr*s,0,0,dpr*s,-view.x*s*dpr,(OV-view.y*s)*dpr);ctx.beginPath();pf.vis.forEach(y0=>ctx.rect(0,y0,PW,PH));ctx.clip();
- try{drawStroke(sub)}finally{ctx.restore()}
+ try{penPiece(cur,pf.n-1,true)}finally{ctx.restore()} // новые отрезки: кривая с точки pf.n-1 заменяет прямой «хвостик» прошлого кадра
  pf.n=n;drawOverlay();
 }
 function redraw(lo){ // lo===true — изменились только черновики линий, готовые записи те же
@@ -702,7 +715,7 @@ function redraw(lo){ // lo===true — изменились только черн
    }
   }
   for(const k in live)if(live[k].page===page)drawStroke(live[k]);
-  if(cur&&cur.pts)drawStroke(cur);
+  if(cur&&cur.pts){if(pfOk())penPiece(cur,0,true);else drawStroke(cur)} // линия пером в процессе — без «хвостика», дальше её дорисовывает penFast
  });
  ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(L,0,0);ctx.restore();
  ctx.restore();
