@@ -310,57 +310,71 @@ function chanAsk(){ // один раз приглашаем в Telegram-кана
   o.append(b);o.addEventListener('pointerdown',e=>{if(e.target===o)close()});document.body.append(o)},1500)}
 // ---------- статистика сайта (только владельцу) ----------
 $('stt').onclick=async()=>{
- const d=dlg('📈 Статистика сайта');d.o.firstChild.style.maxWidth='880px';const ld=el('p',{className:'mut',textContent:'Загружаю…'});d.b.append(ld);
+ const d=dlg('📈 Статистика сайта');d.o.firstChild.style.maxWidth='920px';const ld=el('p',{className:'mut',textContent:'Загружаю…'});d.b.append(ld);
  const r=await api('/api/admin/stats');if(!r.ok){ld.textContent='Не получилось загрузить';return}const S=await r.json();ld.remove();
- const L=S.days.slice(-7),sum=(k,A=L)=>A.reduce((a,x)=>a+(x[k]||0),0),T=S.teachers,act7=T.filter(t=>t.last&&t.last>=S.days[S.days.length-7].day).length;
- const fmt=k=>{const[y,m,dd]=k.split('-');return dd+'.'+m};
+ const T=S.teachers,D=S.days,fmt=k=>{const[y,m,dd]=k.split('-');return dd+'.'+m},fmtY=k=>{const[y,m,dd]=k.split('-');return dd+'.'+m+'.'+y};
  const hm=m=>{m=Math.round(m);return m<60?m+' мин':Math.floor(m/60)+' ч'+(m%60?' '+m%60+' мин':'')},tmOn=!!S.tmSince;
- const card=(n,t,sub)=>el('div',{style:'flex:1;min-width:120px;background:var(--bg,#f4f1fa);border:1px solid var(--bd);border-radius:12px;padding:10px 12px'},
-  el('div',{style:'font-size:24px;font-weight:800',textContent:n}),el('div',{style:'font-size:13px',textContent:t}),sub?el('div',{className:'mut',style:'font-size:12px',textContent:sub}):'');
- d.b.append(el('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},
-  card(act7+' / '+T.length,'репетиторов заходили за 7 дней',S.newTeachers7?'новых за неделю: '+S.newTeachers7:''),
-  card(S.students,'учеников',S.groups?'и групп: '+S.groups:''),
-  card(sum('lessons'),'уроков за 7 дней','звонков: '+sum('calls')),
-  card(tmOn?hm(sum('lesMin')):'—','занятий за 7 дней',!tmOn?'время начнём считать после обновления':sum('timedLessons')?'средний урок '+hm(sum('lesMin')/sum('timedLessons'))+' · в звонке '+hm(sum('callMin')):'пока ни одного урока с замером'),
-  card(sum('hw'),'домашек задано за 7 дней','сдано '+sum('sent')+' · проверено '+sum('checked')),
-  card(T.filter(t=>t.tg).length+' / '+T.reduce((a,t)=>a+t.tgStudents,0),'Telegram: репетиторов / учеников')));
- // график: по дням (30 дней) или по неделям (до 4 месяцев); что показывать — уроки и домашки или время занятий
+ const sum=(k,A)=>A.reduce((a,x)=>a+(x[k]||0),0);
+ const PER={d7:{t:'За 7 дней',n:7},d30:{t:'За 30 дней',n:30},all:{t:'За весь срок',n:0}};let per='d7';
+ const top=el('div',{style:'display:flex;gap:6px;flex-wrap:wrap;align-items:center'}),cards=el('div',{style:'display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px'}),tblBox=el('div');
+ const pill=(txt,on,f)=>el('button',{textContent:txt,onclick:f,style:'border-radius:20px;padding:6px 14px;font-weight:600;'+(on?'background:#6a3fc4;color:#fff;border-color:#6a3fc4':'')});
+ const card=(ic,big,title,sub)=>el('div',{style:'background:var(--bg,#f4f1fa);border:1px solid var(--bd);border-radius:14px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start'},
+  el('div',{style:'font-size:26px;line-height:1',textContent:ic}),
+  el('div',{style:'min-width:0'},el('div',{style:'font-size:26px;font-weight:800;line-height:1.1',textContent:big}),el('div',{style:'font-size:14px;font-weight:600;margin-top:2px',textContent:title}),
+   sub?el('div',{className:'mut',style:'font-size:12.5px;margin-top:3px;line-height:1.35',textContent:sub}):''));
+ const render=()=>{
+  const n=PER[per].n,A=n?D.slice(-n):D,from=A.length?A[0].day:S.first,act=T.filter(t=>t.last&&t.last>=from).length;
+  top.replaceChildren(...Object.keys(PER).map(k=>pill(PER[k].t,per===k,()=>{per=k;render()})),
+   el('span',{className:'mut',style:'font-size:12.5px;margin-left:6px',textContent:per==='all'?'с '+fmtY(S.first)+' (уроки — с '+fmtY(S.since)+(tmOn?', время — с '+fmtY(S.tmSince):'')+')':'с '+fmt(from)+' по '+fmt(D[D.length-1].day)}));
+  const les=sum('lessons',A),tl=sum('timedLessons',A),lm=sum('lesMin',A),cm=sum('callMin',A);
+  cards.replaceChildren(
+   card('🎓',String(les),'уроков проведено','звонков: '+sum('calls',A)+(n?' · в среднем '+(les/A.length).toFixed(1).replace('.',',')+' в день':'')),
+   card('⏱',tmOn?hm(lm):'—','время занятий',!tmOn?'время начнём считать после обновления':tl?'средний урок '+hm(lm/tl)+' · в звонке '+hm(cm):'пока ни одного урока с замером времени'),
+   card('📚',String(sum('hw',A)),'домашек задано','сдано учениками: '+sum('sent',A)+' · проверено: '+sum('checked',A)),
+   card('👩‍🏫',act+' из '+T.length,'репетиторов заходили',per==='all'?'зарегистрировано по приглашениям: '+S.newTeachers.all:(S.newTeachers[per]?'новых за этот период: '+S.newTeachers[per]:'новых за этот период нет')),
+   card('🧑‍🎓',String(S.students),'учеников сейчас',S.groups?'и групп: '+S.groups:'групп нет'),
+   card('✈️',T.filter(t=>t.tg).length+' / '+T.reduce((a,t)=>a+t.tgStudents,0),'Telegram подключён','репетиторов / учеников с уведомлениями'));
+  // таблица репетиторов за выбранный период
+  const today=D[D.length-1].day,ago=k=>{if(!k)return 'не заходил(а)';const m=Math.round((Date.parse(today)-Date.parse(k))/864e5);return m===0?'сегодня':m===1?'вчера':m+' дн. назад'};
+  const tb=el('table',{style:'width:100%;border-collapse:collapse;font-size:13.5px'}),th=el('tr');
+  const H=[['Репетитор','l'],['Учеников','r'],['Уроков','r'],['Время занятий','r'],['Домашки: задано / сдано / проверено','r'],['Ждут проверки','r'],['Заходил(а)','l'],['Telegram','l']];
+  H.forEach(([h,al])=>th.append(el('th',{textContent:h,style:'text-align:'+(al==='r'?'right':'left')+';padding:7px 8px;border-bottom:2px solid var(--bd);font-weight:600;color:var(--mut);font-size:12.5px;vertical-align:bottom'})));tb.append(th);
+  T.slice().sort((a,b)=>b.p[per].lessons-a.p[per].lessons||(b.last||'').localeCompare(a.last||'')||b.students-a.students).forEach((t,ri)=>{const q=t.p[per],tr=el('tr',{style:ri%2?'background:color-mix(in srgb,var(--bd) 22%,transparent)':''});
+   [[t.name+(t.login?' ('+t.login+')':''),'l'],[t.students+(t.groups?' + '+t.groups+' гр.':''),'r'],[q.lessons||'—','r'],[!tmOn?'—':q.lesMin?hm(q.lesMin)+(q.timed?' (ср. '+hm(q.lesMin/q.timed)+')':''):'—','r'],
+    [q.hw||q.sent||q.checked?q.hw+' / '+q.sent+' / '+q.checked:'—','r'],[t.pending||'—','r'],[ago(t.last),'l'],[(t.tg?'✅':'—')+(t.tgStudents?' · уч. '+t.tgStudents:''),'l']]
+    .forEach(([v,al],i)=>tr.append(el('td',{textContent:v,style:'padding:7px 8px;border-bottom:1px solid var(--bd);text-align:'+(al==='r'?'right':'left')+''+(i===0?';font-weight:600':';white-space:nowrap')+(i>0&&i<6?';font-variant-numeric:tabular-nums':'')})));tb.append(tr)});
+  tblBox.replaceChildren(el('div',{style:'font-weight:700;font-size:15px;margin:4px 0 2px',textContent:'Репетиторы — '+PER[per].t.toLowerCase()}),el('div',{style:'overflow:auto'},tb));
+ };
+ // график: по дням (30 дней) или по неделям (весь срок); что показывать — уроки и домашки или время занятий
  let mode='d',what='n';
  const periods=()=>{
-  if(mode==='d')return S.days.slice(-30).map(x=>({from:x.day,to:x.day,A:[x]}));
-  const W=[];S.days.forEach(x=>{const t=Date.parse(x.day),mon=new Date(t-((new Date(t).getUTCDay()+6)%7)*864e5).toISOString().slice(0,10);
+  if(mode==='d')return D.slice(-30).map(x=>({from:x.day,to:x.day,A:[x]}));
+  const W=[];D.forEach(x=>{const t=Date.parse(x.day),mon=new Date(t-((new Date(t).getUTCDay()+6)%7)*864e5).toISOString().slice(0,10);
    const w=W[W.length-1];if(w&&w.mon===mon){w.A.push(x);w.to=x.day}else W.push({mon,from:x.day,to:x.day,A:[x]})});
   while(W.length&&!W[0].A.some(x=>x.has||x.hw||x.sent||x.checked))W.shift(); // недели до начала подсчёта не показываем
   return W};
- const box=el('div'),tabs=el('div',{style:'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px'});
- const tb2=(txt,on,f)=>el('button',{textContent:txt,onclick:f,style:on?'background:#6a3fc4;color:#fff;border-color:#6a3fc4':''});
+ const box=el('div'),tabs=el('div',{style:'display:flex;gap:6px;flex-wrap:wrap;align-items:center'});
  const draw=()=>{
-  tabs.replaceChildren(el('b',{textContent:'Показать:'}),tb2('По дням',mode==='d',()=>{mode='d';draw()}),tb2('По неделям',mode==='w',()=>{mode='w';draw()}),el('span',{textContent:' '}),
-   tb2('Уроки и домашки',what==='n',()=>{what='n';draw()}),tb2('Время занятий',what==='t',()=>{what='t';draw()}));
+  tabs.replaceChildren(el('b',{textContent:'График:'}),pill('По дням',mode==='d',()=>{mode='d';draw()}),pill('По неделям',mode==='w',()=>{mode='w';draw()}),el('span',{textContent:' '}),
+   pill('Уроки и домашки',what==='n',()=>{what='n';draw()}),pill('Время занятий',what==='t',()=>{what='t';draw()}));
   const P=periods().map(p=>{const o={},A=p.A;['lessons','calls','hw','sent','checked','callMin','lesMin','timedLessons'].forEach(k=>o[k]=sum(k,A));
    return Object.assign(o,p,{has:A.some(x=>x.has),timed:A.some(x=>x.timed),teachers:Math.max(0,...A.map(x=>x.teachers))})});
   const a=what==='n'?'lessons':'lesMin',b=what==='n'?'hw':'callMin',ca='#6a3fc4',cb=what==='n'?'#2e9e6b':'#2a7fd4';
-  const mx=Math.max(1,...P.map(x=>Math.max(x[a],x[b]))),ch=el('div',{style:'display:flex;align-items:flex-end;gap:3px;height:130px;padding-top:6px;border-bottom:1px solid var(--bd)'});
-  P.forEach(x=>{const nm=mode==='d'?fmt(x.day=x.from):'Неделя '+fmt(x.from)+'–'+fmt(x.to);
+  const mx=Math.max(1,...P.map(x=>Math.max(x[a],x[b]))),ch=el('div',{style:'display:flex;align-items:flex-end;gap:3px;height:150px;padding-top:16px;border-bottom:1px solid var(--bd)'});
+  const lab=v=>what==='n'?String(v):(v>=60?Math.round(v/60)+'ч':v+'м');
+  P.forEach(x=>{const nm=mode==='d'?fmt(x.from):'Неделя '+fmt(x.from)+'–'+fmt(x.to);
    const tm=x.timed?', занятия '+hm(x.lesMin)+(x.timedLessons?' (средний урок '+hm(x.lesMin/x.timedLessons)+')':'')+', в звонке '+hm(x.callMin):', время — ещё не считали';
-   const col=el('div',{title:nm+': уроков '+(x.has?x.lessons:'— (ещё не считали)')+(x.has?', звонков '+x.calls:'')+tm+', репетиторов заходило '+(x.has?(mode==='d'?x.teachers:'до '+x.teachers+' в день'):'—')+', домашек задано '+x.hw+', сдано '+x.sent+', проверено '+x.checked,style:'flex:1;display:flex;gap:1px;align-items:flex-end;height:100%;cursor:default'});
-   const ok=what==='n'?x.has:x.timed;
-   col.append(el('div',{style:'flex:1;border-radius:3px 3px 0 0;background:'+ca+';height:'+(ok?Math.max(x[a]?2:0,x[a]/mx*100):0)+'%'}),el('div',{style:'flex:1;border-radius:3px 3px 0 0;background:'+cb+';height:'+((what==='n'||ok)?Math.max(x[b]?2:0,x[b]/mx*100):0)+'%'}));ch.append(col)});
+   const col=el('div',{title:nm+': уроков '+(x.has?x.lessons:'— (ещё не считали)')+(x.has?', звонков '+x.calls:'')+tm+', репетиторов заходило '+(x.has?(mode==='d'?x.teachers:'до '+x.teachers+' в день'):'—')+', домашек задано '+x.hw+', сдано '+x.sent+', проверено '+x.checked,style:'flex:1;display:flex;gap:1px;align-items:flex-end;height:100%;cursor:default;position:relative'});
+   const ok=what==='n'?x.has:x.timed,bar=(v,c,show)=>el('div',{style:'flex:1;border-radius:3px 3px 0 0;background:'+c+';height:'+(show?Math.max(v?2:0,v/mx*100):0)+'%;position:relative'},
+    show&&v&&P.length<=31?el('span',{style:'position:absolute;bottom:100%;left:50%;transform:translateX(-50%);font-size:10px;color:var(--mut);white-space:nowrap',textContent:lab(v)}):'');
+   col.append(bar(x[a],ca,ok),bar(x[b],cb,what==='n'||ok));ch.append(col)});
   const leg=what==='n'?[['■ уроки',ca],['■ домашки заданы',cb]]:[['■ время уроков',ca],['■ в звонке',cb]];
-  const note=what==='n'?'уроки и входы считаются с '+fmt(S.since):(tmOn?'время считается с '+fmt(S.tmSince)+' · самый высокий столбик — '+hm(mx):'время начнём считать после обновления');
-  box.replaceChildren(el('div',{style:'font-weight:700;margin-top:4px',textContent:(mode==='d'?'По дням (последние 30 дней)':'По неделям (с понедельника по воскресенье)')+' — наведите на столбик'}),
-   el('div',{className:'mut',style:'font-size:12px'},el('span',{style:'color:'+ca,textContent:leg[0][0]}),'   ',el('span',{style:'color:'+cb,textContent:leg[1][0]}),'   '+note),
+  box.replaceChildren(el('div',{className:'mut',style:'font-size:12.5px;margin-top:4px'},el('span',{style:'color:'+ca,textContent:leg[0][0]}),'   ',el('span',{style:'color:'+cb,textContent:leg[1][0]}),'   '+(mode==='d'?'последние 30 дней':'с понедельника по воскресенье')+' · наведите на столбик, чтобы увидеть подробности'),
    ch,el('div',{className:'mut',style:'display:flex;justify-content:space-between;font-size:11px'},el('span',{textContent:P.length?fmt(P[0].from):''}),el('span',{textContent:P.length?(mode==='d'?fmt(P[P.length-1].to):'неделя с '+fmt(P[P.length-1].from)):''})));
  };
- draw();d.b.append(tabs,box);
- // таблица репетиторов
- const today=S.days[S.days.length-1].day,ago=k=>{if(!k)return 'нет входов с '+fmt(S.since);const n=Math.round((Date.parse(today)-Date.parse(k))/864e5);return n===0?'сегодня':n===1?'вчера':n+' дн. назад'};
- const tb=el('table',{style:'width:100%;border-collapse:collapse;font-size:13px'}),th=el('tr');
- ['Репетитор','Учеников','Заходил(а)','Уроков 7 дн.','Занятия 7 дн.','Домашек 7 дн.','Ждут проверки','Telegram'].forEach(h=>th.append(el('th',{textContent:h,style:'text-align:left;padding:5px 6px;border-bottom:1px solid var(--bd);font-weight:600;color:var(--mut)'})));tb.append(th);
- T.slice().sort((a,b)=>(b.last||'').localeCompare(a.last||'')||b.students-a.students).forEach(t=>{const tr=el('tr');
-  [t.name+(t.login?' ('+t.login+')':''),t.students+(t.groups?' + '+t.groups+' гр.':''),ago(t.last),t.lessons7,!tmOn?'—':t.lesMin7?hm(t.lesMin7)+(t.callMin7?' · звонок '+hm(t.callMin7):''):'',t.hw7,t.pending||'',(t.tg?'✅':'—')+(t.tgStudents?' · уч. '+t.tgStudents:'')].forEach((v,i)=>tr.append(el('td',{textContent:v,style:'padding:5px 6px;border-bottom:1px solid var(--bd);'+(i===0?'font-weight:600':'')})));tb.append(tr)});
- d.b.append(el('div',{style:'font-weight:700;margin-top:6px',textContent:'Репетиторы'}),el('div',{style:'overflow:auto'},tb),
-  el('p',{className:'mut',style:'font-size:12px;margin:0',textContent:'Урок — день, когда на доске ученика заметно писали или был звонок. Время урока — сколько минут на доске были одновременно двое (или шёл звонок вдвоём), если и то и другое — берём большее. «Заходил(а)» — открывал(а) кабинет. Уроки и входы собираются с '+fmt(S.since)+(tmOn?', время — с '+fmt(S.tmSince):'')+', домашки — за всё время.'}),
+ render();draw();
+ d.b.append(top,cards,el('div',{style:'border-top:1px solid var(--bd);margin-top:4px'}),tabs,box,tblBox,
+  el('p',{className:'mut',style:'font-size:12px;margin:0',textContent:'Урок — день, когда на доске ученика заметно писали или был звонок. Время урока — сколько минут на доске были одновременно двое (или шёл звонок вдвоём); если и то и другое — берём большее. «Заходил(а)» — открывал(а) кабинет.'}),
   el('div',{className:'row',style:'border:0'},el('button',{textContent:'Закрыть',onclick:d.close})));
 };
 // ---------- копия доски другому ученику (кнопка «⧉ Копировать доску» под списком досок) ----------

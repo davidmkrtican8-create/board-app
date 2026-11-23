@@ -149,6 +149,13 @@ body.focus #main{padding:4px;gap:4px}
 .tile.me{order:9} /* все окошки одинакового размера, своё — последним */.tile video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.tile.me video{transform:scaleX(-1)}
 .tile .nm{position:absolute;left:4px;bottom:4px;background:rgba(0,0,0,.55);padding:1px 6px;border-radius:6px;font-size:11px;z-index:1}
 .tile.talk{outline:3px solid #2e7d32}
+#callctl{display:flex;gap:8px;justify-content:center;align-items:center;padding:7px 2px 1px}
+#callctl button{width:38px;height:38px;border-radius:50%;padding:0;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--tx) 8%,var(--panel));border:1px solid var(--bd);color:var(--tx);transition:background .15s,transform .1s}
+#callctl button:hover{transform:scale(1.07)}#callctl button svg{width:19px;height:19px}
+#callctl button.off{background:#d32f2f;border-color:#d32f2f;color:#fff}#callctl #cend{background:#d32f2f;border-color:#d32f2f;color:#fff;width:46px;border-radius:19px}
+#callbox.min #callctl{padding-top:2px}#callbox.row #tiles{flex-direction:row}
+.tile .av{width:46%;max-width:72px;aspect-ratio:1;border-radius:50%;background:linear-gradient(135deg,#6a3fc4,#2a7fd4);display:flex;align-items:center;justify-content:center;font-size:calc(var(--tw)*.16);font-weight:800;color:#fff;text-transform:uppercase}
+.tile .mu{position:absolute;left:4px;top:4px;z-index:2;background:#d32f2f;color:#fff;border-radius:6px;padding:1px 5px;font-size:12px;line-height:18px}.tile .mu[hidden]{display:none}
 #hwb,#hwt{background:var(--ac);color:var(--panel);border:1px solid var(--ac);font-weight:700;white-space:nowrap}
 #side .grpb{margin-top:4px;text-align:left}
 #hwb:hover,#hwt:hover{background:color-mix(in srgb,var(--ac) 88%,var(--tx))}#hwb{margin-top:6px;padding:8px 10px}
@@ -245,7 +252,7 @@ body.focus #main{padding:4px;gap:4px}
    <p><b>Android:</b> меню браузера ⋮ → «Установить приложение» или «Добавить на главный экран».</p>
   </details>
  </div>
- <div id="wrap"><div id="vsb" hidden title="Тяните, чтобы листать доску вверх и вниз"><div id="vsbt"></div></div><div id="plots"></div><div id="solidbar" hidden><span id="shint">Тяните внутри фигуры — вращать</span><button id="sletters" title="Подписать вершины буквами">A B C</button><button id="ssec" title="Сечение плоскостью через три точки на рёбрах">✂ Сечение</button><button id="sreset" title="Вернуть исходный вид">↺ Вид</button></div><button id="followb" hidden></button><div id="callbox" hidden><div id="callhd"><span id="callst">Звонок</span><button id="callbig" title="Крупное видео / обычное (или двойной щелчок по видео)">⤢</button><button id="callmin" title="Свернуть/развернуть">–</button></div><div id="tiles"></div><div class="crs se" data-c="se" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs sw" data-c="sw" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs ne" data-c="ne" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs nw" data-c="nw" title="Потяните, чтобы увеличить или уменьшить видео"></div></div><canvas id="cv"></canvas><canvas id="ovl"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edel" hidden title="Удалить выделенное (клавиша Delete)">🗑 Удалить</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button><button id="zfit" hidden>↺ Вернуть масштаб</button><div id="zhint" hidden>Страница приближена в браузере. Вернуть: Ctrl+0 (на Mac ⌘0)</div></div>
+ <div id="wrap"><div id="vsb" hidden title="Тяните, чтобы листать доску вверх и вниз"><div id="vsbt"></div></div><div id="plots"></div><div id="solidbar" hidden><span id="shint">Тяните внутри фигуры — вращать</span><button id="sletters" title="Подписать вершины буквами">A B C</button><button id="ssec" title="Сечение плоскостью через три точки на рёбрах">✂ Сечение</button><button id="sreset" title="Вернуть исходный вид">↺ Вид</button></div><button id="followb" hidden></button><div id="callbox" hidden><div id="callhd"><span id="callst">Звонок</span><button id="callbig" title="Крупное видео / обычное (или двойной щелчок по видео)">⤢</button><button id="callmin" title="Свернуть/развернуть">–</button></div><div id="tiles"></div><div id="callctl"><button id="cmic" title="Микрофон: выключить / включить"></button><button id="ccam" title="Камера: включить / выключить"></button><button id="clay" title="Окошки в ряд или столбиком"></button><button id="cend" title="Завершить звонок"></button></div><div class="crs se" data-c="se" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs sw" data-c="sw" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs ne" data-c="ne" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs nw" data-c="nw" title="Потяните, чтобы увеличить или уменьшить видео"></div></div><canvas id="cv"></canvas><canvas id="ovl"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edel" hidden title="Удалить выделенное (клавиша Delete)">🗑 Удалить</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button><button id="zfit" hidden>↺ Вернуть масштаб</button><div id="zhint" hidden>Страница приближена в браузере. Вернуть: Ctrl+0 (на Mac ⌘0)</div></div>
 </div>
 <script>var errN=0;window.addEventListener('error',function(e){if(/ResizeObserver/.test(e.message||''))return;var s=document.getElementById('st');if(s)s.textContent='Ошибка в скрипте: '+(e.message||'');
  if(errN++<5)try{fetch('/api/log',{method:'POST',body:JSON.stringify({m:String(e.message||'').slice(0,300),l:e.lineno,c:e.colno,s:String(e.error&&e.error.stack||'').slice(0,800),u:navigator.userAgent.slice(0,200),p:location.pathname.slice(0,40)})}).catch(function(){})}catch(_){}})</script>
@@ -1164,7 +1171,7 @@ function openText(x,y,id){
   const v=ta.value.replace(/\s+$/,'');ta.remove();
   if(!v){return}
   const txt=wrapText(v,size,Math.max(60,PW-x-12));
-  if(ex){ex.s=txt;inval(ex);send({t:'stroke',page:page,stroke:clean(ex)});redraw();return}
+  if(ex){const eb=edSnap([id],[]);ex.s=txt;inval(ex);send({t:'stroke',page:page,stroke:clean(ex)});edDone(eb);redraw();return} // правку текста тоже можно отменить
   addObj({id:newId(),k:'text',pts:[x,y],c:color,w:size,s:txt});
  };
  ta.oninput=fit2;
@@ -1349,7 +1356,7 @@ function end(e){
  if(e.pointerType==='touch'){ptrs.delete(e.pointerId);if(ptrs.size<2)gest=null}
  if(pan&&pan.id===e.pointerId){pan=null;setCursor();return}
  if(cur&&curPid!==null&&e.pointerId!==curPid)return; // ладонь оторвалась — линию пера не обрываем
- clearTimeout(holdT);if(!cur)return;const s=cur;cur=null;curPid=null;if(s.erasing){flushErase();if(s.gone&&s.gone.length){mine.push({page:page,dels:s.gone});redo=[]}return}
+ clearTimeout(holdT);if(!cur)return;const s=cur;cur=null;curPid=null;if(s._eb)edDone(s._eb,s._ep);if(s.erasing){flushErase();if(s.gone&&s.gone.length){mine.push({page:page,dels:s.gone});redo=[]}return}
  if(s.mvs){const sk=(strokes[page]||{})[s.mvs];if(sk)send({t:'strokeset',page:page,id:s.mvs,pts:sk.pts});return}
  if(s.mq){const q=s.mq;if((Math.abs(q[2]-q[0])+Math.abs(q[3]-q[1]))*view.s<8)msel=null;else mselPick(q);redraw();return}
  if(s.gmv){const ps=strokes[page]||{},ims=images[page]||{};
@@ -1386,6 +1393,10 @@ function end(e){
  addObj(o);
 }
 cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
+cv.addEventListener('pointerdown',()=>{const c=cur;if(!c||c._eb)return; // начало переноса/поворота/растягивания — запоминаем «как было» для Ctrl+Z
+ const sid=c.mvs||c.rot||c.axres||c.orbit;
+ if(sid)c._eb=edSnap([sid],[]);else if(c.mv)c._eb=edSnap([],[c.mv]);else if(c.gmv)c._eb=edSnap(Object.keys(c.os||{}),Object.keys(c.oi||{}));
+ if(c._eb)c._ep=page});
 cv.addEventListener('pointerleave',()=>{ptr=null;drawOverlay()});
 
 // ---------- клавиатура (Cmd/Ctrl+Z работает и после клика по кнопкам) ----------
@@ -1525,22 +1536,37 @@ function restoreObj(pg,d){
  if(d.stroke){(strokes[pg]=strokes[pg]||{})[d.id]=d.stroke;send({t:'stroke',page:pg,stroke:clean(Object.assign({},d.stroke,{id:d.id}))})}
  else{(images[pg]=images[pg]||{})[d.id]=d.img;send({t:'image',page:pg,img:Object.assign({},d.img,{id:d.id})})}
 }
+// ---------- отмена правок: перенос, поворот, растягивание, правка текста ----------
+// до правки запоминаем объекты (линии — целиком, картинки — место и размер), после — сравниваем; Ctrl+Z возвращает как было
+function edSnap(ids,imgs,pg){pg=pg||page;const ps=strokes[pg]||{},ims=images[pg]||{},S={s:{},i:{}};
+ (ids||[]).forEach(id=>{if(ps[id])S.s[id]=JSON.stringify(clean(ps[id]))});
+ (imgs||[]).forEach(id=>{const g=ims[id];if(g)S.i[id]=JSON.stringify({x:g.x,y:g.y,w:g.w,h:g.h})});return S}
+function edDone(b,pg){if(!b)return;pg=pg||page;const a=edSnap(Object.keys(b.s),Object.keys(b.i),pg);
+ if(Object.keys(b.s).some(id=>a.s[id]!==b.s[id])||Object.keys(b.i).some(id=>a.i[id]!==b.i[id])){mine.push({page:pg,edit:{b:b,a:a}});redo=[]}}
+function edApply(pg,S){ // вернуть объекты к сохранённому виду; false — их уже нет (стёрли)
+ const ps=strokes[pg]||{},ims=images[pg]||{};let n=0;
+ for(const id in S.s){if(!ps[id])continue;const o=JSON.parse(S.s[id]);ps[id]=o;inval(o);send({t:'stroke',page:pg,stroke:clean(o)});n++}
+ for(const id in S.i){const g=ims[id];if(!g)continue;Object.assign(g,JSON.parse(S.i[id]));send({t:'imgset',page:pg,id:id,x:g.x,y:g.y,w:g.w,h:g.h});n++}
+ if(n&&inkC)inkC.key=null;return n>0}
 function undo(){
- const m=mine.pop();if(!m)return;
- if(m.dels){m.dels.forEach(d=>restoreObj(m.page,d));redo.push({page:m.page,redels:m.dels});redraw();return} // вернуть стёртое ластиком
- if(m.del){restoreObj(m.page,m.del);redo.push({page:m.page,id:m.id,redel:m.del});redraw();return} // вернуть удалённое
- const o=(strokes[m.page]||{})[m.id],g=(images[m.page]||{})[m.id];
- if(o){redo.push({page:m.page,id:m.id,stroke:o});delete strokes[m.page][m.id]}
- else if(g){redo.push({page:m.page,id:m.id,img:g});delete images[m.page][m.id]}else return;
- send({t:'erase',page:m.page,id:m.id});redraw();
+ for(let m;(m=mine.pop());){ // если объект уже стёр кто-то другой — эту запись пропускаем и отменяем следующее действие, а не «молчим»
+  if(m.edit){if(edApply(m.page,m.edit.b)){redo.push({page:m.page,edit:{b:m.edit.a,a:m.edit.b}});redraw();return}continue}
+  if(m.dels){m.dels.forEach(d=>restoreObj(m.page,d));redo.push({page:m.page,redels:m.dels});redraw();return} // вернуть стёртое ластиком
+  if(m.del){restoreObj(m.page,m.del);redo.push({page:m.page,id:m.id,redel:m.del});redraw();return} // вернуть удалённое
+  const o=(strokes[m.page]||{})[m.id],g=(images[m.page]||{})[m.id];
+  if(o){redo.push({page:m.page,id:m.id,stroke:o});delete strokes[m.page][m.id]}
+  else if(g){redo.push({page:m.page,id:m.id,img:g});delete images[m.page][m.id]}else continue;
+  if(editStroke===m.id)editStroke=null;if(editImg===m.id)editImg=null;
+  send({t:'erase',page:m.page,id:m.id});redraw();return}
 }
 function redoAct(){
- const r=redo.pop();if(!r)return;
- if(r.redels){const ids=r.redels.map(d=>d.id);ids.forEach(id=>{if(strokes[r.page])delete strokes[r.page][id];if(images[r.page])delete images[r.page][id]});send({t:'erase',page:r.page,ids:ids});mine.push({page:r.page,dels:r.redels});redraw();return}
- if(r.redel){if(strokes[r.page])delete strokes[r.page][r.id];if(images[r.page])delete images[r.page][r.id];send({t:'erase',page:r.page,id:r.id});mine.push({page:r.page,id:r.id,del:r.redel});redraw();return}
- if(r.stroke){(strokes[r.page]=strokes[r.page]||{})[r.id]=r.stroke;send({t:'stroke',page:r.page,stroke:clean(Object.assign({id:r.id},r.stroke))})}
- else{(images[r.page]=images[r.page]||{})[r.id]=r.img;send({t:'image',page:r.page,img:Object.assign({id:r.id},r.img)})}
- mine.push({page:r.page,id:r.id});redraw();
+ for(let r;(r=redo.pop());){
+  if(r.edit){if(edApply(r.page,r.edit.b)){mine.push({page:r.page,edit:{b:r.edit.a,a:r.edit.b}});redraw();return}continue}
+  if(r.redels){const ids=r.redels.map(d=>d.id);ids.forEach(id=>{if(strokes[r.page])delete strokes[r.page][id];if(images[r.page])delete images[r.page][id]});send({t:'erase',page:r.page,ids:ids});mine.push({page:r.page,dels:r.redels});redraw();return}
+  if(r.redel){if(strokes[r.page])delete strokes[r.page][r.id];if(images[r.page])delete images[r.page][r.id];send({t:'erase',page:r.page,id:r.id});mine.push({page:r.page,id:r.id,del:r.redel});redraw();return}
+  if(r.stroke){(strokes[r.page]=strokes[r.page]||{})[r.id]=r.stroke;send({t:'stroke',page:r.page,stroke:clean(Object.assign({id:r.id},r.stroke))})}
+  else{(images[r.page]=images[r.page]||{})[r.id]=r.img;send({t:'image',page:r.page,img:Object.assign({id:r.id},r.img)})}
+  mine.push({page:r.page,id:r.id});redraw();return}
 }
 
 // ---------- диалоги внутри страницы (родные окна браузера ломают полный экран) ----------
@@ -1667,6 +1693,10 @@ function callUI(){
  b.title=call.on?'Завершить звонок':n?([...call.others.values()].join(', ')+' на звонке — нажмите, чтобы присоединиться'):'Голосовой звонок прямо на доске';
  $('micb').hidden=$('camb').hidden=!call.on;$('micb').classList.toggle('off',!call.mic);$('camb').classList.toggle('off',!call.cam);
  $('callbox').hidden=!call.on;
+ $('cmic').innerHTML=ic(call.mic?'microphone':'microphone-off');$('cmic').classList.toggle('off',!call.mic);$('cmic').title=call.mic?'Выключить микрофон':'Включить микрофон';
+ $('ccam').innerHTML=ic(call.cam?'video':'video-off');$('ccam').classList.toggle('off',!call.cam);$('ccam').title=call.cam?'Выключить камеру':'Включить камеру';
+ $('cend').innerHTML=ic('phone-off');$('clay').innerHTML=$('callbox').classList.contains('row')?'⇅':'⇄';
+ const mt=document.getElementById('tile-me');if(mt)mt.querySelector('.mu').hidden=call.mic;
  if(call.on){const c=[...call.peers.values()].filter(p=>p.pc.connectionState==='connected').length;
   $('callst').textContent=call.peers.size?(c?'На связи: '+c:'Соединяюсь…'):'Ждём собеседника…'}
 }
@@ -1674,15 +1704,16 @@ function tile(id,label,stream,me){
  let t=document.getElementById('tile-'+id);
  if(!t){t=document.createElement('div');t.id='tile-'+id;t.className='tile'+(me?' me':'');
   const v=document.createElement('video');v.autoplay=true;v.playsInline=true;v.muted=true;
-  const nm=document.createElement('span');nm.className='nm';t.append(v,nm);
+  const nm=document.createElement('span');nm.className='nm';const av=document.createElement('div');av.className='av';const mu=document.createElement('span');mu.className='mu';mu.textContent='🔇';mu.title='Микрофон выключен';mu.hidden=true;t.append(av,v,nm,mu); // без камеры — кружок с первой буквой имени
   if(!me){const a=document.createElement('audio');a.autoplay=true;t.appendChild(a);volUI(t,label)}
   $('tiles').appendChild(t)}
- t.querySelector('.nm').textContent=label;
+ t.querySelector('.nm').textContent=label;t.querySelector('.av').textContent=(String(label).trim()[0]||'?');
+ const st=me?{mic:call.mic}:(call.st&&call.st[id])||{};t.querySelector('.mu').hidden=st.mic!==false;
  const v=t.querySelector('video'),a=t.querySelector('audio');
  if(stream){if(v.srcObject!==stream)v.srcObject=stream;if(a&&a.srcObject!==stream){a.srcObject=stream;a.play().catch(()=>{})}}
  if(a&&stream)volApply(t);
  const hasV=!!stream&&stream.getVideoTracks().some(x=>x.readyState==='live'&&(me?call.cam:!x.muted));
- v.style.display=hasV?'':'none';if(hasV)v.play().catch(()=>{});
+ v.style.display=hasV?'':'none';t.querySelector('.av').style.display=hasV?'none':'';if(hasV)v.play().catch(()=>{});
  return t;
 }
 function dropPeer(id){const p=call.peers.get(id);if(p){try{p.pc.close()}catch(e){}call.peers.delete(id)}const t=document.getElementById('tile-'+id);if(t){volOff(t);t.remove()}callUI()}
@@ -1746,8 +1777,9 @@ function peer(id){
 async function onRtc(o){
  if(o.from===me)return;
  if(o.kind==='hello'){call.others.set(o.from,String((o.data&&o.data.label)||'Участник').slice(0,40));
-  if(call.on){const q=call.peers.get(o.from);if(!(o.data&&o.data.rejoin&&q&&q.pc.connectionState==='connected')){dropPeer(o.from);peer(o.from)}}callUI();return}
+  if(call.on){const q=call.peers.get(o.from);if(!(o.data&&o.data.rejoin&&q&&q.pc.connectionState==='connected')){dropPeer(o.from);peer(o.from)}setTimeout(callSt,800)}callUI();return}
  if(o.kind==='bye'){call.others.delete(o.from);dropPeer(o.from);return}
+ if(o.kind==='st'){call.st=call.st||{};call.st[o.from]=o.data||{};const t=document.getElementById('tile-'+o.from);if(t)t.querySelector('.mu').hidden=(o.data||{}).mic!==false;return}
  if(!call.on||o.to!==me)return;
  if(!call.others.has(o.from))call.others.set(o.from,'Участник');
  const p=peer(o.from),pc=p.pc;
@@ -1852,21 +1884,26 @@ async function camToggle(){
    call.stream.addTrack(v);call.peers.forEach(p=>{p.pc.addTrack(v,call.stream);setTimeout(()=>audioPrio(p.pc),1500)});call.cam=true}
   catch(e){await modal('Не получилось включить камеру. Проверьте, что браузеру разрешён доступ к камере.',{ok:'Понятно'})}
  }
- tile('me','Вы',call.stream,true);callUI();
+ tile('me','Вы',call.stream,true);callUI();callSt();
 }
 $('callb').onclick=()=>call.on?callStop():callStart();
-$('micb').onclick=()=>{call.mic=!call.mic;if(call.stream)call.stream.getAudioTracks().forEach(t=>t.enabled=call.mic);callUI()};
+const callSt=()=>{if(call.on)sig(null,'st',{mic:call.mic,cam:call.cam})}; // собеседники видят, что у меня выключен микрофон
+$('micb').onclick=()=>{call.mic=!call.mic;if(call.stream)call.stream.getAudioTracks().forEach(t=>t.enabled=call.mic);callUI();callSt()};
+$('cmic').onclick=()=>$('micb').click();$('ccam').onclick=()=>camToggle();$('cend').onclick=()=>{if(call.on)$('callb').click()};
+$('clay').onclick=()=>{const b=$('callbox');b.classList.toggle('row');try{localStorage.setItem('callRow',b.classList.contains('row')?'1':'0')}catch(e){}callUI();window.dispatchEvent(new Event('resize'))};
+try{if(localStorage.getItem('callRow')==='1')$('callbox').classList.add('row')}catch(e){}
 $('camb').onclick=camToggle;
 $('callmin').onclick=()=>{$('callbox').classList.toggle('min');$('callmin').textContent=$('callbox').classList.contains('min')?'+':'–'};
 (function(){ // окно звонка можно перетаскивать за заголовок
  let d=null;const box=$('callbox');
  $('callhd').addEventListener('pointerdown',e=>{if(e.target.tagName==='BUTTON')return;const r=box.getBoundingClientRect(),w=wrap.getBoundingClientRect();d={x:e.clientX-r.left,y:e.clientY-r.top,w:w};$('callhd').setPointerCapture(e.pointerId)});
  $('callhd').addEventListener('pointermove',e=>{if(!d)return;const w=d.w;box.style.left=Math.max(0,Math.min(w.width-box.offsetWidth,e.clientX-w.left-d.x))+'px';box.style.top=Math.max(0,Math.min(w.height-box.offsetHeight,e.clientY-w.top-d.y))+'px';box.style.right='auto'});
- $('callhd').addEventListener('pointerup',()=>{d=null});
+ $('callhd').addEventListener('pointerup',()=>{if(d){d=null;try{localStorage.setItem('callPos',JSON.stringify([parseFloat(box.style.left)||0,parseFloat(box.style.top)||0]))}catch(e){}}}); // место окна запоминаем
  // размер видео: тянуть за уголок, кнопка ⤢ или двойной щелчок по видео; размер запоминается
  const fit=()=>{const w=wrap.getBoundingClientRect(),r=box.getBoundingClientRect();
   if(r.right>w.right-4||r.bottom>w.bottom-4){box.style.left=Math.max(0,Math.min(r.left-w.left,w.width-box.offsetWidth-4))+'px';box.style.top=Math.max(0,Math.min(r.top-w.top,w.height-box.offsetHeight-4))+'px';box.style.right='auto'}};
- const setTw=(v,save)=>{const w=wrap.getBoundingClientRect(),n=Math.max(1,$('tiles').children.length);v=Math.round(Math.max(100,Math.min(v,w.width-40,(w.height-60-6*(n-1))/n/.75)));box.style.setProperty('--tw',v+'px');if(save)try{localStorage.setItem('callTw',v)}catch(e){};return v};
+ const setTw=(v,save)=>{const w=wrap.getBoundingClientRect(),n=Math.max(1,$('tiles').children.length),row=box.classList.contains('row'); // в ряд — делим ширину, столбиком — высоту; 110 — заголовок и кнопки
+  v=Math.round(Math.max(100,Math.min(v,row?(w.width-40-6*(n-1))/n:w.width-40,row?(w.height-110)/.75:(w.height-110-6*(n-1))/n/.75)));box.style.setProperty('--tw',v+'px');if(save)try{localStorage.setItem('callTw',v)}catch(e){};return v};
  let tw0=160;try{tw0=+localStorage.getItem('callTw')||160}catch(e){}
  box.style.setProperty('--tw',Math.max(100,Math.min(640,tw0))+'px'); // до показа окна размеры доски могут быть ещё нулевые — не ограничиваем по ним
  let rz=null; // тянуть можно за любой уголок: противоположный уголок стоит на месте
@@ -1886,7 +1923,8 @@ $('callmin').onclick=()=>{$('callbox').classList.toggle('min');$('callmin').text
  $('callbig').onclick=big;$('tiles').addEventListener('dblclick',big);
  // кто-то вошёл или вышел из звонка, окно доски изменилось — подгоняем размер окошек, чтобы ряд помещался
  const refit=()=>{if(box.hidden)return;setTw(parseFloat(getComputedStyle(box).getPropertyValue('--tw'))||160,false);fit()};
- new MutationObserver(()=>setTimeout(refit,0)).observe($('tiles'),{childList:true});new MutationObserver(()=>setTimeout(refit,0)).observe(box,{attributes:true,attributeFilter:['hidden']});
+ const restore=()=>{if(box.hidden||box.dataset.pos)return;box.dataset.pos=1;try{const q=JSON.parse(localStorage.getItem('callPos')||'null');if(q){box.style.left=q[0]+'px';box.style.top=q[1]+'px';box.style.right='auto'}}catch(e){}}; // окно звонка открывается там, где его оставили
+ new MutationObserver(()=>setTimeout(refit,0)).observe($('tiles'),{childList:true});new MutationObserver(()=>{restore();setTimeout(refit,0)}).observe(box,{attributes:true,attributeFilter:['hidden']});
  addEventListener('resize',()=>setTimeout(refit,50));
 })();
 window.addEventListener('pagehide',()=>{if(call.on)navigator.sendBeacon&&navigator.sendBeacon('/api/'+room+'/op',JSON.stringify({t:'rtc',kind:'bye',from:me}))});

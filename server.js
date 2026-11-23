@@ -137,7 +137,7 @@ function apply(s, op) {
       s.pages = np; return true;
     }
     case 'title': { const p = s.pages.find(p => p.id === op.id); if (p) p.title = String(op.title || '').slice(0, 80); return true; }
-    case 'rtc': return ['hello', 'here', 'offer', 'answer', 'ice', 'bye'].includes(op.kind) && RID.test(String(op.from)) && (!op.to || RID.test(String(op.to))) && JSON.stringify(op.data || null).length < 30000;
+    case 'rtc': return ['hello', 'here', 'offer', 'answer', 'ice', 'bye', 'st'].includes(op.kind) && RID.test(String(op.from)) && (!op.to || RID.test(String(op.to))) && JSON.stringify(op.data || null).length < 30000;
     case 'cursor': return Number.isFinite(+op.x) && Number.isFinite(+op.y) && String(op.label || '').length <= 40;
     case 'live': return true;
     case 'laser': return Array.isArray(op.pts) && op.pts.length <= 400 && op.pts.every(v => Number.isFinite(+v)); // указка: не сохраняется
@@ -387,7 +387,7 @@ let stT = 0;
 function stSave() {
   if (stT) return;
   stT = setTimeout(() => {
-    stT = 0; const old = dayKey(Date.now() - 120 * 864e5); for (const k in STATS) if (k < old) delete STATS[k]; // храним 4 месяца
+    stT = 0; const old = dayKey(Date.now() - 3 * 365 * 864e5); for (const k in STATS) if (k < old) delete STATS[k]; // храним 3 года — статистика «за весь срок» (день — пара килобайт)
     try { fs.writeFileSync(STF, JSON.stringify(STATS)); } catch (e) {}
   }, 60e3);
 }
@@ -946,21 +946,28 @@ function dropRoom(id) { // удалить доску ученика целико
     if (SN[id]) { delete SN[id]; saveSN(); } fs.rm(path.join(SND, id), { recursive: true, force: true }, () => {}); fs.rm(path.join(HWD, id), { recursive: true, force: true }, () => {});
   }
 }
-function siteStats() {
-  const N = 120, now = Date.now(), days = [], at = {}; // 120 дней — столько хранится; окно показывает 30 дней или недели
-  for (let i = N - 1; i >= 0; i--) { const k = dayKey(now - i * 864e5); at[k] = days.length; days.push({ day: k, has: !!STATS[k], teachers: 0, lessons: 0, calls: 0, hw: 0, sent: 0, checked: 0, callMin: 0, togMin: 0, lesMin: 0, timedLessons: 0, timed: !!(STATS[k] && STATS[k].tm) }); }
-  const sts = index.students.filter(s => s.type !== 'group'), ownerOf = {};
+function siteStats() { // статистика сайта для владельца: по дням (с начала подсчёта) и по репетиторам за 7 дней, 30 дней и весь срок
+  const now = Date.now(), today = dayKey(now), sts = index.students.filter(s => s.type !== 'group'), ownerOf = {};
   index.students.forEach(s => { ownerOf[s.id] = s.owner; });
+  let first = Object.keys(STATS).sort()[0] || today; // первый день: начало подсчёта или самая ранняя домашка
+  for (const s of sts) for (const h of hwOf(s.id).list || []) if (h.created && dayKey(h.created) < first) first = dayKey(h.created);
+  const days = [], at = {};
+  for (let t = Date.parse(first + 'T12:00:00Z') - 3 * 3600e3; dayKey(t) <= today && days.length < 1200; t += 864e5) {
+    const k = dayKey(t); at[k] = days.length;
+    days.push({ day: k, has: !!STATS[k], teachers: 0, lessons: 0, calls: 0, hw: 0, sent: 0, checked: 0, callMin: 0, togMin: 0, lesMin: 0, timedLessons: 0, timed: !!(STATS[k] && STATS[k].tm) });
+  }
+  const P0 = () => ({ lessons: 0, lesMin: 0, callMin: 0, timed: 0, hw: 0, sent: 0, checked: 0 });
   const list = [owner(), ...teachersOnly()].map(t => ({ id: t.id, name: t.id === 'owner' ? (t.name || 'Владелец') + ' (вы)' : t.name, login: t.login, created: t.created || 0,
     students: sts.filter(s => s.owner === t.id).length, groups: index.students.filter(s => s.type === 'group' && s.owner === t.id).length,
-    last: '', lessons7: 0, hw7: 0, pending: 0, callMin7: 0, lesMin7: 0, tg: !!((TG.tsubs || {})[t.id] || []).length, tgStudents: sts.filter(s => s.owner === t.id && (TG.subs[s.id] || []).length).length }));
-  const byId = Object.fromEntries(list.map(t => [t.id, t])), wk = dayKey(now - 6 * 864e5);
+    last: '', pending: 0, p: { d7: P0(), d30: P0(), all: P0() }, tg: !!((TG.tsubs || {})[t.id] || []).length, tgStudents: sts.filter(s => s.owner === t.id && (TG.subs[s.id] || []).length).length }));
+  const byId = Object.fromEntries(list.map(t => [t.id, t])), d7 = dayKey(now - 6 * 864e5), d30 = dayKey(now - 29 * 864e5);
+  const per = k => ['all'].concat(k >= d30 ? ['d30'] : [], k >= d7 ? ['d7'] : []); // в какие периоды попадает день
   for (const k of Object.keys(STATS).sort()) {
     const d = STATS[k], i = at[k], les = new Set([...Object.keys(d.brd).filter(r => d.brd[r] >= 20), ...Object.keys(d.call)]); // урок: на доске заметно писали или был звонок
     for (const tid in d.seen) if (byId[tid]) byId[tid].last = k;
-    if (k >= wk) les.forEach(r => { const t = byId[ownerOf[r]]; if (t) t.lessons7++; });
-    const cm = d.cm || {}, om = d.om || {};
-    if (k >= wk) { for (const r in cm) { const t = byId[ownerOf[r]]; if (t) t.callMin7 += cm[r]; } les.forEach(r => { const t = byId[ownerOf[r]]; if (t) t.lesMin7 += Math.max(cm[r] || 0, om[r] || 0); }); }
+    const cm = d.cm || {}, om = d.om || {}, ps = per(k);
+    les.forEach(r => { const t = byId[ownerOf[r]]; if (!t) return; const m = Math.max(cm[r] || 0, om[r] || 0); ps.forEach(q => { const x = t.p[q]; x.lessons++; x.lesMin += m; if (m) x.timed++; }); });
+    for (const r in cm) { const t = byId[ownerOf[r]]; if (t) ps.forEach(q => { t.p[q].callMin += cm[r]; }); }
     if (i !== undefined) {
       const x = days[i]; x.teachers = Object.keys(d.seen).length; x.lessons = les.size; x.calls = Object.keys(d.call).length;
       for (const r in cm) x.callMin += cm[r]; for (const r in om) x.togMin += om[r];
@@ -970,16 +977,21 @@ function siteStats() {
   for (const s of sts) {
     const t = byId[s.owner];
     for (const h of hwOf(s.id).list || []) {
-      const ix = t => t ? at[dayKey(t)] : undefined, c = ix(h.created), se = ix(h.sentAt), ch = ix(h.checkedAt);
+      const ix = v => v ? at[dayKey(v)] : undefined, c = ix(h.created), se = ix(h.sentAt), ch = ix(h.checkedAt);
       if (c !== undefined) days[c].hw++;
       if (se !== undefined) days[se].sent++;
       if (ch !== undefined) days[ch].checked++;
-      if (t && h.created && dayKey(h.created) >= wk) t.hw7++;
-      if (t && h.st === 'sent') t.pending++;
+      if (t) {
+        if (h.created) per(dayKey(h.created)).forEach(q => { t.p[q].hw++; });
+        if (h.sentAt) per(dayKey(h.sentAt)).forEach(q => { t.p[q].sent++; });
+        if (h.checkedAt) per(dayKey(h.checkedAt)).forEach(q => { t.p[q].checked++; });
+        if (h.st === 'sent') t.pending++;
+      }
     }
   }
-  const since = Object.keys(STATS).sort()[0] || dayKey(), tmSince = Object.keys(STATS).sort().find(k => STATS[k].tm) || '';
-  return { since, tmSince, days, teachers: list, students: sts.length, groups: index.students.length - sts.length, newTeachers7: teachersOnly().filter(t => t.created && now - t.created < 7 * 864e5).length };
+  const since = Object.keys(STATS).sort()[0] || today, tmSince = Object.keys(STATS).sort().find(k => STATS[k].tm) || '';
+  return { since, first, tmSince, days, teachers: list, students: sts.length, groups: index.students.length - sts.length,
+    newTeachers: { d7: teachersOnly().filter(t => t.created && now - t.created < 7 * 864e5).length, d30: teachersOnly().filter(t => t.created && now - t.created < 30 * 864e5).length, all: teachersOnly().length } };
 }
 function admin(req, res, u) {
   const me = auth(req);
