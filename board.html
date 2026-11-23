@@ -149,10 +149,12 @@ body.focus #main{padding:4px;gap:4px}
 .tile.me{order:9} /* все окошки одинакового размера, своё — последним */.tile video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.tile.me video{transform:scaleX(-1)}
 .tile .nm{position:absolute;left:4px;bottom:4px;background:rgba(0,0,0,.55);padding:1px 6px;border-radius:6px;font-size:11px;z-index:1}
 .tile.talk{outline:3px solid #2e7d32}
-#callctl{display:flex;gap:8px;justify-content:center;align-items:center;padding:7px 2px 1px}
-#callctl button{width:38px;height:38px;border-radius:50%;padding:0;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--tx) 8%,var(--panel));border:1px solid var(--bd);color:var(--tx);transition:background .15s,transform .1s}
-#callctl button:hover{transform:scale(1.07)}#callctl button svg{width:19px;height:19px}
-#callctl button.off{background:#d32f2f;border-color:#d32f2f;color:#fff}#callctl #cend{background:#d32f2f;border-color:#d32f2f;color:#fff;width:46px;border-radius:19px}
+#callctl{display:flex;gap:clamp(4px,calc(var(--tw)*.04),8px);justify-content:center;align-items:center;padding:7px 2px 1px;--cb:clamp(26px,calc((var(--tw) - 24px)/4.2),38px)}
+/* окно звонка — ровно по ширине видео: заголовок и кнопки ширину не задают, а подстраиваются (иначе справа пустое поле) */
+#callbox:not(.min) #callctl,#callbox:not(.min) #callhd{width:0;min-width:100%;box-sizing:border-box}#callhd span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+#callctl button{width:var(--cb);height:var(--cb);flex:none;border-radius:50%;padding:0;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--tx) 8%,var(--panel));border:1px solid var(--bd);color:var(--tx);transition:background .15s,transform .1s}
+#callctl button:hover{transform:scale(1.07)}#callctl button svg{width:calc(var(--cb)*.5);height:calc(var(--cb)*.5)}
+#callctl button.off{background:#d32f2f;border-color:#d32f2f;color:#fff}#callctl #cend{background:#d32f2f;border-color:#d32f2f;color:#fff;width:calc(var(--cb)*1.2);border-radius:19px}
 #callbox.min #callctl{padding-top:2px}#callbox.row #tiles{flex-direction:row}
 .tile .av{width:46%;max-width:72px;aspect-ratio:1;border-radius:50%;background:linear-gradient(135deg,#6a3fc4,#2a7fd4);display:flex;align-items:center;justify-content:center;font-size:calc(var(--tw)*.16);font-weight:800;color:#fff;text-transform:uppercase}
 .tile .mu{position:absolute;left:4px;top:4px;z-index:2;background:#d32f2f;color:#fff;border-radius:6px;padding:1px 5px;font-size:12px;line-height:18px}.tile .mu[hidden]{display:none}
@@ -1903,9 +1905,9 @@ $('callmin').onclick=()=>{$('callbox').classList.toggle('min');$('callmin').text
  const fit=()=>{const w=wrap.getBoundingClientRect(),r=box.getBoundingClientRect();
   if(r.right>w.right-4||r.bottom>w.bottom-4){box.style.left=Math.max(0,Math.min(r.left-w.left,w.width-box.offsetWidth-4))+'px';box.style.top=Math.max(0,Math.min(r.top-w.top,w.height-box.offsetHeight-4))+'px';box.style.right='auto'}};
  const setTw=(v,save)=>{const w=wrap.getBoundingClientRect(),n=Math.max(1,$('tiles').children.length),row=box.classList.contains('row'); // в ряд — делим ширину, столбиком — высоту; 110 — заголовок и кнопки
-  v=Math.round(Math.max(100,Math.min(v,row?(w.width-40-6*(n-1))/n:w.width-40,row?(w.height-110)/.75:(w.height-110-6*(n-1))/n/.75)));box.style.setProperty('--tw',v+'px');if(save)try{localStorage.setItem('callTw',v)}catch(e){};return v};
+  v=Math.round(Math.max(130,Math.min(v,row?(w.width-40-6*(n-1))/n:w.width-40,row?(w.height-110)/.75:(w.height-110-6*(n-1))/n/.75)));box.style.setProperty('--tw',v+'px');if(save)try{localStorage.setItem('callTw',v)}catch(e){};return v};
  let tw0=160;try{tw0=+localStorage.getItem('callTw')||160}catch(e){}
- box.style.setProperty('--tw',Math.max(100,Math.min(640,tw0))+'px'); // до показа окна размеры доски могут быть ещё нулевые — не ограничиваем по ним
+ box.style.setProperty('--tw',Math.max(130,Math.min(640,tw0))+'px'); // до показа окна размеры доски могут быть ещё нулевые — не ограничиваем по ним
  let rz=null; // тянуть можно за любой уголок: противоположный уголок стоит на месте
  box.querySelectorAll('.crs').forEach(h=>{
   h.addEventListener('pointerdown',e=>{e.stopPropagation();const r=box.getBoundingClientRect(),w=wrap.getBoundingClientRect();
