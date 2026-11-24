@@ -148,7 +148,12 @@ body.focus #main{padding:4px;gap:4px}
 .tile{position:relative;width:var(--tw);height:calc(var(--tw)*.75);border-radius:8px;overflow:hidden;background:#2b2638;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;text-align:center}
 .tile.me{order:9} /* все окошки одинакового размера, своё — последним */.tile video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.tile.me video{transform:scaleX(-1)}
 .tile .nm{position:absolute;left:4px;bottom:4px;background:rgba(0,0,0,.55);padding:1px 6px;border-radius:6px;font-size:11px;z-index:1}
-.tile.talk{outline:3px solid #2e7d32}
+.tile{transition:box-shadow .15s}.tile.talk{outline:3px solid #34c759;outline-offset:-3px;box-shadow:0 0 0 2px rgba(52,199,89,.35),0 0 14px rgba(52,199,89,.55)} /* сейчас говорит */
+#awayb{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:7;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+#awayb>div{pointer-events:auto;display:flex;align-items:center;gap:10px;padding:8px 10px 8px 14px;border-radius:12px;font-weight:600;font-size:14px;box-shadow:0 4px 16px rgba(0,0,0,.22);background:#d84315;color:#fff;max-width:min(560px,90vw)}
+#awayb>div.away{animation:awp 1.6s ease-in-out infinite}#awayb>div.back{background:#2e7d32}#awayb>div.info{background:var(--panel);color:var(--tx);border:1px solid var(--bd)}
+#awayb button{background:transparent;border:0;color:inherit;font-size:16px;padding:0 4px;line-height:1}
+@keyframes awp{50%{box-shadow:0 4px 16px rgba(0,0,0,.22),0 0 0 5px rgba(216,67,21,.3)}}
 #callctl{display:flex;gap:clamp(4px,calc(var(--tw)*.04),8px);justify-content:center;align-items:center;padding:7px 2px 1px;--cb:clamp(26px,calc((var(--tw) - 24px)/4.2),38px)}
 /* окно звонка — ровно по ширине видео: заголовок и кнопки ширину не задают, а подстраиваются (иначе справа пустое поле) */
 #callbox:not(.min) #callctl,#callbox:not(.min) #callhd{width:0;min-width:100%;box-sizing:border-box}#callhd span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
@@ -254,7 +259,7 @@ body.focus #main{padding:4px;gap:4px}
    <p><b>Android:</b> меню браузера ⋮ → «Установить приложение» или «Добавить на главный экран».</p>
   </details>
  </div>
- <div id="wrap"><div id="vsb" hidden title="Тяните, чтобы листать доску вверх и вниз"><div id="vsbt"></div></div><div id="plots"></div><div id="solidbar" hidden><span id="shint">Тяните внутри фигуры — вращать</span><button id="sletters" title="Подписать вершины буквами">A B C</button><button id="ssec" title="Сечение плоскостью через три точки на рёбрах">✂ Сечение</button><button id="sreset" title="Вернуть исходный вид">↺ Вид</button></div><button id="followb" hidden></button><div id="callbox" hidden><div id="callhd"><span id="callst">Звонок</span><button id="callbig" title="Крупное видео / обычное (или двойной щелчок по видео)">⤢</button><button id="callmin" title="Свернуть/развернуть">–</button></div><div id="tiles"></div><div id="callctl"><button id="cmic" title="Микрофон: выключить / включить"></button><button id="ccam" title="Камера: включить / выключить"></button><button id="clay" title="Окошки в ряд или столбиком"></button><button id="cend" title="Завершить звонок"></button></div><div class="crs se" data-c="se" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs sw" data-c="sw" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs ne" data-c="ne" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs nw" data-c="nw" title="Потяните, чтобы увеличить или уменьшить видео"></div></div><canvas id="cv"></canvas><canvas id="ovl"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edel" hidden title="Удалить выделенное (клавиша Delete)">🗑 Удалить</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button><button id="zfit" hidden>↺ Вернуть масштаб</button><div id="zhint" hidden>Страница приближена в браузере. Вернуть: Ctrl+0 (на Mac ⌘0)</div></div>
+ <div id="wrap"><div id="vsb" hidden title="Тяните, чтобы листать доску вверх и вниз"><div id="vsbt"></div></div><div id="plots"></div><div id="solidbar" hidden><span id="shint">Тяните внутри фигуры — вращать</span><button id="sletters" title="Подписать вершины буквами">A B C</button><button id="ssec" title="Сечение плоскостью через три точки на рёбрах">✂ Сечение</button><button id="sreset" title="Вернуть исходный вид">↺ Вид</button></div><button id="followb" hidden></button><div id="awayb"></div><div id="callbox" hidden><div id="callhd"><span id="callst">Звонок</span><button id="callbig" title="Крупное видео / обычное (или двойной щелчок по видео)">⤢</button><button id="callmin" title="Свернуть/развернуть">–</button></div><div id="tiles"></div><div id="callctl"><button id="cmic" title="Микрофон: выключить / включить"></button><button id="ccam" title="Камера: включить / выключить"></button><button id="clay" title="Окошки в ряд или столбиком"></button><button id="cend" title="Завершить звонок"></button></div><div class="crs se" data-c="se" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs sw" data-c="sw" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs ne" data-c="ne" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs nw" data-c="nw" title="Потяните, чтобы увеличить или уменьшить видео"></div></div><canvas id="cv"></canvas><canvas id="ovl"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edel" hidden title="Удалить выделенное (клавиша Delete)">🗑 Удалить</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button><button id="zfit" hidden>↺ Вернуть масштаб</button><div id="zhint" hidden>Страница приближена в браузере. Вернуть: Ctrl+0 (на Mac ⌘0)</div></div>
 </div>
 <script>var errN=0;window.addEventListener('error',function(e){if(/ResizeObserver/.test(e.message||''))return;var s=document.getElementById('st');if(s)s.textContent='Ошибка в скрипте: '+(e.message||'');
  if(errN++<5)try{fetch('/api/log',{method:'POST',body:JSON.stringify({m:String(e.message||'').slice(0,300),l:e.lineno,c:e.colno,s:String(e.error&&e.error.stack||'').slice(0,800),u:navigator.userAgent.slice(0,200),p:location.pathname.slice(0,40)})}).catch(function(){})}catch(_){}})</script>
@@ -277,7 +282,7 @@ const postOp=(op,b)=>{const h={};if(op.t==='delPage'||op.t==='clear'){try{h['X-T
  return fetch('/api/'+room+'/op',{method:'POST',headers:h,body:b})};
 // Изменения доски (линии, стирание, картинки…) уходят на сервер по очереди. Если связь пропала, они ждут в очереди
 // и досылаются, когда связь вернётся, — линия не исчезает. Пролетающие сообщения (живая линия, курсор, лазер) не копим.
-const EPH=['live','cursor','laser','view','rtc'],outQ=[];let outBusy=false,outT=0,outBad=false;
+const EPH=['live','cursor','laser','view','rtc','away'],outQ=[];let outBusy=false,outT=0,outBad=false;
 const send=op=>{op.from=me;
  if(EPH.includes(op.t))return postOp(op,JSON.stringify(op)).catch(()=>{if(!outQ.length)$('st').textContent='Нет связи с сервером'});
  if((op.t==='strokeset'||op.t==='imgset')&&outQ.length>1){const q=outQ[outQ.length-1]; // перенос того же объекта: в очереди держим только последнее положение
@@ -882,16 +887,17 @@ function openPage(id){page=id;live={};$('newt').hidden=true;jump=null;editImg=nu
 const imgGone=ids=>{if(isTeacher&&ids&&ids.length)try{parent.postMessage({t:'imgGone',ids:ids.map(String)},location.origin)}catch(e){}}; // кабинет убирает из черновика домашки аналоги стёртых задач
 function onOp(o){
  if(o.page&&SNAP_OPS.includes(o.t))snapDirty[o.page]=Date.now(); // доска изменилась — позже сохраним её PDF для вечернего конспекта
- if(inkC&&!['live','cursor','laser','view','rtc'].includes(o.t))inkC.key=null; // чужая правка — картинку готовых записей пересобираем
+ if(inkC&&!['live','cursor','laser','view','rtc','away'].includes(o.t))inkC.key=null; // чужая правка — картинку готовых записей пересобираем
  if(o.from===me&&(o.t==='strokeset'||o.t==='imgset'||o.t==='stroke'))return; // своё эхо со старым положением заставляло объект дёргаться
  if(o.t==='rtc'){onRtc(o);return}
  if(o.t==='init'){callInit(o.call);myName=o.name||null;$('who').textContent=o.group?'👥 Группа: '+o.group:o.name?'Кабинет: '+o.name:'Доска';document.title=o.group||o.name||'Доска';pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};for(const pg in strokes)for(const id in strokes[pg])strokes[pg][id].id=id; // у загруженных объектов нет поля id — проставляем
  reapplyQ();flushQ();
  const hp=(location.hash.match(/^#p=([\w-]+)$/)||[])[1];if(hp&&!initDone&&pages.some(p=>p.id===hp))page=hp;initDone=true; // ссылка на конкретную доску (из кабинета ученика)
  if(!page||!pages.some(p=>p.id===page))page=pages[0].id;openPage(page);return}
- if(o.t==='peers'){$('st').textContent=peersTxt='Онлайн: '+o.n+(o.who&&o.who.length?' · '+o.who.join(', '):'');if(lead)sendView(true);return}
+ if(o.t==='peers'){peersN=+o.n||0;$('st').textContent=peersTxt='Онлайн: '+o.n+(o.who&&o.who.length?' · '+o.who.join(', '):'');if(lead)sendView(true);return}
  if(o.t==='laser'){if(o.from!==me&&Array.isArray(o.pts)){const l=(lasers[o.from]=lasers[o.from]||{page:o.page,pts:[],sp:[]}),n0=performance.now();l.page=o.page;
   const m=o.pts.length/2;for(let i=0;i+1<o.pts.length;i+=2)l.pts.push({x:+o.pts[i],y:+o.pts[i+1],t:n0+(i/2+1)/m*50});laserLoop()}return} // пачку из 50 мс показываем постепенно — указка ученика и преподавателя движется плавно
+ if(o.t==='away'){if(isTeacher&&o.from!==me)awayGot(o);return}
  if(o.t==='view'){if(o.from===me)return;if(o.stop){leaderView=null;detached=false}else{leaderView={page:o.page,x:+o.x,y:+o.y,w:+o.w,h:+o.h};applyLeader()}followUI();return}
  if(o.t==='cursor'){if(o.from!==me){const old=cursors[o.from],x=+o.x,y=+o.y,jump=!old||old.page!==o.page||Date.now()-old.t>1500; // новый или давно стоявший курсор ставим сразу, остальное — плавно доводим
   cursors[o.from]={x,y,dx:jump?x:old.dx,dy:jump?y:old.dy,page:o.page,label:String(o.label||'Участник'),color:/^#[0-9a-f]{6}$/i.test(o.color)?o.color:'#0e9f8e',t:Date.now()};curAnim()}return}
@@ -1751,6 +1757,46 @@ async function buildPDF(all,only){ // only — одна доска по id, бе
 }
 
 // ---------- звонок на доске (WebRTC: звук и видео идут напрямую, через свой TURN, если напрямую нельзя) ----------
+// ---------- «отвлёкся»: ученик ушёл с доски на другую вкладку или в другое приложение — у репетитора плашка ----------
+let peersN=0;
+function note(text,cls,ms,key){ // плашка сверху по центру доски; key — одна плашка на человека
+ const box=$('awayb');let d=key&&box.querySelector('[data-k="'+key+'"]');
+ if(!d){d=document.createElement('div');if(key)d.dataset.k=key;box.append(d)}
+ clearTimeout(d._t);d.className=cls||'';d.innerHTML='';const sp=document.createElement('span');sp.textContent=text;
+ const x=document.createElement('button');x.textContent='✕';x.title='Скрыть';x.onclick=()=>{clearInterval(d._i);d.remove()};d.append(sp,x);
+ if(ms)d._t=setTimeout(()=>{clearInterval(d._i);d.remove()},ms);return d}
+const fmtDur=sec=>sec<60?sec+' с':Math.floor(sec/60)+' мин'+(sec%60?' '+sec%60+' с':'');
+const AW={};
+function awayGot(o){ // у репетитора: короткие отлучки (до 3 с) не показываем
+ const k='aw-'+String(o.from).replace(/[^a-z0-9]/gi,''),nm=String(o.name||'Ученик').slice(0,60),A=AW[k]||(AW[k]={});
+ clearTimeout(A.t);
+ if(o.on){A.at=Date.now();A.t=setTimeout(()=>{A.shown=true;const d=note('','away',0,k),upd=()=>{d.firstChild.textContent='⚠️ '+nm+' не на доске — открыта другая вкладка или приложение · '+fmtDur(Math.round((Date.now()-A.at)/1000))};upd();clearInterval(d._i);d._i=setInterval(upd,1000)},3000);return}
+ if(A.shown){A.shown=false;const sec=+o.dur||Math.round((Date.now()-(A.at||Date.now()))/1000),d=note('✅ '+nm+' снова на доске · не было '+fmtDur(sec),'back',7000,k);clearInterval(d._i)}
+}
+if(!isTeacher){ // у ученика: сообщаем, когда доска скрыта (другая вкладка, свёрнутое окно, другое приложение на iPad) и когда вернулся
+ let awAt=0,awOn=false,told=false;
+ const beacon=op=>{op.from=me;const b=JSON.stringify(op);if(!(navigator.sendBeacon&&navigator.sendBeacon('/api/'+room+'/op',new Blob([b],{type:'application/json'}))))send(op)}; // в фоне обычный запрос могут не отпустить
+ document.addEventListener('visibilitychange',()=>{
+  if(!page)return;
+  if(document.hidden){awAt=Date.now();awOn=true;beacon({t:'away',on:true,name:myName||'Ученик'})}
+  else if(awOn){awOn=false;const sec=Math.round((Date.now()-awAt)/1000);beacon({t:'away',on:false,name:myName||'Ученик',dur:sec});
+   if(!told&&sec>=3&&peersN>1){told=true;note('Репетитор видит, когда ты уходишь с доски во время занятия 🙂','info',6000)}}
+ });
+}
+// ---------- подсветка того, кто говорит: зелёная рамка у окошка ----------
+function talkTick(){
+ if(!call.on)return;
+ call.peers.forEach((p,id)=>{let lv=0;try{const r=p.pc.getReceivers().find(x=>x.track&&x.track.kind==='audio'),ss=r&&r.getSynchronizationSources&&r.getSynchronizationSources()[0];
+   if(ss&&(Math.abs(performance.timeOrigin+performance.now()-ss.timestamp)<1000||Math.abs(performance.now()-ss.timestamp)<1000))lv=ss.audioLevel||0}catch(e){} // свежий звук (Chrome и Safari считают время по-разному)
+  talkSet('tile-'+id,lv>.03)});
+ let lv=0;const tr=call.stream&&call.stream.getAudioTracks()[0];
+ if(tr&&call.mic&&call.ac&&call.ac.state==='running'){
+  if(!call.ta||call.ta.id!==tr.id){try{if(call.ta)call.ta.src.disconnect()}catch(e){}try{const src=call.ac.createMediaStreamSource(new MediaStream([tr])),an=call.ac.createAnalyser();an.fftSize=512;src.connect(an);call.ta={id:tr.id,src:src,an:an,buf:new Float32Array(512)}}catch(e){call.ta={id:tr.id}}}
+  const T=call.ta;if(T.an){T.an.getFloatTimeDomainData(T.buf);let q=0;for(let i=0;i<T.buf.length;i++)q+=T.buf[i]*T.buf[i];lv=Math.sqrt(q/T.buf.length)*3}}
+ talkSet('tile-me',lv>.03);
+}
+function talkSet(id,on){const t=document.getElementById(id);if(!t)return;const n=performance.now();if(on)t._tk=n;t.classList.toggle('talk',!!t._tk&&n-t._tk<350)} // держим рамку 0,35 с — не мигает между словами
+setInterval(talkTick,120);
 const call={on:false,stream:null,ice:null,peers:new Map(),others:new Map(),mic:true,cam:false};
 const myLabel=()=>isTeacher?'Преподаватель':(myName||'Ученик');
 const sig=(to,kind,data)=>send({t:'rtc',kind:kind,to:to,data:data});

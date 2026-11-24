@@ -141,6 +141,7 @@ function apply(s, op) {
     case 'cursor': return Number.isFinite(+op.x) && Number.isFinite(+op.y) && String(op.label || '').length <= 40;
     case 'live': return true;
     case 'laser': return Array.isArray(op.pts) && op.pts.length <= 400 && op.pts.every(v => Number.isFinite(+v)); // указка: не сохраняется
+    case 'away': return typeof op.on === 'boolean' && String(op.name || '').length <= 60 && (op.dur == null || Number.isFinite(+op.dur)); // ученик ушёл с доски / вернулся: не сохраняется
     case 'view': return !!op.stop || ['x', 'y', 'w', 'h'].every(k => Number.isFinite(+op[k])); // «следуй за мной»: не сохраняется
   }
   return false;
@@ -425,7 +426,7 @@ const stDay = () => { const k = dayKey(); return STATS[k] || (STATS[k] = { seen:
 function statSeen(tid) { const d = stDay(); if (!d.seen[tid]) { d.seen[tid] = 1; stSave(); } }
 function statOp(rid, op) {
   if (op.t === 'rtc') { if (op.kind === 'hello') { const d = stDay(); if (!d.call[rid]) { d.call[rid] = 1; stSave(); } } return; }
-  if (['live', 'cursor', 'laser', 'view'].includes(op.t)) return;
+  if (['live', 'cursor', 'laser', 'view', 'away'].includes(op.t)) return;
   const d = stDay(); d.brd[rid] = (d.brd[rid] || 0) + 1; stSave();
 }
 // длительность занятий: раз в минуту отмечаем доски, где сейчас идёт звонок (2+ участника) и где на доске сразу 2+ человека
@@ -1232,7 +1233,7 @@ http.createServer((req, res) => {
       if (!apply(r.s, op)) { res.writeHead(400); return res.end(); }
       if (op.t === 'rtc') { if (op.kind === 'hello') r.call.add(op.from); if (op.kind === 'bye') r.call.delete(op.from); }
       bcast(r, op); statOp(m[1], op);
-      if (!['live', 'rtc', 'cursor', 'laser', 'view'].includes(op.t)) save(r);
+      if (!['live', 'rtc', 'cursor', 'laser', 'view', 'away'].includes(op.t)) save(r);
       res.writeHead(204); res.end();
     });
   }
