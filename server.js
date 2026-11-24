@@ -410,6 +410,36 @@ function hwBoard(sid, h) { // «Решать на доске»: отдельна
 // ---------- Telegram-бот: домашка, напоминания и конспекты ученику и родителям ----------
 // один бот на весь сайт; токен вводит владелец в кабинете («Telegram»), хранится в _tg.json
 const https = require('https');
+// скачать картинку по ссылке: только http(s), только внешние адреса (не сам сервер и не локальная сеть), только image/*, до 10 МБ, до 3 переадресаций
+const dnsLib = require('dns'), netLib = require('net'), imgRate = new Map();
+function ipPrivate(a) {
+  if (netLib.isIPv4(a)) { const [x, y] = a.split('.').map(Number); return x === 0 || x === 10 || x === 127 || x >= 224 || (x === 100 && y >= 64 && y < 128) || (x === 169 && y === 254) || (x === 172 && y >= 16 && y < 32) || (x === 192 && y === 168) || (x === 198 && (y === 18 || y === 19)); }
+  const v = a.toLowerCase(); if (v.startsWith('::ffff:')) return ipPrivate(v.slice(7));
+  return v === '::' || v === '::1' || /^f[cd]/.test(v) || /^fe[89ab]/.test(v);
+}
+function imgFetch(url, hops, done) {
+  let U; try { U = new URL(url); } catch (e) { return done('bad url'); }
+  if (!/^https?:$/.test(U.protocol) || U.username || U.password || url.length > 4000) return done('bad url');
+  const lib = U.protocol === 'https:' ? https : http;
+  const lookup = (host, opts, cb) => { if (typeof opts === 'function') { cb = opts; opts = {}; }
+    dnsLib.lookup(host, { family: opts.family || 0, all: true }, (e, L) => {
+      if (e) return cb(e); if (!L.length || L.some(x => ipPrivate(x.address))) return cb(new Error('private address')); // адрес внутри нашей сети — не ходим
+      if (opts.all) cb(null, L); else cb(null, L[0].address, L[0].family);
+    }); };
+  if (netLib.isIP(U.hostname.replace(/^\[|\]$/g, '')) && ipPrivate(U.hostname.replace(/^\[|\]$/g, ''))) return done('private address');
+  let fin = false; const end = (e, t, b) => { if (!fin) { fin = true; done(e, t, b); } };
+  const rq = lib.get(U, { lookup, timeout: 10000, headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36', Accept: 'image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8', Referer: U.origin + '/' } }, r => {
+    if ([301, 302, 303, 307, 308].includes(r.statusCode) && r.headers.location && hops < 3) { r.resume(); let nx; try { nx = new URL(r.headers.location, U).href; } catch (e) { return end('bad redirect'); } return imgFetch(nx, hops + 1, end); }
+    const type = String(r.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+    if (r.statusCode !== 200 || !/^image\/(png|jpeg|jpg|gif|webp|avif|bmp|svg\+xml)$/.test(type)) { r.resume(); return end('not an image'); }
+    const parts = []; let n = 0;
+    r.on('data', c => { n += c.length; if (n > 10e6) { rq.destroy(); return end('too big'); } parts.push(c); });
+    r.on('end', () => end(null, type === 'image/jpg' ? 'image/jpeg' : type, Buffer.concat(parts)));
+    r.on('error', () => end('download failed'));
+  });
+  rq.on('timeout', () => { rq.destroy(); end('timeout'); });
+  rq.on('error', () => end('download failed'));
+}
 // ---------- статистика для владельца сайта: кто заходил, где был урок, звонки (по дням, московское время) ----------
 const STF = path.join(DIR, '_stats.json');
 let STATS = {}; try { STATS = JSON.parse(fs.readFileSync(STF, 'utf8')) || {}; } catch (e) {}
@@ -1150,6 +1180,17 @@ http.createServer((req, res) => {
   const pj = u.pathname.match(/^\/pdfjs\/(pdf(?:\.worker)?\.min\.mjs)$/);
   if (pj) { // pdf.js для просмотра сборников задач в кабинете преподавателя
     return sendFile(req, res, path.join(__dirname, pj[1]), 'text/javascript; charset=utf-8', 'public, max-age=86400');
+  }
+  if (u.pathname === '/api/img') { // картинку, скопированную со страницы чужого сайта, браузер сам скачать не может — скачиваем мы (только для открытых досок)
+    const rr = String(u.searchParams.get('r') || '');
+    if (!RID.test(rr) || !index.students.some(x => x.id === rr)) { res.writeHead(404); return res.end(); }
+    const ip = ipOf(req), mn = Math.floor(Date.now() / 60000), q = imgRate.get(ip);
+    if (q && q.m === mn && q.n >= 30) { res.writeHead(429); return res.end(); }
+    imgRate.set(ip, q && q.m === mn ? { m: mn, n: q.n + 1 } : { m: mn, n: 1 }); if (imgRate.size > 2000) imgRate.clear();
+    return imgFetch(String(u.searchParams.get('u') || ''), 0, (err, type, buf) => {
+      if (err) { res.writeHead(422, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end(err); }
+      res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }); res.end(buf);
+    });
   }
   if (u.pathname === '/api/ice') { // ключи TURN выдаём только тем, кто открыл существующую доску
     const rr = String(u.searchParams.get('r') || '');

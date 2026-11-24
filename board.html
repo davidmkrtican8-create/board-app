@@ -144,16 +144,17 @@ body.focus #main{padding:4px;gap:4px}
 #callbox{position:absolute;right:12px;top:12px;z-index:6;background:var(--panel);border:1px solid var(--bd);border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.25);padding:6px;max-width:calc(100% - 24px);touch-action:none;--tw:160px}
 .crs{position:absolute;width:18px;height:18px;touch-action:none;z-index:3}.crs.se{right:-4px;bottom:-4px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 55%,var(--mut) 55%,var(--mut) 62%,transparent 62%,transparent 72%,var(--mut) 72%,var(--mut) 79%,transparent 79%)}.crs.sw{left:-4px;bottom:-4px;cursor:nesw-resize}.crs.ne{right:-4px;top:-4px;width:12px;height:12px;cursor:nesw-resize}.crs.nw{left:-4px;top:-4px;cursor:nwse-resize}#callbox.min .crs{display:none}
 #callhd{display:flex;align-items:center;gap:6px;cursor:move;font-size:12px;color:var(--mut);padding:0 2px 4px}#callhd span{flex:1}#callhd button{padding:0 8px;line-height:20px}
-#tiles{display:flex;flex-direction:column;flex-wrap:nowrap;gap:6px;position:relative} /* окошки одно под другим — окно звонка ровно по ним, без пустого места */#callbox.min #tiles{display:none}
+#tiles{display:flex;flex-direction:column;flex-wrap:nowrap;gap:6px;position:relative} /* окошки одно под другим — окно звонка ровно по ним, без пустого места */#callbox.min{display:none} /* свёрнутый звонок — кнопкой «📞» в верхней панели, окно над доской не занимает место */
+#callpill{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;border-radius:10px;font-weight:600;white-space:nowrap}#callpill .d{width:9px;height:9px;border-radius:50%;background:#9a93b0;transition:background .15s}#callpill.talk .d{background:#34c759;box-shadow:0 0 6px #34c759}
 .tile{position:relative;width:var(--tw);height:calc(var(--tw)*.75);border-radius:8px;overflow:hidden;background:#2b2638;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;text-align:center}
 .tile.me{order:9} /* все окошки одинакового размера, своё — последним */.tile video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.tile.me video{transform:scaleX(-1)}
 .tile .nm{position:absolute;left:4px;bottom:4px;background:rgba(0,0,0,.55);padding:1px 6px;border-radius:6px;font-size:11px;z-index:1}
 .tile{transition:box-shadow .15s}.tile.talk{outline:3px solid #34c759;outline-offset:-3px;box-shadow:0 0 0 2px rgba(52,199,89,.35),0 0 14px rgba(52,199,89,.55)} /* сейчас говорит */
 #awayb{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:7;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
 #awayb>div{pointer-events:auto;display:flex;align-items:center;gap:10px;padding:8px 10px 8px 14px;border-radius:12px;font-weight:600;font-size:14px;box-shadow:0 4px 16px rgba(0,0,0,.22);background:#d84315;color:#fff;max-width:min(560px,90vw)}
-#awayb>div.away{animation:awp 1.6s ease-in-out infinite}#awayb>div.back{background:#2e7d32}#awayb>div.info{background:var(--panel);color:var(--tx);border:1px solid var(--bd)}
+#awayb>div.away::before{content:'';width:9px;height:9px;border-radius:50%;background:#fff;flex:none;animation:awp 1.2s ease-in-out infinite}#awayb>div.back{background:#2e7d32}#awayb>div.info{background:var(--panel);color:var(--tx);border:1px solid var(--bd)}
 #awayb button{background:transparent;border:0;color:inherit;font-size:16px;padding:0 4px;line-height:1}
-@keyframes awp{50%{box-shadow:0 4px 16px rgba(0,0,0,.22),0 0 0 5px rgba(216,67,21,.3)}}
+@keyframes awp{50%{opacity:.25}} /* мигает только точка (дёшево), а не тень всей плашки поверх доски */
 #callctl{display:flex;gap:clamp(4px,calc(var(--tw)*.04),8px);justify-content:center;align-items:center;padding:7px 2px 1px;--cb:clamp(26px,calc((var(--tw) - 24px)/4.2),38px)}
 /* окно звонка — ровно по ширине видео: заголовок и кнопки ширину не задают, а подстраиваются (иначе справа пустое поле) */
 #callbox:not(.min) #callctl,#callbox:not(.min) #callhd{width:0;min-width:100%;box-sizing:border-box}#callhd span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
@@ -215,7 +216,7 @@ body.focus #main{padding:4px;gap:4px}
   </span>
   <span class="rg keep">
    <button id="hwt" class="keep" hidden title="Личный кабинет: домашка, прогресс, все доски">🎓<span class="lbl"> Кабинет</span><span class="hwn" hidden></span></button>
-   <button id="micb" class="keep tb ib" hidden title="Микрофон вкл/выкл"></button><button id="camb" class="keep tb ib" hidden title="Камера вкл/выкл"></button>
+   <button id="callpill" class="keep" hidden title="Развернуть окно звонка"></button><button id="micb" class="keep tb ib" hidden title="Микрофон вкл/выкл"></button><button id="camb" class="keep tb ib" hidden title="Камера вкл/выкл"></button>
    <button id="callb" class="keep" title="Звонок прямо на доске"></button>
    <button id="fsb" class="keep ib" title="Во весь экран (Esc — выйти)"></button>
   </span>
@@ -799,7 +800,8 @@ function redraw(lo){ // lo===true — изменились только черн
  if(msel||(cur&&cur.mq)){ // выделение рамкой: выбранная область и рамка, которую сейчас тянут
   ctx.save();ctx.strokeStyle='rgba(106,63,196,.95)';ctx.lineWidth=2/s;ctx.setLineDash([8/s,6/s]);
   const R=(a,b,c,d)=>{const x=Math.min(a,c),y=Math.min(b,d),w=Math.abs(c-a),h=Math.abs(d-b);ctx.fillStyle='rgba(106,63,196,.07)';ctx.fillRect(x,y,w,h);ctx.strokeRect(x,y,w,h)};
-  if(msel)R(...msel.box);if(cur&&cur.mq)R(...cur.mq);ctx.restore()}
+  if(msel)R(...msel.box);if(cur&&cur.mq)R(...cur.mq);ctx.restore();
+  if(msel&&!viewOnly){const r=HZ()*.32;ctx.save();for(const [,x,y] of gszCorners()){ctx.beginPath();ctx.arc(x,y,r,0,6.2832);ctx.fillStyle='#fff';ctx.fill();ctx.lineWidth=2.5/s;ctx.strokeStyle='rgba(106,63,196,.95)';ctx.stroke()}ctx.restore()}} // кружки в углах — растянуть всё выделенное
  if(editStroke&&strokes[page]&&strokes[page][editStroke]){ // пунктирная рамка вокруг только что созданного объекта
   const bb=strokeBox(strokes[page][editStroke]);ctx.save();ctx.strokeStyle='rgba(106,63,196,.9)';ctx.lineWidth=2/s;ctx.setLineDash([8/s,6/s]);
   ctx.strokeRect(bb[0],bb[1],bb[2]-bb[0],bb[3]-bb[1]);ctx.restore();
@@ -1322,6 +1324,7 @@ cv.addEventListener('pointerdown',e=>{
  if(t==='text'){const id=strokeAt(p[0],p[1],true,true);openText(id?strokes[page][id].pts[0]:p[0],id?strokes[page][id].pts[1]:p[1],id);return}
  if(t==='mv'){ // двигать: внутри выделенной области — тащим всё сразу; потом фигуры/линии/текст, картинки; пустое место — рамка выделения
   if(msel){
+   const gc=gszAt(p);if(gc){cur=gszStart(gc,p);return}
    if(inBox(msel.box,p[0],p[1])){const ps=strokes[page]||{},ims=images[page]||{};cur={gmv:1,sx:p[0],sy:p[1],os:{},oi:{},ob:msel.box.slice()};
     msel.ids.forEach(id=>{if(ps[id])cur.os[id]=ps[id].pts.slice()});msel.imgs.forEach(id=>{if(ims[id])cur.oi[id]=[ims[id].x,ims[id].y]});return}
    msel=null;redraw()}
@@ -1359,6 +1362,7 @@ cv.addEventListener('pointermove',e=>{
   const rq=sk&&rszAt(sk,q);
   if(sk)cv.style.cursor=rq?(rq==='nw'||rq==='se'?'nwse-resize':'nesw-resize'):axc?'nwse-resize':onRotHandle(sk,q)?'grab':inBox(strokeBox(sk),q[0],q[1])?'move':(S.ring&&ringTools.includes(tool())?'none':'crosshair');
  }
+ if(!cur&&msel&&!editImg&&!editStroke&&e.pointerType!=='touch'&&!space){const gc=gszAt(pos(e));if(gc){cv.style.cursor=gc==='nw'||gc==='se'?'nwse-resize':'nesw-resize'}else if(tool()==='mv')cv.style.cursor=inBox(msel.box,...pos(e))?'move':'default'}
  if(!cur&&editImg&&e.pointerType!=='touch'&&!space){
   const q=pos(e),h2=handleAt(q[0],q[1]),g=(images[page]||{})[editImg],ins=g&&inBox([g.x,g.y,g.x+g.w,g.y+g.h],q[0],q[1]);
   cv.style.cursor=h2?(h2.type==='move'?'move':(h2.c==='nw'||h2.c==='se'?'nwse-resize':'nesw-resize')):(ins?'move':(S.ring&&ringTools.includes(tool())?'none':'crosshair'));
@@ -1388,6 +1392,7 @@ cv.addEventListener('pointermove',e=>{
   const t2=Date.now();if(t2-lastEmit>80){lastEmit=t2;send({t:'stroke',page:page,stroke:clean(sk)})}
   return}
  if(cur.mq){const p=pos(e);cur.mq[2]=p[0];cur.mq[3]=p[1];rd();return}
+ if(cur.gsz){gszMove(pos(e));rd();return}
  if(cur.gmv){const p=pos(e),dx=p[0]-cur.sx,dy=p[1]-cur.sy,ps=strokes[page]||{},ims=images[page]||{};
   for(const id in cur.os)if(ps[id]){ps[id].pts=cur.os[id].map((v,i)=>r2(v+(i%2?dy:dx)));inval(ps[id])}
   for(const id in cur.oi)if(ims[id]){ims[id].x=r2(cur.oi[id][0]+dx);ims[id].y=r2(cur.oi[id][1]+dy)}
@@ -1436,6 +1441,10 @@ function end(e){
  clearTimeout(holdT);if(!cur)return;const s=cur;cur=null;curPid=null;if(s._eb)edDone(s._eb,s._ep);if(s.erasing){flushErase();if(s.gone&&s.gone.length){mine.push({page:page,dels:s.gone});redo=[]}return}
  if(s.mvs){const sk=(strokes[page]||{})[s.mvs];if(sk)send({t:'strokeset',page:page,id:s.mvs,pts:sk.pts});return}
  if(s.mq){const q=s.mq;if((Math.abs(q[2]-q[0])+Math.abs(q[3]-q[1]))*view.s<8)msel=null;else mselPick(q);redraw();return}
+ if(s.gsz){const ps=strokes[page]||{},ims=images[page]||{}; // растянули выделение: толщина и размер шрифта тоже поменялись — отправляем объекты целиком
+  for(const id in s.os)if(ps[id])send({t:'stroke',page:page,stroke:clean(ps[id])});
+  for(const id in s.oi){const g=ims[id];if(g)send({t:'imgset',page:page,id:id,x:r2(g.x),y:r2(g.y),w:r2(g.w),h:r2(g.h)})}
+  if(msel)mselBox();redraw();return}
  if(s.gmv){const ps=strokes[page]||{},ims=images[page]||{};
   for(const id in s.os)if(ps[id])send({t:'strokeset',page:page,id:id,pts:ps[id].pts});
   for(const id in s.oi){const g=ims[id];if(g)send({t:'imgset',page:page,id:id,x:r2(g.x),y:r2(g.y),w:r2(g.w),h:r2(g.h)})}
@@ -1473,7 +1482,7 @@ function end(e){
 cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
 cv.addEventListener('pointerdown',()=>{const c=cur;if(!c||c._eb)return; // начало переноса/поворота/растягивания — запоминаем «как было» для Ctrl+Z
  const sid=c.mvs||c.rot||c.axres||c.orbit||c.rsz;
- if(sid)c._eb=edSnap([sid],[]);else if(c.mv)c._eb=edSnap([],[c.mv]);else if(c.gmv)c._eb=edSnap(Object.keys(c.os||{}),Object.keys(c.oi||{}));
+ if(sid)c._eb=edSnap([sid],[]);else if(c.mv)c._eb=edSnap([],[c.mv]);else if(c.gmv||c.gsz)c._eb=edSnap(Object.keys(c.os||{}),Object.keys(c.oi||{}));
  if(c._eb)c._ep=page});
 cv.addEventListener('pointerleave',()=>{ptr=null;drawOverlay()});
 
@@ -1550,6 +1559,7 @@ window.addEventListener('message',e=>{
  if(d.t==='pdfreq'){buildPDF(false).then(async r=>{const b=new Uint8Array(await r.blob.arrayBuffer());let s='';for(let i=0;i<b.length;i+=32768)s+=String.fromCharCode.apply(null,b.subarray(i,i+32768));
   e.source.postMessage({t:'pdfres',b64:btoa(s),fname:r.fname,title:r.title,page:page},location.origin)}).catch(()=>e.source.postMessage({t:'pdfres',err:1},location.origin));return} // конспект в Telegram из кабинета
  if(d.t==='pasteimg'&&typeof d.src==='string'&&/^data:image\//.test(d.src)){addImageSrc(d.src,!!d.heic);return} // ⌘V, нажатый в кабинете
+ if(d.t==='pasteurl'&&typeof d.url==='string'&&/^(https?:|data:image\/)/i.test(d.url)){addImageUrl(d.url);return} // то же, но скопировали кусок страницы сайта
  if(d.t==='callend'){if(call.on)callStop();return} // «Завершить» на плашке звонка в кабинете преподавателя
  if(d.t==='go'&&typeof d.url==='string'){ // ссылка из личного кабинета, открытого поверх доски
   let u;try{u=new URL(d.url,location.href)}catch(er){return}
@@ -1568,12 +1578,30 @@ function clipImage(dt){ // картинка из буфера обмена (ск
  for(const f of (dt.files||[]))if(/^image\/|\.(heic|heif)$/i.test(f.type||f.name))return f;
  return null;
 }
+function clipUrl(dt){ // скопировали кусок страницы сайта: в буфере не сама картинка, а HTML со ссылкой на неё (или просто ссылка на картинку)
+ if(!dt)return null;const h=dt.getData('text/html')||'',L=[];
+ const im=h.match(/<img\b[^>]*>/i);
+ if(im){const at=n=>{const m=im[0].match(new RegExp('\\s'+n+'\\s*=\\s*("([^"]*)"|\'([^\']*)\')','i'));return m?(m[2]!=null?m[2]:m[3]).replace(/&amp;/g,'&').trim():''};
+  for(const n of ['src','data-src','data-original','data-lazy-src'])L.push(at(n));
+  const ss=at('srcset')||at('data-srcset');if(ss)L.push(...ss.split(',').map(x=>x.trim().split(/\s+/)[0]).reverse())} // в srcset последняя — самая крупная
+ const t=(dt.getData('text/plain')||'').trim();if(/^https?:\/\/\S+\.(png|jpe?g|gif|webp|avif|bmp|svg)([?#]\S*)?$/i.test(t))L.push(t); // просто ссылка — только если это ссылка на картинку
+ const big=L.filter(u=>u&&!/^data:image\/gif/i.test(u)&&!(/^data:/i.test(u)&&u.length<400)); // «заглушки» ленивой загрузки (крошечные data:) пропускаем
+ return big.find(u=>/^data:image\//i.test(u)||/^https?:\/\//i.test(u))||null}
+window.clipUrlFrom=clipUrl; // кабинет преподавателя: ⌘V нажали, когда фокус был в кабинете
+async function addImageUrl(u){
+ if(viewOnly||imgFull())return;if(/^data:image\//i.test(u)){addImageSrc(u);return}
+ setSt('Скачиваю картинку…');
+ try{const r=await fetch('/api/img?r='+room+'&u='+encodeURIComponent(u));if(!r.ok)throw 0;const b=await r.blob();if(!/^image\//.test(b.type))throw 0;addImage(b)}
+ catch(e){modal('Не получилось взять картинку с этого сайта. Нажмите на картинку правой кнопкой мыши → «Копировать картинку» (или сделайте скриншот) и вставьте снова.',{ok:'Понятно'})}
+ finally{setSt(peersTxt)}}
 document.addEventListener('paste',e=>{
  if(viewOnly)return;const a=document.activeElement,dt=e.clipboardData;
  if(isTextTarget(a)&&dt&&dt.getData('text/plain'))return; // в поле ввода вставляем текст как обычно
- const f=clipImage(dt);if(!f)return;
+ const f=clipImage(dt);
+ if(!f){const u=clipUrl(dt);if(!u)return;e.preventDefault();if(a&&a!==document.body)a.blur();addImageUrl(u);return}
  e.preventDefault();if(a&&a!==document.body)a.blur();addImage(f);
 },true);
+const setSt=t=>{$('st').textContent=t};
 // Safari присылает «вставку», только если фокус в поле ввода: на ⌘V подставляем невидимое поле
 const pcatch=document.createElement('div');pcatch.contentEditable='true';pcatch.setAttribute('aria-hidden','true');
 pcatch.style.cssText='position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;overflow:hidden';document.body.appendChild(pcatch);
@@ -1582,6 +1610,18 @@ $('fi').onchange=()=>{if($('fi').files[0])addImage($('fi').files[0]);$('fi').val
 
 // ---------- отмена / возврат ----------
 // ---------- выделение рамкой (стрелка V, тянуть по пустому месту): перенести или удалить сразу задачу и решение ----------
+// растянуть выделенное рамкой (записи пером, фигуры, текст, картинки) за угол: всё вместе и без искажения, противоположный угол на месте
+const gszCorners=()=>{const b=msel.box;return[['nw',b[0],b[1]],['ne',b[2],b[1]],['sw',b[0],b[3]],['se',b[2],b[3]]]};
+function gszAt(p){if(!msel||viewOnly)return null;const z=HZ()*.75;for(const [c,x,y] of gszCorners())if(Math.abs(p[0]-x)<=z&&Math.abs(p[1]-y)<=z)return c;return null}
+function gszStart(c,p){const b=msel.box,E=c[1]==='e',S_=c[0]==='s',ps=strokes[page]||{},ims=images[page]||{},o={gsz:1,sx:p[0],sy:p[1],ax:E?b[0]:b[2],ay:S_?b[1]:b[3],hx:E?b[2]:b[0],hy:S_?b[3]:b[1],ob:b.slice(),os:{},oi:{}};
+ msel.ids.forEach(id=>{if(ps[id])o.os[id]={pts:ps[id].pts.slice(),w:ps[id].w}});msel.imgs.forEach(id=>{const g=ims[id];if(g)o.oi[id]=[g.x,g.y,g.w,g.h]});return o}
+function gszMove(p){const c=cur,W=c.hx-c.ax,H=c.hy-c.ay,fx=W?(W+p[0]-c.sx)/W:1,fy=H?(H+p[1]-c.sy)/H:1;
+ const f=Math.max(.05,Math.min(20,Math.max(fx,fy))),X=v=>c.ax+(v-c.ax)*f,Y=v=>c.ay+(v-c.ay)*f,ps=strokes[page]||{},ims=images[page]||{};
+ for(const id in c.os){const sk=ps[id];if(!sk)continue;const o=c.os[id];sk.pts=o.pts.map((v,i)=>r2(i%2?Y(v):X(v)));
+  if(sk.k!=='plot'&&typeof o.w==='number')sk.w=r2(Math.max(sk.k==='text'?6:.3,o.w*f)); // толщина линий и размер шрифта — вместе с размером
+  inval(sk)}
+ for(const id in c.oi){const g=ims[id],o=c.oi[id];if(!g)continue;g.x=r2(X(o[0]));g.y=r2(Y(o[1]));g.w=r2(o[2]*f);g.h=r2(o[3]*f)}
+ const b=c.ob;msel.box=[X(b[0]),Y(b[1]),X(b[2]),Y(b[3])].map(r2);if(msel.box[0]>msel.box[2])msel.box=[msel.box[2],msel.box[1],msel.box[0],msel.box[3]];if(msel.box[1]>msel.box[3])msel.box=[msel.box[0],msel.box[3],msel.box[2],msel.box[1]]}
 function mselBox(){
  const ps=strokes[page]||{},ims=images[page]||{};msel.ids=msel.ids.filter(id=>ps[id]);msel.imgs=msel.imgs.filter(id=>ims[id]);
  let a=1e12,b=1e12,c=-1e12,d=-1e12;
@@ -1773,8 +1813,9 @@ const AW={};
 function awayGot(o){ // у репетитора: короткие отлучки (до 3 с) не показываем
  const k='aw-'+String(o.from).replace(/[^a-z0-9]/gi,''),nm=String(o.name||'Ученик').slice(0,60),A=AW[k]||(AW[k]={});
  clearTimeout(A.t);
- if(o.on){A.at=Date.now();A.t=setTimeout(()=>{A.shown=true;const d=note('','away',0,k),upd=()=>{d.firstChild.textContent='⚠️ '+nm+' не на доске — открыта другая вкладка или приложение · '+fmtDur(Math.round((Date.now()-A.at)/1000))};upd();clearInterval(d._i);d._i=setInterval(upd,1000)},3000);return}
- if(A.shown){A.shown=false;const sec=+o.dur||Math.round((Date.now()-(A.at||Date.now()))/1000),d=note('✅ '+nm+' снова на доске · не было '+fmtDur(sec),'back',7000,k);clearInterval(d._i)}
+ if(o.on){A.at=Date.now();A.t=setTimeout(()=>{if(!A.at)return;A.shown=true;const d=note('','away',0,k),upd=()=>{d.firstChild.textContent='⚠️ '+nm+' не на доске — открыта другая вкладка или приложение · '+fmtDur(Math.round((Date.now()-A.at)/1000))};upd();clearInterval(d._i);d._i=setInterval(upd,1000)},2000);return}
+ const was=A.at;A.at=0;
+ if(A.shown){A.shown=false;const sec=+o.dur||Math.round((Date.now()-(was||Date.now()))/1000),d=note('✅ '+nm+' снова на доске · не было '+fmtDur(sec),'back',7000,k);clearInterval(d._i)}
 }
 if(!isTeacher){ // у ученика: сообщаем, когда доска скрыта (другая вкладка, свёрнутое окно, другое приложение на iPad) и когда вернулся
  let awAt=0,awOn=false,told=false;
@@ -1797,6 +1838,7 @@ function talkTick(){
   if(!call.ta||call.ta.id!==tr.id){try{if(call.ta)call.ta.src.disconnect()}catch(e){}try{const src=call.ac.createMediaStreamSource(new MediaStream([tr])),an=call.ac.createAnalyser();an.fftSize=512;src.connect(an);call.ta={id:tr.id,src:src,an:an,buf:new Float32Array(512)}}catch(e){call.ta={id:tr.id}}}
   const T=call.ta;if(T.an){T.an.getFloatTimeDomainData(T.buf);let q=0;for(let i=0;i<T.buf.length;i++)q+=T.buf[i]*T.buf[i];lv=Math.sqrt(q/T.buf.length)*3}}
  talkSet('tile-me',lv>.03);
+ const pl=$('callpill');if(!pl.hidden)pl.classList.toggle('talk',!!document.querySelector('.tile.talk:not(.me)')); // свёрнутый звонок: точка зеленеет, когда собеседник говорит
 }
 function talkSet(id,on){const t=document.getElementById(id);if(!t)return;const n=performance.now();if(on)t._tk=n;t.classList.toggle('talk',!!t._tk&&n-t._tk<350)} // держим рамку 0,35 с — не мигает между словами
 setInterval(talkTick,120);
@@ -1811,6 +1853,7 @@ function callUI(){
  b.title=call.on?'Завершить звонок':n?([...call.others.values()].join(', ')+' на звонке — нажмите, чтобы присоединиться'):'Голосовой звонок прямо на доске';
  $('micb').hidden=$('camb').hidden=!call.on;$('micb').classList.toggle('off',!call.mic);$('camb').classList.toggle('off',!call.cam);
  $('callbox').hidden=!call.on;
+ {const pl=$('callpill'),mn=$('callbox').classList.contains('min');pl.hidden=!call.on||!mn;if(!pl.hidden){const c=[...call.peers.values()].filter(p=>p.pc.connectionState==='connected').length;pl.innerHTML='<i class="d"></i>📞 '+(c?'На связи: '+c:call.peers.size?'Соединяюсь…':'Ждём…')+' ⤢'}}
  $('cmic').innerHTML=ic(call.mic?'microphone':'microphone-off');$('cmic').classList.toggle('off',!call.mic);$('cmic').title=call.mic?'Выключить микрофон':'Включить микрофон';
  $('ccam').innerHTML=ic(call.cam?'video':'video-off');$('ccam').classList.toggle('off',!call.cam);$('ccam').title=call.cam?'Выключить камеру':'Включить камеру';
  $('cend').innerHTML=ic('phone-off');$('clay').innerHTML=$('callbox').classList.contains('row')?'⇅':'⇄';
@@ -1920,6 +1963,7 @@ function callInit(list){ // при (пере)подключении к доск�
 // ---------- шумоподавление: браузерное + свой фильтр против скрипа пера ----------
 // Скрип — резкие высокие звуки (выше ~4 кГц), а речь в основном ниже. Режем высокие и низкие частоты,
 // а когда человек молчит (в полосе речи тихо) — приглушаем микрофон почти до нуля, чтобы скрип не было слышно.
+const nrMode=()=>isTeacher?S.nr:'off'; // шумодав — только у репетитора; у ученика микрофон без обработки (только эхоподавление)
 const GATE_LOW=.015; // «закрытый» шумодав приглушает примерно на −36 дБ: шорохи и клавиатуру почти не слышно, но и полной «мёртвой» тишины нет
 function micFilter(raw){
  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;
@@ -1960,8 +2004,8 @@ function micFilter(raw){
 }
 async function micMode(){ // применить выбранный режим (и посреди звонка — без переподключения)
  if(!call.on||!call.raw)return;
- try{await call.raw.applyConstraints({echoCancellation:true,autoGainControl:true,noiseSuppression:S.nr!=='off'})}catch(e){}
- const old=call.flt;call.flt=S.nr==='strong'?micFilter(call.raw):null;
+ try{await call.raw.applyConstraints({echoCancellation:true,autoGainControl:true,noiseSuppression:nrMode()!=='off'})}catch(e){}
+ const old=call.flt;call.flt=nrMode()==='strong'?micFilter(call.raw):null;
  const tr=call.flt?call.flt.track:call.raw,prev=call.stream.getAudioTracks()[0];
  tr.enabled=call.mic;
  if(prev!==tr){call.peers.forEach(p=>{const sn=p.pc.getSenders().find(x=>x.track&&x.track.kind==='audio');if(sn)sn.replaceTrack(tr).catch(()=>{})});
@@ -1973,8 +2017,8 @@ async function callStart(){
  $('callb').disabled=true;
  try{
   const AC=window.AudioContext||window.webkitAudioContext;if(AC&&!call.ac)try{call.ac=new AC()}catch(e){} // создаём сразу по нажатию — иначе iPad не даст звук (нужен и фильтру, и усилителю громкости)
-  const ms=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:S.nr!=='off',autoGainControl:true,voiceIsolation:S.nr==='strong'},video:false}); // voiceIsolation — «Изоляция голоса», где браузер её умеет
-  call.raw=ms.getAudioTracks()[0];call.flt=S.nr==='strong'?micFilter(call.raw):null;
+  const ms=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:nrMode()!=='off',autoGainControl:true,voiceIsolation:nrMode()==='strong'},video:false}); // voiceIsolation — «Изоляция голоса», где браузер её умеет
+  call.raw=ms.getAudioTracks()[0];call.flt=nrMode()==='strong'?micFilter(call.raw):null;
   call.stream=new MediaStream([call.flt?call.flt.track:call.raw]);
   try{call.ice=await (await fetch('/api/ice?r='+room)).json()}catch(e){call.ice=[]}
   call.on=true;call.mic=true;call.cam=false;
@@ -2011,7 +2055,8 @@ $('cmic').onclick=()=>$('micb').click();$('ccam').onclick=()=>camToggle();$('cen
 $('clay').onclick=()=>{const b=$('callbox');b.classList.toggle('row');try{localStorage.setItem('callRow',b.classList.contains('row')?'1':'0')}catch(e){}callUI();window.dispatchEvent(new Event('resize'))};
 try{if(localStorage.getItem('callRow')==='1')$('callbox').classList.add('row')}catch(e){}
 $('camb').onclick=camToggle;
-$('callmin').onclick=()=>{$('callbox').classList.toggle('min');$('callmin').textContent=$('callbox').classList.contains('min')?'+':'–'};
+$('callmin').onclick=()=>{$('callbox').classList.add('min');callUI()};
+$('callpill').onclick=()=>{$('callbox').classList.remove('min');$('callmin').textContent='–';callUI();window.dispatchEvent(new Event('resize'))};
 (function(){ // окно звонка можно перетаскивать за заголовок
  let d=null;const box=$('callbox');
  $('callhd').addEventListener('pointerdown',e=>{if(e.target.tagName==='BUTTON')return;const r=box.getBoundingClientRect(),w=wrap.getBoundingClientRect();d={x:e.clientX-r.left,y:e.clientY-r.top,w:w};$('callhd').setPointerCapture(e.pointerId)});
@@ -2602,6 +2647,7 @@ document.addEventListener('pointerdown',e=>{
  if(!$('hlp').hidden&&!$('hlp').contains(e.target)&&!$('thl').contains(e.target))$('hlp').hidden=true},true);
 ['snap','prs','palm','ring','seec','showme'].forEach(id=>{$(id).checked=!!S[id];$(id).onchange=()=>{S[id]=$(id).checked;saveS();setCursor();drawOverlay()}});
 $('theme').value=S.theme;$('theme').onchange=()=>{S.theme=$('theme').value;saveS();applyTheme()};
+if(!isTeacher)$('nrs').closest('label').hidden=true; // ученику настройка шумодава не нужна
 $('nrs').value=S.nr;$('nrs').onchange=()=>{S.nr=$('nrs').value;saveS();micMode()};
 $('bgs').value=S.bg;$('bgs').onchange=()=>{bg=$('bgs').value;S.bg=bg;saveS();redraw()};
 function setView(v){viewOnly=v;$('vbadge').hidden=!v;closeText();editImg=null;editStroke=null;setCursor();redraw()}

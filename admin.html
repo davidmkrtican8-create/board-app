@@ -919,7 +919,14 @@ document.addEventListener('paste',e=>{
  let f=null;const it=dt.items||[];
  for(let i=0;i<it.length&&!f;i++)if(it[i].kind==='file'&&/^image\//.test(it[i].type))f=it[i].getAsFile();
  if(!f)for(const x of (dt.files||[]))if(/^image\/|\.(heic|heif)$/i.test(x.type||x.name)){f=x;break}
- if(!f)return;e.preventDefault();if(a&&a!==document.body)a.blur();
+ if(!f){ // скопировали кусок страницы сайта (HTML со ссылкой на картинку) — доска сама скачает её через сервер
+  if(window.hwDraft)return;const h=dt.getData('text/html')||'',t=(dt.getData('text/plain')||'').trim();
+  if(!/<img\b/i.test(h)&&!/^https?:\/\/\S+\.(png|jpe?g|gif|webp|avif|bmp)(\?\S*)?$/i.test(t))return;
+  e.preventDefault();if(a&&a!==document.body)a.blur();
+  const fake={getData:k=>k==='text/html'?h:k==='text/plain'?t:''},w=$('fr').contentWindow;
+  try{const u=w.clipUrlFrom?w.clipUrlFrom(fake):null;if(u)w.postMessage({t:'pasteurl',url:u},location.origin)}catch(er){}
+  $('fr').focus();return}
+ e.preventDefault();if(a&&a!==document.body)a.blur();
  if(window.hwDraft&&window.hwAddFile){window.hwAddFile(f);return} // собираем домашку
  const r=new FileReader();r.onload=()=>{$('fr').contentWindow.postMessage({t:'pasteimg',src:r.result,heic:/heic|heif/i.test(f.type+' '+(f.name||''))},location.origin);$('fr').focus()};r.readAsDataURL(f);
 },true);
