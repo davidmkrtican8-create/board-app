@@ -664,6 +664,9 @@ function clampView(n){
  view.x=vw>=PW+2*PM?(PW-vw)/2:Math.max(-PM,Math.min(PW+PM-vw,view.x));
  view.y=Math.max(-PM,Math.min(Math.max(-PM,tot+PM-vh),view.y));
 }
+function sheetNum(y0,s,light){ // номер листа — мелко и бледно в левом нижнем углу (на доске и в PDF-конспекте); на экране не мельче 11 px
+ const f=Math.max(19,11/s);ctx.save();ctx.font='600 '+f+'px '+FONT;ctx.textBaseline='alphabetic';ctx.textAlign='left';
+ ctx.fillStyle=dark&&!light?'#6b6580':'#aaa3bf';ctx.fillText(String(Math.round(y0/PS)+1),f*1.2,y0+PH-f);ctx.restore()}
 function sheetGrid(y0,s,e){
  ctx.lineWidth=1/s;ctx.strokeStyle=dark?'#2e2a42':'#dfe6f2';ctx.beginPath();
  if(bg==='grid'){let st=24;while(st*s<5)st*=2;
@@ -707,7 +710,7 @@ function drawPaper(){
   for(let k=0,n=sheets();k<n;k++){const y0=k*PS;if(y0+PH<view.y||y0>view.y+ch/s)continue;
    ctx.fillStyle=dark?'#1e1a2a':'#fff';ctx.fillRect(0,y0,PW,PH);
    sheetGrid(y0,s,{xa:Math.max(0,view.x),xb:Math.min(PW,view.x+cw/s),ya:Math.max(y0,view.y),yb:Math.min(y0+PH,view.y+ch/s)});
-   ctx.strokeStyle=dark?'#3a3450':'#cfc8e0';ctx.lineWidth=1/s;ctx.strokeRect(0,y0,PW,PH)}
+   ctx.strokeStyle=dark?'#3a3450':'#cfc8e0';ctx.lineWidth=1/s;ctx.strokeRect(0,y0,PW,PH);sheetNum(y0,s)}
  }finally{ctx=keep}
 }
 function moveFrame(){
@@ -765,7 +768,7 @@ function redraw(lo){ // lo===true — изменились только черн
  const vis=[];for(let k=0;k<n;k++){const y0=k*PS;if(y0+PH>=ya&&y0<=yb)vis.push(y0)}
  vis.forEach(y0=>{ctx.fillStyle=dark?'#1e1a2a':'#fff';ctx.fillRect(0,y0,PW,PH);
   sheetGrid(y0,s,{xa:Math.max(0,view.x),xb:Math.min(PW,view.x+cw/s),ya:Math.max(y0,ya),yb:Math.min(y0+PH,yb)});
-  ctx.strokeStyle=dark?'#3a3450':'#cfc8e0';ctx.lineWidth=1/s;ctx.strokeRect(0,y0,PW,PH)});
+  ctx.strokeStyle=dark?'#3a3450':'#cfc8e0';ctx.lineWidth=1/s;ctx.strokeRect(0,y0,PW,PH);sheetNum(y0,s)});
  ctx.save();ctx.beginPath();vis.forEach(y0=>ctx.rect(0,y0,PW,PH));ctx.clip(); // чернила видны только на листах
  const ims=images[page]||{};
  for(const id in ims){const g=ims[id],e=getImg(id,g.src);if(e.complete&&e.naturalWidth)ctx.drawImage(e,g.x,g.y,g.w,g.h)}
@@ -1739,7 +1742,7 @@ async function buildPDF(all,only){ // only — одна доска по id, бе
     const c=document.createElement('canvas');c.width=1240;c.height=1754;ctx=c.getContext('2d');
     const y0=k*PS;ctx.setTransform(sc,0,0,sc,0,-y0*sc);
     ctx.fillStyle='#fff';ctx.fillRect(0,y0,PW,PH);
-    sheetGrid(y0,sc,{xa:0,xb:PW,ya:y0,yb:y0+PH});
+    sheetGrid(y0,sc,{xa:0,xb:PW,ya:y0,yb:y0+PH});sheetNum(y0,sc,true);
     ctx.save();ctx.beginPath();ctx.rect(0,y0,PW,PH);ctx.clip();
     for(const id in im){const g=im[id],e=getImg(id,g.src);if(e.complete&&e.naturalWidth)ctx.drawImage(e,g.x,g.y,g.w,g.h)}
     const L=inkLayer(1240,1754,[sc,0,0,sc,0,-y0*sc],()=>{for(const id in sk)drawStroke(sk[id])});
