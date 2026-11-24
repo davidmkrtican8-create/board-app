@@ -942,15 +942,20 @@ async function bget0(db,k){return new Promise((res,rej)=>{const q=db.transaction
 async function bput(k,v){const db=await bdb();return new Promise((res,rej)=>{const t=db.transaction('b','readwrite');t.objectStore('b').put(v,bkey(k));t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})}
 const fmt=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
 async function serverCount(){const r=await api('/api/admin/students');return r.ok?(await r.json()).length:-1}
-async function makeBackup(){
+let bkBusy=false;
+async function makeBackup(){ // копию берём, только если на сервере что-то изменилось (сервер отвечает {same:true}) — иначе он зря гоняет десятки МБ
+ if(bkBusy||document.hidden)return;bkBusy=true;
  try{
   if(await serverCount()<1)return; // пустой сервер не затирает копию
-  const r=await api('/api/admin/backup');if(!r.ok)return;
-  const data=await r.json(),now=Date.now(),cur=await bget('latest'),day=await bget('daily');
+  const cur=await bget('latest'),v=cur&&cur.data&&cur.data.v;
+  const r=await api('/api/admin/backup'+(v?'?v='+encodeURIComponent(v):''));if(!r.ok)return;
+  const data=await r.json(),now=Date.now(),day=await bget('daily');
+  if(data.same){$('bkst').textContent='Автокопия: '+fmt(cur.t)+' (изменений нет)';return}
   if(cur&&(!day||now-day.t>20*3600e3))await bput('daily',cur);
   await bput('latest',{t:now,data:data});
   $('bkst').textContent='Автокопия: '+fmt(now);
  }catch(e){$('bkst').textContent='Автокопия не сохранилась'}
+ finally{bkBusy=false}
 }
 async function restore(b){
  const r=await api('/api/admin/op',{method:'POST',body:JSON.stringify({t:'restore',merge:true,data:b.data})});
@@ -971,7 +976,7 @@ async function start(){
   if(confirm('На сервере пусто (так бывает после обновления файлов на GitHub). Вернуть учеников и доски из автокопии от '+fmt(b.t)+'?'))return restore(b);
   $('bkst').textContent='Есть автокопия от '+fmt(b.t)+' (кнопка «Восстановить из автокопии»)';
  }else await makeBackup();
- setInterval(makeBackup,180000);
+ setInterval(makeBackup,15*60e3); // раз в 15 минут и только в открытой вкладке
 }
 const tt=setInterval(()=>{if(!$('app').hidden){clearInterval(tt);start()}},700);
 })();

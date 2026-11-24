@@ -257,6 +257,35 @@ function account(req, res, u) { // вход и регистрация (без а
   });
   res.writeHead(404); res.end();
 }
+// автокопия кабинета: доски отдаём по одной (закрытые — прямо из файла, в память не загружаем), иначе несколько кабинетов разом
+// забивали память сервера (каждая копия — десятки МБ) и он падал. ?v=<версия> — если с прошлой копии ничего не менялось, отвечаем {same:true}
+function backupVer(L) {
+  let v = 0;
+  for (const s of L) {
+    const r = rooms[s.id]; if (r && r.pend) return Date.now();
+    try { v = Math.max(v, fs.statSync(path.join(DIR, s.id + '.json')).mtimeMs); } catch (e) {}
+  }
+  try { v = Math.max(v, fs.statSync(IDX).mtimeMs); } catch (e) {}
+  return String(Math.floor(v)) + '.' + L.length;
+}
+async function backupOut(req, res, u, L) {
+  const v = backupVer(L);
+  if (u.searchParams.get('v') === v) return json(res, { same: true, v });
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  const put = d => new Promise(ok => { if (res.write(d)) ok(); else res.once('drain', ok); }); // медленная сеть — ждём, а не копим в памяти
+  let gone = false; res.on('close', () => { gone = true; });
+  await put('{"v":' + JSON.stringify(v) + ',"index":' + JSON.stringify({ students: L }) + ',"rooms":{');
+  let first = true;
+  for (const s of L) {
+    if (gone) return;
+    let d = null;
+    if (rooms[s.id]) d = JSON.stringify(rooms[s.id].s);
+    else { try { d = await fs.promises.readFile(path.join(DIR, s.id + '.json'), 'utf8'); } catch (e) {} }
+    if (!d) continue;
+    await put((first ? '' : ',') + JSON.stringify(s.id) + ':' + d); first = false;
+  }
+  res.end('}}');
+}
 const json = (res, v) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(v)); };
 let logMin = 0, logN = 0;
 function body(req, res, lim, cb) {
@@ -1014,10 +1043,7 @@ function admin(req, res, u) {
   if (u.pathname === '/api/admin/hw' || u.pathname === '/api/admin/hw-pending' || u.pathname === '/api/admin/hw-rep' || u.pathname === '/api/admin/hw-draft') return hwTeacher(req, res, u, me);
   if (u.pathname === '/api/admin/tg' || u.pathname === '/api/admin/tg-student') return tgAdmin(req, res, u, me);
   if (u.pathname === '/api/admin/trn') return trAdmin(req, res, u, me);
-  if (req.method === 'GET' && u.pathname === '/api/admin/backup') {
-    const all = {}; mine().forEach(s => { const r = room(s.id); if (r) all[s.id] = r.s; });
-    return json(res, { index: { students: mine() }, rooms: all });
-  }
+  if (req.method === 'GET' && u.pathname === '/api/admin/backup') return backupOut(req, res, u, mine());
   if (u.pathname === '/api/admin/model') {
     if (!isOwner) { res.writeHead(403); return res.end(); }
     if (req.method === 'POST') { MOD.v++; fs.writeFileSync(MF, JSON.stringify(MOD)); }
