@@ -609,6 +609,23 @@ function rotHandle(sk){ // где ручка поворота: над рамко
  return[x,up>12/view.s?up:bb[3]+30/view.s];
 }
 const onRotHandle=(sk,p)=>{const h=rotHandle(sk);return!!h&&Math.hypot(p[0]-h[0],p[1]-h[1])<18/view.s};
+// размер фигуры после добавления: кружки в углах рамки (как у картинок); у 3D-тела левый верхний угол занят ручкой «перенести»
+const RSZK=['line','arrow','rect','ellipse','poly','shape','solid','text'];
+const rszCorners=sk=>{const b=strokeBox(sk);return[['nw',b[0],b[1]],['ne',b[2],b[1]],['sw',b[0],b[3]],['se',b[2],b[3]]].filter(c=>!(sk.k==='solid'&&c[0]==='nw'))};
+const rszOk=sk=>!!sk&&!viewOnly&&RSZK.includes(sk.k)&&!(sk.k==='text'&&!sk.s);
+function rszAt(sk,p){if(!rszOk(sk))return null;const z=HZ()*.75;
+ for(const [c,x,y] of rszCorners(sk))if(Math.abs(p[0]-x)<=z&&Math.abs(p[1]-y)<=z)return c;return null}
+function rszStart(id,sk,c,p){const B=bbox(sk),E=c[1]==='e',S_=c[0]==='s';
+ return{rsz:id,c:c,sx:p[0],sy:p[1],ax:E?B[0]:B[2],ay:S_?B[1]:B[3],hx:E?B[2]:B[0],hy:S_?B[3]:B[1],orig:sk.pts.slice(),w0:sk.w,ctr:rawC(sk),rotd:!!(sk.a&&canRot(sk))}}
+function rszMove(sk,R,p,shift){ // тянем угол: противоположный угол на месте; у повёрнутой фигуры — от центра, одинаково по обеим осям
+ let fx,fy;
+ if(R.rotd){const d0=Math.hypot(R.sx-R.ctr[0],R.sy-R.ctr[1])||1;fx=fy=Math.max(.05,Math.hypot(p[0]-R.ctr[0],p[1]-R.ctr[1])/d0)}
+ else{const W=R.hx-R.ax,H=R.hy-R.ay;fx=W?(W+p[0]-R.sx)/W:1;fy=H?(H+p[1]-R.sy)/H:1;fx=Math.max(.05,fx);fy=Math.max(.05,fy);
+  if(shift||sk.k==='shape'||sk.k==='solid'||sk.k==='text'||!W||!H){const f=!W?fy:!H?fx:Math.max(fx,fy);fx=fy=f}} // правильные фигуры, тела и текст — без искажения
+ const ox=R.rotd?R.ctr[0]:R.ax,oy=R.rotd?R.ctr[1]:R.ay;
+ sk.pts=R.orig.map((v,i)=>r2(i%2?oy+(v-oy)*fy:ox+(v-ox)*fx));
+ if(sk.k==='text')sk.w=r2(Math.max(6,Math.min(400,R.w0*fx)));
+ inval(sk)}
 function mY(sk){ // нижняя точка объекта (кэшируется)
  if(sk._my===undefined){const q=smp(sk);let m=-1e12;for(let i=1;i<q.length;i+=2)if(q[i]>m)m=q[i];sk._my=m}
  return sk._my;
@@ -779,6 +796,8 @@ function redraw(lo){ // lo===true — изменились только черн
   const bb=strokeBox(strokes[page][editStroke]);ctx.save();ctx.strokeStyle='rgba(106,63,196,.9)';ctx.lineWidth=2/s;ctx.setLineDash([8/s,6/s]);
   ctx.strokeRect(bb[0],bb[1],bb[2]-bb[0],bb[3]-bb[1]);ctx.restore();
   if(strokes[page][editStroke].k==='solid')drawSolidHandle(strokes[page][editStroke]);
+  if(rszOk(strokes[page][editStroke])){const r=HZ()*.32;ctx.save(); // кружки в углах — тянуть, чтобы изменить размер
+   for(const [,x,y] of rszCorners(strokes[page][editStroke])){ctx.beginPath();ctx.arc(x,y,r,0,6.2832);ctx.fillStyle='#fff';ctx.fill();ctx.lineWidth=2.5/s;ctx.strokeStyle='rgba(106,63,196,.95)';ctx.stroke()}ctx.restore()}
   if(strokes[page][editStroke].k==='axes'){const z=14/s;ctx.save();ctx.fillStyle='rgba(106,63,196,.95)';ctx.strokeStyle='#fff';ctx.lineWidth=2/s;ctx.fillRect(bb[2]-z/2,bb[3]-z/2,z,z);ctx.strokeRect(bb[2]-z/2,bb[3]-z/2,z,z);ctx.restore()} // уголок: тянуть — растянуть плоскость
   const h=rotHandle(strokes[page][editStroke]);
   if(h){ // кружок со стрелкой: тянуть — вращать фигуру
@@ -1270,7 +1289,8 @@ cv.addEventListener('pointerdown',e=>{
  if(editStroke){ // сразу после создания фигуры/оси: можно перенести, клик в стороне — выход
   const sk=(strokes[page]||{})[editStroke];
   if(!sk||t==='er'){editStroke=null;redraw()}
-  else{const bb=strokeBox(sk);
+  else{const bb=strokeBox(sk),rc=rszAt(sk,p);
+   if(rc){cur=rszStart(editStroke,sk,rc,p);return}
    if(sk.k==='solid'&&inBox(bb,p[0],p[1])){if(solidMoveAt(sk,p)){cur={mvs:editStroke,sx:p[0],sy:p[1],orig:sk.pts.slice()};return}
     if(secMode&&secPick(sk,p))return;
     const j=solidJ(sk);cur={orbit:editStroke,x:e.clientX,y:e.clientY,y0:+j.y||0,p0:+j.p||0};return}
@@ -1327,7 +1347,8 @@ cv.addEventListener('pointermove',e=>{
  if(!cur&&editStroke&&e.pointerType!=='touch'&&!space){
   const q=pos(e),sk=(strokes[page]||{})[editStroke];
   const axc=sk&&sk.k==='axes'&&sk.s&&(()=>{const b=strokeBox(sk);return Math.abs(q[0]-b[2])<16/view.s&&Math.abs(q[1]-b[3])<16/view.s})();
-  if(sk)cv.style.cursor=axc?'nwse-resize':onRotHandle(sk,q)?'grab':inBox(strokeBox(sk),q[0],q[1])?'move':(S.ring&&ringTools.includes(tool())?'none':'crosshair');
+  const rq=sk&&rszAt(sk,q);
+  if(sk)cv.style.cursor=rq?(rq==='nw'||rq==='se'?'nwse-resize':'nesw-resize'):axc?'nwse-resize':onRotHandle(sk,q)?'grab':inBox(strokeBox(sk),q[0],q[1])?'move':(S.ring&&ringTools.includes(tool())?'none':'crosshair');
  }
  if(!cur&&editImg&&e.pointerType!=='touch'&&!space){
   const q=pos(e),h2=handleAt(q[0],q[1]),g=(images[page]||{})[editImg],ins=g&&inBox([g.x,g.y,g.x+g.w,g.y+g.h],q[0],q[1]);
@@ -1348,6 +1369,9 @@ cv.addEventListener('pointermove',e=>{
   a=Math.round(a*1e4)/1e4;if(a)sk.a=a;else delete sk.a;inval(sk);rd();
   $('st').textContent='Поворот: '+Math.round(-a/DEG)+'°';
   const t2=Date.now();if(t2-lastEmit>80){lastEmit=t2;send({t:'strokeset',page:page,id:cur.rot,pts:sk.pts,a:sk.a||0})}
+  return}
+ if(cur.rsz){const sk=(strokes[page]||{})[cur.rsz];if(!sk)return;rszMove(sk,cur,pos(e),e.shiftKey);rd();
+  const t2=Date.now();if(t2-lastEmit>80){lastEmit=t2;send({t:'stroke',page:page,stroke:clean(sk)})}
   return}
  if(cur.axres){const p=pos(e),sk=(strokes[page]||{})[cur.axres];if(!sk)return;const c=cur.c,tl=cur.tl; // растягиваем плоскость за уголок, левый верхний угол на месте
   const u=Math.max(8,Math.min(120,Math.max((p[0]-tl[0])/(c.xb-c.xa+2.2),(p[1]-tl[1])/(c.yb-c.ya+2.1))));
@@ -1410,6 +1434,7 @@ function end(e){
  if(s.laser){laserFlush();return}
  if(s.orbit){const sk=(strokes[page]||{})[s.orbit];if(sk)send({t:'stroke',page:page,stroke:clean(sk)});return}
  if(s.axres){const sk=(strokes[page]||{})[s.axres];if(sk)send({t:'stroke',page:page,stroke:clean(sk)});return}
+ if(s.rsz){const sk=(strokes[page]||{})[s.rsz];if(sk)send({t:'stroke',page:page,stroke:clean(sk)});redraw();return}
  if(s.rot){const sk=(strokes[page]||{})[s.rot];if(sk)send({t:'strokeset',page:page,id:s.rot,pts:sk.pts,a:sk.a||0});setTimeout(()=>{$('st').textContent=peersTxt},1200);return}
  if(s.mv){const g=images[page][s.mv];send({t:'imgset',page:page,id:s.mv,x:r2(g.x),y:r2(g.y),w:r2(g.w),h:r2(g.h)});if(s.guides&&s.guides.length)redraw();return}
  if(s.k==='hl'){ // почти прямая полоса (подчёркивание) — делаем ровной; почти горизонтальную — строго горизонтальной
@@ -1438,7 +1463,7 @@ function end(e){
 }
 cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
 cv.addEventListener('pointerdown',()=>{const c=cur;if(!c||c._eb)return; // начало переноса/поворота/растягивания — запоминаем «как было» для Ctrl+Z
- const sid=c.mvs||c.rot||c.axres||c.orbit;
+ const sid=c.mvs||c.rot||c.axres||c.orbit||c.rsz;
  if(sid)c._eb=edSnap([sid],[]);else if(c.mv)c._eb=edSnap([],[c.mv]);else if(c.gmv)c._eb=edSnap(Object.keys(c.os||{}),Object.keys(c.oi||{}));
  if(c._eb)c._ep=page});
 cv.addEventListener('pointerleave',()=>{ptr=null;drawOverlay()});
