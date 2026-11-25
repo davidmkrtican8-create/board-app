@@ -901,7 +901,8 @@ function onOp(o){
  if(!page||!pages.some(p=>p.id===page))page=pages[0].id;openPage(page);return}
  if(o.t==='peers'){peersN=+o.n||0;$('st').textContent=peersTxt='Онлайн: '+o.n+(o.who&&o.who.length?' · '+o.who.join(', '):'');if(lead)sendView(true);return}
  if(o.t==='laser'){if(o.from!==me&&Array.isArray(o.pts)){const l=(lasers[o.from]=lasers[o.from]||{page:o.page,pts:[],sp:[]}),n0=performance.now();l.page=o.page;
-  const m=o.pts.length/2;for(let i=0;i+1<o.pts.length;i+=2)l.pts.push({x:+o.pts[i],y:+o.pts[i+1],t:n0+(i/2+1)/m*50});laserLoop()}return} // пачку из 50 мс показываем постепенно — указка ученика и преподавателя движется плавно
+  if(o.ping){laserPing([+o.pts[0],+o.pts[1]],o.from);return}
+  const m=o.pts.length/2;for(let i=0;i+1<o.pts.length;i+=2)l.pts.push({x:+o.pts[i],y:+o.pts[i+1],t:n0+(i/2+1)/m*50,nw:i===0&&o.nw?1:0});laserLoop()}return} // пачку из 50 мс показываем постепенно — указка ученика и преподавателя движется плавно
  if(o.t==='away'){if(isTeacher&&o.from!==me)awayGot(o);return}
  if(o.t==='view'){if(o.from===me)return;if(o.stop){leaderView=null;detached=false}else{leaderView={page:o.page,x:+o.x,y:+o.y,w:+o.w,h:+o.h};applyLeader()}followUI();return}
  if(o.t==='cursor'){if(o.from!==me){const old=cursors[o.from],x=+o.x,y=+o.y,jump=!old||old.page!==o.page||Date.now()-old.t>1500; // новый или давно стоявший курсор ставим сразу, остальное — плавно доводим
@@ -1296,7 +1297,7 @@ cv.addEventListener('pointerdown',e=>{
  if(panMode){pan={id:e.pointerId,touch:e.pointerType==='touch',x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};cv.style.cursor='grabbing';return}
  curPid=e.pointerId;curPen=e.pointerType==='pen';curT0=performance.now();curX=e.clientX;curY=e.clientY;curTr=0; // рисует только это касание; другие (ладонь) линию не трогают
  const p=pos(e);lastP=p;
- if(t==='laser'){editStroke=null;editImg=null;cur={laser:1};laserBuf.push(p[0],p[1]);laserPoint(p);return}
+ if(t==='laser'){editStroke=null;editImg=null;cur={laser:1,cx:e.clientX,cy:e.clientY,t0:performance.now(),p0:p};laserFlush();laserNw=true;laserBuf.push(p[0],p[1]);laserPoint(p,null,true);return}
  if(e.altKey&&t!=='er'){const ia=imgAt(p[0],p[1]);if(ia){editImg=ia;redraw();return}} // Alt+клик по картинке — править её
  if(editStroke){ // сразу после создания фигуры/оси: можно перенести, клик в стороне — выход
   const sk=(strokes[page]||{})[editStroke];
@@ -1450,7 +1451,7 @@ function end(e){
   for(const id in s.os)if(ps[id])send({t:'strokeset',page:page,id:id,pts:ps[id].pts});
   for(const id in s.oi){const g=ims[id];if(g)send({t:'imgset',page:page,id:id,x:r2(g.x),y:r2(g.y),w:r2(g.w),h:r2(g.h)})}
   if(msel)mselBox();redraw();return}
- if(s.laser){laserFlush();return}
+ if(s.laser){laserFlush();if(performance.now()-s.t0<350&&Math.hypot(e.clientX-s.cx,e.clientY-s.cy)<8){laserPing(s.p0);send({t:'laser',page:page,pts:[r2(s.p0[0]),r2(s.p0[1])],ping:1})}return} // коротко ткнули — волна
  if(s.orbit){const sk=(strokes[page]||{})[s.orbit];if(sk)send({t:'stroke',page:page,stroke:clean(sk)});return}
  if(s.axres){const sk=(strokes[page]||{})[s.axres];if(sk)send({t:'stroke',page:page,stroke:clean(sk)});return}
  if(s.rsz){const sk=(strokes[page]||{})[s.rsz];if(sk)send({t:'stroke',page:page,stroke:clean(sk)});redraw();return}
@@ -1804,7 +1805,7 @@ async function buildPDF(all,only){ // only — одна доска по id, бе
 // ---------- «отвлёкся»: ученик ушёл с доски на другую вкладку или в другое приложение — у репетитора плашка ----------
 let peersN=0;
 function note(text,cls,ms,key){ // плашка сверху по центру доски; key — одна плашка на человека
- const box=$('awayb');let d=key&&box.querySelector('[data-k="'+key+'"]');
+ const box=$('awayb');let d=key&&[...box.children].find(x=>x.dataset.k===key);
  if(!d){d=document.createElement('div');if(key)d.dataset.k=key;box.append(d)}
  clearTimeout(d._t);d.className=cls||'';d.innerHTML='';const sp=document.createElement('span');sp.textContent=text;
  const x=document.createElement('button');x.textContent='✕';x.title='Скрыть';x.onclick=()=>{clearInterval(d._i);d.remove()};d.append(sp,x);
@@ -1812,7 +1813,7 @@ function note(text,cls,ms,key){ // плашка сверху по центру �
 const fmtDur=sec=>sec<60?sec+' с':Math.floor(sec/60)+' мин'+(sec%60?' '+sec%60+' с':'');
 const AW={};
 function awayGot(o){ // у репетитора: короткие отлучки (до 3 с) не показываем
- const k='aw-'+String(o.from).replace(/[^a-z0-9]/gi,''),nm=String(o.name||'Ученик').slice(0,60),A=AW[k]||(AW[k]={});
+ const nm=String(o.name||'Ученик').slice(0,60),k='aw-'+nm,A=AW[k]||(AW[k]={}); // одна плашка на ученика (по имени): перезагрузил страницу — старая не зависает
  clearTimeout(A.t);
  if(o.on){A.at=Date.now();A.t=setTimeout(()=>{if(!A.at)return;A.shown=true;const d=note('','away',0,k),upd=()=>{d.firstChild.textContent='⚠️ '+nm+' не на доске — открыта другая вкладка или приложение · '+fmtDur(Math.round((Date.now()-A.at)/1000))};upd();clearInterval(d._i);d._i=setInterval(upd,1000)},2000);return}
  const was=A.at;A.at=0;
@@ -2104,24 +2105,33 @@ window.addEventListener('pagehide',()=>{if(call.on)navigator.sendBeacon&&navigat
 setInterval(()=>{if(call.on)callUI()},2000);
 
 // ---------- указка-комета: огненный след с хвостом, сияющая головка и искры; исчезает через секунду, не сохраняется ----------
-const lasers={},LASER_MS=1100,SPARK_MS=650;let laserBuf=[],laserT=0,laserRaf=0;
-function laserPoint(p,from){const k=from||me,l=(lasers[k]=lasers[k]||{page:page,pts:[],sp:[]});l.page=page;const q=l.pts[l.pts.length-1],now=performance.now();
+// след указки держится 2,6 с; «волна» от касания — 1,5 с
+const lasers={},LASER_MS=2600,SPARK_MS=800,PING_MS=1500;let laserBuf=[],laserT=0,laserRaf=0;
+function laserPoint(p,from,nw){const k=from||me,l=(lasers[k]=lasers[k]||{page:page,pts:[],sp:[]});l.page=page;const q=l.pts[l.pts.length-1],now=performance.now();
+ if(nw){l.pts.push({x:p[0],y:p[1],t:now,nw:1});laserLoop();return} // новое нажатие — отдельный след, не соединяем с прошлым
  if(q&&Math.hypot(p[0]-q.x,p[1]-q.y)*view.s<2&&now-q.t<60){q.t=now;return} // точки ближе 2 пикселей не копим
  l.pts.push({x:p[0],y:p[1],t:now});laserLoop()}
-function laserLoop(){if(laserRaf)return;const f=()=>{laserRaf=0;drawOverlay();if(Object.values(lasers).some(l=>l.pts.length||(l.sp&&l.sp.length)))laserRaf=requestAnimationFrame(f)};laserRaf=requestAnimationFrame(f)}
-function laserFlush(){if(!laserBuf.length)return;send({t:'laser',page:page,pts:laserBuf});laserBuf=[]}
+function laserPing(p,from){const k=from||me,l=(lasers[k]=lasers[k]||{page:page,pts:[],sp:[]});l.page=from?l.page:page;(l.pg=l.pg||[]).push({x:p[0],y:p[1],t:performance.now()});if(l.pg.length>6)l.pg.shift();laserLoop()} // «смотри сюда»: короткое касание указкой — волна колец
+function laserLoop(){if(laserRaf)return;const f=()=>{laserRaf=0;drawOverlay();if(Object.values(lasers).some(l=>l.pts.length||(l.sp&&l.sp.length)||(l.pg&&l.pg.length)))laserRaf=requestAnimationFrame(f)};laserRaf=requestAnimationFrame(f)}
+let laserNw=false;
+function laserFlush(){if(!laserBuf.length)return;const o={t:'laser',page:page,pts:laserBuf};if(laserNw)o.nw=1;laserNw=false;send(o);laserBuf=[]}
 function drawLasers(c){
  const now=performance.now(),X=q=>(q.x-view.x)*view.s,Y=q=>(q.y-view.y)*view.s;
  for(const k in lasers){const l=lasers[k];l.sp=l.sp||[];
-  l.pts=l.pts.filter(q=>now-q.t<LASER_MS);l.sp=l.sp.filter(z=>now-z.t<SPARK_MS);
+  l.pts=l.pts.filter(q=>now-q.t<LASER_MS);l.sp=l.sp.filter(z=>now-z.t<SPARK_MS);l.pg=(l.pg||[]).filter(z=>now-z.t<PING_MS);
   const P=l.pts.filter(q=>q.t<=now); // точки от другого участника «проявляются» плавно, а не пачкой раз в 50 мс
-  if(l.page!==page||(!P.length&&!l.sp.length))continue;
+  if(l.page!==page||(!P.length&&!l.sp.length&&!l.pg.length))continue;
   c.save();c.lineCap='round';c.lineJoin='round';
+  for(const z of l.pg){const zx=X(z),zy=Y(z);
+   for(let j=0;j<3;j++){const t=(now-z.t-j*170)/(PING_MS-340);if(t<=0||t>=1)continue;const e=1-Math.pow(1-t,3),R=8+62*e,a=(1-t)*(j?.7:1); // три кольца одно за другим, разлетаются и тают
+    c.strokeStyle='rgba(255,60,80,'+(a*.35).toFixed(3)+')';c.lineWidth=7*(1-t)+1;c.beginPath();c.arc(zx,zy,R,0,6.2832);c.stroke();
+    c.strokeStyle='rgba(255,215,90,'+a.toFixed(3)+')';c.lineWidth=2*(1-t)+.6;c.beginPath();c.arc(zx,zy,R,0,6.2832);c.stroke()}
+   const f=1-(now-z.t)/350;if(f>0){const g=c.createRadialGradient(zx,zy,0,zx,zy,22);g.addColorStop(0,'rgba(255,255,255,'+f+')');g.addColorStop(.4,'rgba(255,200,90,'+(f*.8)+')');g.addColorStop(1,'rgba(255,60,80,0)');c.fillStyle=g;c.beginPath();c.arc(zx,zy,22,0,6.2832);c.fill()}} // вспышка в центре
   if(P.length>1){
    // хвост кометы: сглаженная кривая через середины отрезков; 10 ступеней — от тонкого бледного хвоста к толстой яркой головке
    const B=10,paths=[];for(let j=0;j<B;j++)paths.push(new Path2D());
-   for(let i=1;i<P.length;i++){const a=P[i-1],b=P[i];if(b.t-a.t>250)continue;const al=1-(now-b.t)/LASER_MS;if(al<=0)continue;
-    const p0=i>1&&a.t-P[i-2].t<=250?P[i-2]:a,P_=paths[Math.min(B-1,Math.floor(al*B))];
+   for(let i=1;i<P.length;i++){const a=P[i-1],b=P[i];if(b.nw||b.t-a.t>250)continue;const al=1-(now-b.t)/LASER_MS;if(al<=0)continue;
+    const p0=i>1&&!a.nw&&a.t-P[i-2].t<=250?P[i-2]:a,P_=paths[Math.min(B-1,Math.floor(al*B))];
     P_.moveTo((X(p0)+X(a))/2,(Y(p0)+Y(a))/2);P_.quadraticCurveTo(X(a),Y(a),(X(a)+X(b))/2,(Y(a)+Y(b))/2)}
    for(let j=0;j<B;j++){const al=(j+.5)/B,e=al*al;
     c.strokeStyle='rgba(255,40,90,'+(e*.13).toFixed(3)+')';c.lineWidth=3+10*e;c.stroke(paths[j]);   // широкое розовое сияние
