@@ -925,11 +925,12 @@ function onOp(o){
  if(o.t==='title'&&o.id===page&&document.activeElement!==$('title'))$('title').value=o.title;
 }
 // поток событий доски. Если за 7 с лист не пришёл (некоторые сети/фильтры задерживают сжатый поток) — переподключаемся без сжатия и запоминаем это на устройстве
-let es=null,noGz=(()=>{try{return localStorage.getItem('sseNoGz')==='1'}catch(e){return false}})();
+let esBad=0,es=null,noGz=(()=>{try{return localStorage.getItem('sseNoGz')==='1'}catch(e){return false}})();
 function connectES(){
  if(es)try{es.close()}catch(e){}
  es=new EventSource('/api/'+room+'/events?c='+me+(ME?'&u='+ME:'')+(noGz?'&nogz=1':''));
- es.onmessage=e=>onOp(JSON.parse(e.data));
+ es.onmessage=e=>{let o;try{o=JSON.parse(e.data)}catch(er){ // сообщение пришло обрезанным (бывает в Safari) — переподключаемся: сервер пришлёт доску заново
+  if(Date.now()-esBad>5000){esBad=Date.now();setTimeout(connectES,300)}return}onOp(o)};
  es.onerror=()=>{$('st').textContent='Переподключение…'};
  es.onopen=()=>{clearTimeout(outT);flushQ()}; // связь вернулась — сразу досылаем то, что не ушло
  if(!noGz)setTimeout(()=>{if(initDone||noGz)return;noGz=true;try{localStorage.setItem('sseNoGz','1')}catch(e){}
