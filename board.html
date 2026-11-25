@@ -1839,7 +1839,7 @@ function talkTick(){
   if(!call.ta||call.ta.id!==tr.id){try{if(call.ta)call.ta.src.disconnect()}catch(e){}try{const src=call.ac.createMediaStreamSource(new MediaStream([tr])),an=call.ac.createAnalyser();an.fftSize=512;src.connect(an);call.ta={id:tr.id,src:src,an:an,buf:new Float32Array(512)}}catch(e){call.ta={id:tr.id}}}
   const T=call.ta;if(T.an){T.an.getFloatTimeDomainData(T.buf);let q=0;for(let i=0;i<T.buf.length;i++)q+=T.buf[i]*T.buf[i];lv=Math.sqrt(q/T.buf.length)*3}}
  talkSet('tile-me',lv>.03);
- const pl=$('callpill');if(!pl.hidden)pl.classList.toggle('talk',!!document.querySelector('.tile.talk:not(.me)')); // свёрнутый звонок: точка зеленеет, когда собеседник говорит
+ const pl=$('callpill');if(!pl.hidden)pl.classList.toggle('talk',!!document.querySelector('.tile.talk')); // свёрнутый звонок: точка зеленеет, когда кто-то говорит (и вы тоже)
 }
 function talkSet(id,on){const t=document.getElementById(id);if(!t)return;const n=performance.now();if(on)t._tk=n;t.classList.toggle('talk',!!t._tk&&n-t._tk<350)} // держим рамку 0,35 с — не мигает между словами
 setInterval(talkTick,120);
