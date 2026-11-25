@@ -1854,14 +1854,23 @@ function callUI(){
  b.title=call.on?'Завершить звонок':n?([...call.others.values()].join(', ')+' на звонке — нажмите, чтобы присоединиться'):'Голосовой звонок прямо на доске';
  $('micb').hidden=$('camb').hidden=!call.on;$('micb').classList.toggle('off',!call.mic);$('camb').classList.toggle('off',!call.cam);
  $('callbox').hidden=!call.on;
- {const pl=$('callpill'),mn=$('callbox').classList.contains('min');pl.hidden=!call.on||!mn;if(!pl.hidden){const c=[...call.peers.values()].filter(p=>p.pc.connectionState==='connected').length;pl.innerHTML='<i class="d"></i>📞 '+(c?'На связи: '+c:call.peers.size?'Соединяюсь…':'Ждём…')+' ⤢'}}
+ {const pl=$('callpill'),mn=$('callbox').classList.contains('min');pl.hidden=!call.on||!mn;if(!pl.hidden&&!pl.firstChild)pl.innerHTML='<i class="d"></i><span></span>';callTime()}
  $('cmic').innerHTML=ic(call.mic?'microphone':'microphone-off');$('cmic').classList.toggle('off',!call.mic);$('cmic').title=call.mic?'Выключить микрофон':'Включить микрофон';
  $('ccam').innerHTML=ic(call.cam?'video':'video-off');$('ccam').classList.toggle('off',!call.cam);$('ccam').title=call.cam?'Выключить камеру':'Включить камеру';
  $('cend').innerHTML=ic('phone-off');$('clay').innerHTML=$('callbox').classList.contains('row')?'⇅':'⇄';
  const mt=document.getElementById('tile-me');if(mt)mt.querySelector('.mu').hidden=call.mic;
- if(call.on){const c=[...call.peers.values()].filter(p=>p.pc.connectionState==='connected').length;
-  $('callst').textContent=call.peers.size?(c?'На связи: '+c:'Соединяюсь…'):'Ждём собеседника…'}
+ callTime();
 }
+// длительность звонка: отсчёт с момента, когда подключился первый собеседник; видна в заголовке окна и на свёрнутой кнопке
+const mmss=t=>{const x=Math.max(0,Math.floor(t/1000)),h=Math.floor(x/3600),m=Math.floor(x/60)%60,ss=x%60;return(h?h+':'+String(m).padStart(2,'0'):m)+':'+String(ss).padStart(2,'0')};
+function callTime(){
+ if(!call.on){call.t0=0;return}
+ const c=[...call.peers.values()].filter(p=>p.pc.connectionState==='connected').length;
+ if(c&&!call.t0)call.t0=Date.now();
+ const tm=call.t0?' · '+mmss(Date.now()-call.t0):'';
+ $('callst').textContent=(call.peers.size?(c?'На связи'+(c>1?': '+c:''):'Соединяюсь…'):'Ждём собеседника…')+tm;$('callst').title='Длительность звонка'+(call.t0?': '+mmss(Date.now()-call.t0):'');
+ const pl=$('callpill'),sp=pl.querySelector('span');if(!pl.hidden&&sp)sp.textContent='📞 '+(c?mmss(Date.now()-call.t0):call.peers.size?'Соединяюсь…':'Ждём…')+' ⤢'}
+setInterval(()=>{if(call.on)callTime()},1000);
 function tile(id,label,stream,me){
  let t=document.getElementById('tile-'+id);
  if(!t){t=document.createElement('div');t.id='tile-'+id;t.className='tile'+(me?' me':'');
@@ -2031,7 +2040,7 @@ async function callStart(){
  }finally{$('callb').disabled=false;callUI()}
 }
 function callStop(){
- if(!call.on)return;sig(null,'bye');call.on=false;
+ if(!call.on)return;sig(null,'bye');call.on=false;call.t0=0;
  [...call.peers.keys()].forEach(dropPeer);
  if(call.stream)call.stream.getTracks().forEach(t=>t.stop());call.stream=null;
  if(call.flt){call.flt.close();call.flt=null}if(call.raw){call.raw.stop();call.raw=null}
