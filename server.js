@@ -575,11 +575,42 @@ function subsOf(id) { // кому писать: ученик и родители
 }
 function tgStudent(sid, f) { (TG.subs[sid] || []).forEach(x => { const t = f(x.who); if (t) tgSay(x.chat, t); }); }
 function tgTeacher(tid, text) { (TG.tsubs[tid] || []).forEach(c => tgSay(c, text)); }
+// ---------- кнопка «📊 Нагрузка» в боте — только владельцу сайта ----------
+const LOADB = '📊 Нагрузка', ownerChats = () => (TG.tsubs && TG.tsubs.owner) || [];
+const tgKb = (chat, text) => tgRetry(() => tgCall('sendMessage', { chat_id: chat, text, disable_web_page_preview: true, reply_markup: { keyboard: [[{ text: LOADB }]], resize_keyboard: true, is_persistent: true } }, 12000), 3);
+async function loadReport() {
+  const os = require('os'), c0 = os.cpus().map(c => c.times); await new Promise(r => setTimeout(r, 1000));
+  const c1 = os.cpus().map(c => c.times); let busy = 0, all = 0;
+  c1.forEach((t, i) => { const a = c0[i], d = k => t[k] - a[k]; const tot = d('user') + d('nice') + d('sys') + d('idle') + d('irq'); all += tot; busy += tot - d('idle'); });
+  const cpu = all ? Math.round(busy / all * 100) : 0, mi = {}; try { fs.readFileSync('/proc/meminfo', 'utf8').split('\n').forEach(l => { const m = l.match(/^(\w+):\s+(\d+)/); if (m) mi[m[1]] = +m[2] * 1024; }); } catch (e) {}
+  const tot = os.totalmem(), avail = mi.MemAvailable || os.freemem(), used = tot - avail, mb = v => Math.round(v / 1048576);
+  let disk = ''; try { const d = fs.statfsSync(DIR); const T = d.blocks * d.bsize, F = d.bavail * d.bsize; disk = Math.round((T - F) / 1e9 * 10) / 10 + ' из ' + Math.round(T / 1e9) + ' ГБ (' + Math.round((T - F) / T * 100) + '%)'; } catch (e) { disk = 'нет данных'; }
+  let people = 0, boards = 0, calls = 0, inCall = 0;
+  for (const id in rooms) { const r = rooms[id]; if (r.clients.size) { boards++; people += r.clients.size; } if (r.call.size >= 2) { calls++; inCall += r.call.size; } }
+  let peak = ''; try { // за сегодня по журналу замеров (раз в 5 минут)
+    const today = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10), L = fs.readFileSync('/var/log/board-stats.csv', 'utf8').trim().split('\n').filter(l => l.startsWith(today)).map(l => l.split(';'));
+    if (L.length) { const mx = i => Math.max(...L.map(x => +x[i] || 0)); peak = '\n\n📈 Пик за сегодня: процессор ' + mx(1) + '%, подключений ' + mx(6) + ', доска ' + mx(5) + ' МБ памяти'; }
+  } catch (e) {}
+  const up = s => { s = Math.floor(s); const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60); return (d ? d + ' д ' : '') + (d || h ? h + ' ч ' : '') + m + ' мин'; };
+  const la = os.loadavg().map(x => x.toFixed(2)).join(' / '), n = os.cpus().length, lvl = cpu < 50 && used / tot < .8 ? '🟢 всё спокойно' : cpu < 85 && used / tot < .9 ? '🟡 нагрузка заметная' : '🔴 сервер загружен';
+  return '📊 Сервер сейчас — ' + lvl + '\n\n' +
+    '🧠 Процессор: ' + cpu + '% (' + n + ' ' + (n === 1 ? 'ядро' : n < 5 ? 'ядра' : 'ядер') + ', средняя загрузка ' + la + ')\n' +
+    '💾 Память: ' + mb(used) + ' из ' + mb(tot) + ' МБ (' + Math.round(used / tot * 100) + '%), доска занимает ' + mb(process.memoryUsage().rss) + ' МБ\n' +
+    '🗄 Диск: ' + disk + '\n\n' +
+    '👥 Сейчас на сайте: ' + people + ' ' + (people % 10 === 1 && people % 100 !== 11 ? 'подключение' : [2, 3, 4].includes(people % 10) && ![12, 13, 14].includes(people % 100) ? 'подключения' : 'подключений') + ' на ' + boards + ' досках\n' +
+    '📞 Звонков: ' + calls + (calls ? ' (участников ' + inCall + ')' : '') + peak + '\n\n' +
+    '⏱ Доска работает без перезапуска ' + up(process.uptime()) + ', сервер — ' + up(os.uptime());
+}
+setTimeout(() => { // после обновления — один раз показать владельцу кнопку
+  if (!TG.token || TG.loadKb) return; const L = ownerChats(); if (!L.length) return;
+  TG.loadKb = 1; saveTG(); L.forEach(c => tgKb(c, 'Новая кнопка «' + LOADB + '» внизу: нажмите — пришлю, как сейчас нагружен сервер.'));
+}, 20000);
 function tgOnMessage(m) {
   if (!m || !m.chat || m.chat.type !== 'private') return;
   const chat = m.chat.id, text = String(m.text || '').trim(), who = [m.from && m.from.first_name, m.from && m.from.last_name].filter(Boolean).join(' ').slice(0, 60);
   const st = text.match(/^\/start(?:\s+(\S+))?/);
   if (text === '/stop') { tgDrop(chat); return tgSay(chat, 'Готово, больше не буду писать. Подключиться снова можно по ссылке из кабинета.'); }
+  if ((text === LOADB || text === '/load') && ownerChats().includes(chat)) { loadReport().then(t => tgKb(chat, t)).catch(() => {}); return; } // только владельцу
   if (st && st[1]) {
     const c = st[1], s = index.students.find(x => x.id === c.slice(1));
     if ((c[0] === 's' || c[0] === 'p') && s) {
@@ -593,6 +624,7 @@ function tgOnMessage(m) {
     const t = [owner(), ...teachersOnly()].find(x => tCode(x.id) === c);
     if (t) {
       const L = (TG.tsubs[t.id] = (TG.tsubs[t.id] || []).filter(x => x !== chat)); L.push(chat); saveTG();
+      if (t.id === 'owner') return tgKb(chat, 'Готово, ' + t.name + '! Буду сообщать, когда ученики сдают домашку.\nКнопка «' + LOADB + '» внизу — как сейчас нагружен сервер.\nОтключить: /stop');
       return tgSay(chat, 'Готово, ' + t.name + '! Буду сообщать, когда ученики сдают домашку.\nОтключить: /stop');
     }
   }
