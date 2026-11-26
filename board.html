@@ -150,6 +150,7 @@ body.focus #main{padding:4px;gap:4px}
 .tile.me{order:9} /* все окошки одинакового размера, своё — последним */.tile video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.tile.me video{transform:scaleX(-1)}
 .tile .nm{position:absolute;left:4px;bottom:4px;background:rgba(0,0,0,.55);padding:1px 6px;border-radius:6px;font-size:11px;z-index:1}
 .tile{transition:box-shadow .15s}.tile.talk{outline:3px solid #34c759;outline-offset:-3px;box-shadow:0 0 0 2px rgba(52,199,89,.35),0 0 14px rgba(52,199,89,.55)} /* сейчас говорит */
+#snowc{position:absolute;inset:0;width:100%;height:100%;z-index:5;pointer-events:none}#snowc[hidden]{display:none}
 #awayb{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:7;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
 #awayb>div{pointer-events:auto;display:flex;align-items:center;gap:10px;padding:8px 10px 8px 14px;border-radius:12px;font-weight:600;font-size:14px;box-shadow:0 4px 16px rgba(0,0,0,.22);background:#d84315;color:#fff;max-width:min(560px,90vw)}
 #awayb>div.away::before{content:'';width:9px;height:9px;border-radius:50%;background:#fff;flex:none;animation:awp 1.2s ease-in-out infinite}#awayb>div.back{background:#2e7d32}#awayb>div.info{background:var(--panel);color:var(--tx);border:1px solid var(--bd)}
@@ -230,6 +231,7 @@ body.focus #main{padding:4px;gap:4px}
   <div class="mz"><span class="mic" data-i="zoom-in"></span>Масштаб<span class="zz"><button id="zo" title="Уменьшить">−</button><button id="zi" title="Увеличить">+</button></span></div>
   <div class="mi" data-click="fit"><span class="mic" data-i="arrows-horizontal"></span>По ширине<button id="fit" hidden>По ширине</button></div>
   <div class="mi" data-click="fs2"><span class="mic" data-i="layout-off"></span>Убрать лишние панели<button id="fs2" hidden title="Фокус: убрать панели">⛶</button></div>
+  <div class="mi" data-click="snowb" id="snowmi" hidden><span class="mic" style="font-size:16px">❄️</span>Снегопад<button id="snowb" hidden></button><small id="snowst">выкл</small></div>
   <div class="mi" data-click="gear"><span class="mic" data-i="settings"></span>Настройки<button id="gear" hidden title="Настройки">⚙</button></div>
   <hr class="tonly">
   <div class="mi red" data-fm="clr"><span class="mic" data-i="eraser-off"></span>Очистить доску…</div>
@@ -260,7 +262,7 @@ body.focus #main{padding:4px;gap:4px}
    <p><b>Android:</b> меню браузера ⋮ → «Установить приложение» или «Добавить на главный экран».</p>
   </details>
  </div>
- <div id="wrap"><div id="vsb" hidden title="Тяните, чтобы листать доску вверх и вниз"><div id="vsbt"></div></div><div id="plots"></div><div id="solidbar" hidden><span id="shint">Тяните внутри фигуры — вращать</span><button id="sletters" title="Подписать вершины буквами">A B C</button><button id="ssec" title="Сечение плоскостью через три точки на рёбрах">✂ Сечение</button><button id="sreset" title="Вернуть исходный вид">↺ Вид</button></div><button id="followb" hidden></button><div id="awayb"></div><div id="callbox" hidden><div id="callhd"><span id="callst">Звонок</span><button id="callbig" title="Крупное видео / обычное (или двойной щелчок по видео)">⤢</button><button id="callmin" title="Свернуть/развернуть">–</button></div><div id="tiles"></div><div id="callctl"><button id="cmic" title="Микрофон: выключить / включить"></button><button id="ccam" title="Камера: включить / выключить"></button><button id="clay" title="Окошки в ряд или столбиком"></button><button id="cend" title="Завершить звонок"></button></div><div class="crs se" data-c="se" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs sw" data-c="sw" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs ne" data-c="ne" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs nw" data-c="nw" title="Потяните, чтобы увеличить или уменьшить видео"></div></div><canvas id="cv"></canvas><canvas id="ovl"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edel" hidden title="Удалить выделенное (клавиша Delete)">🗑 Удалить</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button><button id="zfit" hidden>↺ Вернуть масштаб</button><div id="zhint" hidden>Страница приближена в браузере. Вернуть: Ctrl+0 (на Mac ⌘0)</div></div>
+ <div id="wrap"><div id="vsb" hidden title="Тяните, чтобы листать доску вверх и вниз"><div id="vsbt"></div></div><div id="plots"></div><div id="solidbar" hidden><span id="shint">Тяните внутри фигуры — вращать</span><button id="sletters" title="Подписать вершины буквами">A B C</button><button id="ssec" title="Сечение плоскостью через три точки на рёбрах">✂ Сечение</button><button id="sreset" title="Вернуть исходный вид">↺ Вид</button></div><button id="followb" hidden></button><div id="awayb"></div><canvas id="snowc" hidden></canvas><div id="callbox" hidden><div id="callhd"><span id="callst">Звонок</span><button id="callbig" title="Крупное видео / обычное (или двойной щелчок по видео)">⤢</button><button id="callmin" title="Свернуть/развернуть">–</button></div><div id="tiles"></div><div id="callctl"><button id="cmic" title="Микрофон: выключить / включить"></button><button id="ccam" title="Камера: включить / выключить"></button><button id="clay" title="Окошки в ряд или столбиком"></button><button id="cend" title="Завершить звонок"></button></div><div class="crs se" data-c="se" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs sw" data-c="sw" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs ne" data-c="ne" title="Потяните, чтобы увеличить или уменьшить видео"></div><div class="crs nw" data-c="nw" title="Потяните, чтобы увеличить или уменьшить видео"></div></div><canvas id="cv"></canvas><canvas id="ovl"></canvas><button id="newt" hidden>↓ Новая задача</button><button id="edel" hidden title="Удалить выделенное (клавиша Delete)">🗑 Удалить</button><button id="edone" hidden title="Закончить правку (или Enter)">✓ Готово</button><button id="vbadge" hidden>👁 Просмотр: нажмите, чтобы рисовать</button><button id="zfit" hidden>↺ Вернуть масштаб</button><div id="zhint" hidden>Страница приближена в браузере. Вернуть: Ctrl+0 (на Mac ⌘0)</div></div>
 </div>
 <script>var errN=0;window.addEventListener('error',function(e){if(/ResizeObserver/.test(e.message||''))return;var s=document.getElementById('st');if(s)s.textContent='Ошибка в скрипте: '+(e.message||'');
  if(errN++<5)try{fetch('/api/log',{method:'POST',body:JSON.stringify({m:String(e.message||'').slice(0,300),l:e.lineno,c:e.colno,s:String(e.error&&e.error.stack||'').slice(0,800),u:navigator.userAgent.slice(0,200),p:location.pathname.slice(0,40)})}).catch(function(){})}catch(_){}})</script>
@@ -283,7 +285,7 @@ const postOp=(op,b)=>{const h={};if(op.t==='delPage'||op.t==='clear'){try{h['X-T
  return fetch('/api/'+room+'/op',{method:'POST',headers:h,body:b})};
 // Изменения доски (линии, стирание, картинки…) уходят на сервер по очереди. Если связь пропала, они ждут в очереди
 // и досылаются, когда связь вернётся, — линия не исчезает. Пролетающие сообщения (живая линия, курсор, лазер) не копим.
-const EPH=['live','cursor','laser','view','rtc','away'],outQ=[];let outBusy=false,outT=0,outBad=false;
+const EPH=['live','cursor','laser','view','rtc','away','snow'],outQ=[];let outBusy=false,outT=0,outBad=false;
 const send=op=>{op.from=me;
  if(EPH.includes(op.t))return postOp(op,JSON.stringify(op)).catch(()=>{if(!outQ.length)$('st').textContent='Нет связи с сервером'});
  if((op.t==='strokeset'||op.t==='imgset')&&outQ.length>1){const q=outQ[outQ.length-1]; // перенос того же объекта: в очереди держим только последнее положение
@@ -892,17 +894,19 @@ function openPage(id){page=id;live={};$('newt').hidden=true;jump=null;editImg=nu
 const imgGone=ids=>{if(isTeacher&&ids&&ids.length)try{parent.postMessage({t:'imgGone',ids:ids.map(String)},location.origin)}catch(e){}}; // кабинет убирает из черновика домашки аналоги стёртых задач
 function onOp(o){
  if(o.page&&SNAP_OPS.includes(o.t))snapDirty[o.page]=Date.now(); // доска изменилась — позже сохраним её PDF для вечернего конспекта
- if(inkC&&!['live','cursor','laser','view','rtc','away'].includes(o.t))inkC.key=null; // чужая правка — картинку готовых записей пересобираем
+ if(inkC&&!['live','cursor','laser','view','rtc','away','snow'].includes(o.t))inkC.key=null; // чужая правка — картинку готовых записей пересобираем
  if(o.from===me&&(o.t==='strokeset'||o.t==='imgset'||o.t==='stroke'))return; // своё эхо со старым положением заставляло объект дёргаться
  if(o.t==='rtc'){onRtc(o);return}
  if(o.t==='init'){callInit(o.call);myName=o.name||null;$('who').textContent=o.group?'👥 Группа: '+o.group:o.name?'Кабинет: '+o.name:'Доска';document.title=o.group||o.name||'Доска';pages=o.s.pages;strokes=o.s.strokes;images=o.s.images||{};for(const pg in strokes)for(const id in strokes[pg])strokes[pg][id].id=id; // у загруженных объектов нет поля id — проставляем
  reapplyQ();flushQ();
  const hp=(location.hash.match(/^#p=([\w-]+)$/)||[])[1];if(hp&&!initDone&&pages.some(p=>p.id===hp))page=hp;initDone=true; // ссылка на конкретную доску (из кабинета ученика)
  if(!page||!pages.some(p=>p.id===page))page=pages[0].id;openPage(page);return}
- if(o.t==='peers'){peersN=+o.n||0;$('st').textContent=peersTxt='Онлайн: '+o.n+(o.who&&o.who.length?' · '+o.who.join(', '):'');if(lead)sendView(true);return}
+ if(o.t==='peers'){peersN=+o.n||0;if(snowOwner&&snowOn)setTimeout(()=>send({t:'snow',on:true}),400); // новый участник тоже видит снег
+ $('st').textContent=peersTxt='Онлайн: '+o.n+(o.who&&o.who.length?' · '+o.who.join(', '):'');if(lead)sendView(true);return}
  if(o.t==='laser'){if(o.from!==me&&Array.isArray(o.pts)){const l=(lasers[o.from]=lasers[o.from]||{page:o.page,pts:[],sp:[]}),n0=performance.now();l.page=o.page;
   if(o.ping){laserPing([+o.pts[0],+o.pts[1]],o.from);return}
   const m=o.pts.length/2;for(let i=0;i+1<o.pts.length;i+=2)l.pts.push({x:+o.pts[i],y:+o.pts[i+1],t:n0+(i/2+1)/m*50,nw:i===0&&o.nw?1:0});laserLoop()}return} // пачку из 50 мс показываем постепенно — указка ученика и преподавателя движется плавно
+ if(o.t==='snow'){if(o.from!==me)snowSet(!!o.on);return}
  if(o.t==='away'){if(isTeacher&&o.from!==me)awayGot(o);return}
  if(o.t==='view'){if(o.from===me)return;if(o.stop){leaderView=null;detached=false}else{leaderView={page:o.page,x:+o.x,y:+o.y,w:+o.w,h:+o.h};applyLeader()}followUI();return}
  if(o.t==='cursor'){if(o.from!==me){const old=cursors[o.from],x=+o.x,y=+o.y,jump=!old||old.page!==o.page||Date.now()-old.t>1500; // новый или давно стоявший курсор ставим сразу, остальное — плавно доводим
@@ -1802,6 +1806,28 @@ async function buildPDF(all,only){ // only — одна доска по id, бе
 }
 
 // ---------- звонок на доске (WebRTC: звук и видео идут напрямую, через свой TURN, если напрямую нельзя) ----------
+// ---------- снегопад: включает только владелец сайта (кнопка «❄️ Снегопад» в меню «Ещё»), видят все на доске; рисовать не мешает ----------
+const snowOwner=isTeacher&&(()=>{try{return localStorage.getItem('tlogin')==='admin'}catch(e){return false}})();
+let snowOn=false,snowRaf=0,snowF=[],snowT=0;
+function snowSet(on){
+ snowOn=on;const c=$('snowc');c.hidden=!on;if($('snowst'))$('snowst').textContent=on?'вкл':'выкл';
+ cancelAnimationFrame(snowRaf);snowRaf=0;snowF=[];if(!on)return;
+ const g=c.getContext('2d');snowT=performance.now();
+ const mk=(top)=>{const z=Math.random();return{x:Math.random(),y:top?Math.random():-.05,r:1.2+z*3.2,v:.018+z*.05,w:Math.random()*6.28,ws:.4+Math.random()*1.2,a:.55+z*.4,f:z>.82}}; // z — «глубина»: ближние снежинки крупнее и быстрее
+ for(let i=0;i<90;i++)snowF.push(mk(true));
+ const tick=t=>{snowRaf=requestAnimationFrame(tick);if(document.hidden)return;
+  const dt=Math.min(.05,(t-snowT)/1000);snowT=t;const W=c.clientWidth,H=c.clientHeight;if(!W||!H)return;
+  if(c.width!==W||c.height!==H){c.width=W;c.height=H}
+  g.clearRect(0,0,W,H);
+  for(const f of snowF){f.y+=f.v*dt*(H>0?600/H:1);f.w+=f.ws*dt;const x=(f.x+Math.sin(f.w)*.012)*W,y=f.y*H;
+   if(f.y>1.05){Object.assign(f,mk(false))}
+   if(f.f){g.save();g.translate(x,y);g.rotate(f.w*.3);g.strokeStyle='rgba(120,160,220,'+f.a+')';g.lineWidth=1.2;g.beginPath(); // крупные — шестиконечные снежинки
+    for(let k=0;k<6;k++){const a=k*Math.PI/3,L=f.r*2.2;g.moveTo(0,0);g.lineTo(Math.cos(a)*L,Math.sin(a)*L);const m=L*.55;g.moveTo(Math.cos(a)*m,Math.sin(a)*m);g.lineTo(Math.cos(a+.5)*m*1.35,Math.sin(a+.5)*m*1.35);g.moveTo(Math.cos(a)*m,Math.sin(a)*m);g.lineTo(Math.cos(a-.5)*m*1.35,Math.sin(a-.5)*m*1.35)}
+    g.stroke();g.restore()}
+   else{g.fillStyle='rgba(150,185,235,'+f.a+')';g.beginPath();g.arc(x,y,f.r,0,6.2832);g.fill();g.fillStyle='rgba(255,255,255,'+f.a+')';g.beginPath();g.arc(x-f.r*.25,y-f.r*.25,f.r*.5,0,6.2832);g.fill()}} // голубоватые — видно и на белом листе
+ };snowRaf=requestAnimationFrame(tick);
+}
+if(snowOwner){$('snowmi').hidden=false;$('snowb').onclick=()=>{snowSet(!snowOn);send({t:'snow',on:snowOn})}}
 // ---------- «отвлёкся»: ученик ушёл с доски на другую вкладку или в другое приложение — у репетитора плашка ----------
 let peersN=0;
 function note(text,cls,ms,key){ // плашка сверху по центру доски; key — одна плашка на человека
