@@ -503,6 +503,7 @@ function rawC(s){const p=s.pts;let a=1e12,b=1e12,c=-1e12,d=-1e12;for(let i=0;i<p
 function rotFlat(q,s){if(!s.a)return q;const c=rawC(s),cs=Math.cos(s.a),sn=Math.sin(s.a),o=new Array(q.length);
  for(let i=0;i<q.length;i+=2){const x=q[i]-c[0],y=q[i+1]-c[1];o[i]=c[0]+x*cs-y*sn;o[i+1]=c[1]+x*sn+y*cs}return o}
 function drawStroke(s){
+ if(s._hide)return; // текст сейчас правится в поле ввода — на доске его не рисуем, иначе он двоится
  if(s.a&&canRot(s)){const c=rawC(s);ctx.save();ctx.translate(c[0],c[1]);ctx.rotate(s.a);ctx.translate(-c[0],-c[1]);drawStroke0(s);ctx.restore()}
  else drawStroke0(s);
 }
@@ -1242,16 +1243,18 @@ function openText(x,y,id){
  ta.rows=Math.max(1,ex?ex.s.split('\n').length:1);ta.value=ex?ex.s:'';
  const fit2=()=>{ta.style.height='auto';ta.style.height=ta.scrollHeight+'px'};
  let done=false;
+ const unhide=()=>{if(ex&&ex._hide){delete ex._hide;if(inkC)inkC.key=null;redraw()}};
+ if(ex){ex._hide=true;if(inkC)inkC.key=null;redraw()}
  const commit=()=>{
   if(done)return;done=true;tbox=null;
   const v=ta.value.replace(/\s+$/,'');ta.remove();
-  if(!v){return}
+  if(!v){unhide();return}
   const txt=wrapText(v,size,Math.max(60,PW-x-12));
-  if(ex){const eb=edSnap([id],[]);ex.s=txt;inval(ex);send({t:'stroke',page:page,stroke:clean(ex)});edDone(eb);redraw();return} // правку текста тоже можно отменить
+  if(ex){delete ex._hide;const eb=edSnap([id],[]);ex.s=txt;inval(ex);send({t:'stroke',page:page,stroke:clean(ex)});edDone(eb);redraw();return} // правку текста тоже можно отменить
   addObj({id:newId(),k:'text',pts:[x,y],c:color,w:size,s:txt});
  };
  ta.oninput=fit2;
- ta.onkeydown=e=>{if(e.key==='Escape'){done=true;tbox=null;ta.remove()}else if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();commit()}};
+ ta.onkeydown=e=>{if(e.key==='Escape'){done=true;tbox=null;ta.remove();unhide()}else if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();commit()}};
  ta.onblur=commit;
  wrap.appendChild(ta);tbox={commit:commit};fit2();ta.focus();
 }
