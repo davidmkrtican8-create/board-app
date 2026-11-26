@@ -1543,7 +1543,7 @@ function placeImage(im,task,gap,fixId){
  send({t:'image',page:page,img:{id:iid,src:src,x:r2(x),y:r2(y),w:r2(dw),h:r2(dh)}});
  editImg=iid;redraw(); // сразу режим правки: можно подвинуть и изменить размер
 }
-const MAXIMG=80; // столько картинок на одной доске принимает сервер
+const MAXIMG=300; // столько картинок на одной доске принимает сервер (картинки лежат отдельными файлами, доска от них не тяжелеет)
 function imgFull(){if(Object.keys(images[page]||{}).length<MAXIMG)return false;
  modal('На этой доске уже '+MAXIMG+' картинок — больше не помещается. Создайте новую доску: «+ Доска».',{ok:'Понятно'});return true}
 function addImageSrc(src,heic){ // картинка из data:-ссылки (файл, вставка, кабинет)

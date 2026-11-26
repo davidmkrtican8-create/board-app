@@ -14,6 +14,9 @@ const SHAPES = ['tri', 'rtri', 'square', 'circle', 'para', 'trap', 'rhomb', 'hex
 const ICE = (() => { try { return JSON.parse(process.env.ICE_SERVERS || ''); } catch (e) { return null; } })()
   || [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }];
 const IMG = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/=]+$/;
+// Картинки на досках лежат отдельными файлами DATA/img/<хеш>.<тип>, а в доске — только ссылка /img/<хеш>.<тип>.
+// Браузер скачивает картинку один раз и дальше берёт из своего кэша; доска открывается быстро, а не тянет 10–15 МБ картинок целиком.
+const IREF = /^\/img\/[a-f0-9]{32}\.(png|jpg|webp)$/, IDATA = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+\/=]+)$/;
 const COLORS = ['#4caf50', '#1e4f8f', '#e8702a', '#a3238e', '#c4a67a', '#8a9a9f', '#d93025', '#f5c242', '#2a6bb0', '#b0254f', '#8bc34a', '#5b2d90', '#3a9ad9'];
 const IDX = path.join(DIR, '_index.json');
 let index = { students: [] };
@@ -36,7 +39,34 @@ function room(id) {
   }
   s.images = s.images || {};
   for (const pg in s.strokes || {}) delete s.strokes[pg].undefined; // объекты без номера (старая ошибка правки после перезагрузки)
-  return (rooms[id] = { id, s, clients: new Set(), timer: null, call: new Set(), last: Date.now(), pend: false });
+  const moved = imgsOut(s); // старая доска с картинками внутри — выносим их в файлы (один раз)
+  const r = rooms[id] = { id, s, clients: new Set(), timer: null, call: new Set(), last: Date.now(), pend: false };
+  if (moved) save(r);
+  return r;
+}
+const IMD = path.join(DIR, 'img'); fs.mkdirSync(IMD, { recursive: true });
+function imgStore(src) { // data:-картинка → файл → '/img/<хеш>.<тип>'; уже ссылка — оставляем (если файл есть)
+  if (IREF.test(src)) return fs.existsSync(path.join(IMD, src.slice(5))) ? src : null;
+  const m = IDATA.exec(src); if (!m) return null;
+  const buf = Buffer.from(m[2], 'base64'); if (!buf.length) return null;
+  const name = crypto.createHash('sha256').update(buf).digest('hex').slice(0, 32) + '.' + (m[1] === 'jpeg' ? 'jpg' : m[1]), f = path.join(IMD, name);
+  if (!fs.existsSync(f)) { fs.writeFileSync(f + '.tmp', buf); fs.renameSync(f + '.tmp', f); }
+  return '/img/' + name;
+}
+function imgsOut(s) { // все data:-картинки доски → файлы; true, если что-то поменялось
+  let ch = false;
+  for (const pg in s.images || {}) for (const id in s.images[pg]) {
+    const g = s.images[pg][id]; if (!g || typeof g.src !== 'string' || !g.src.startsWith('data:')) continue;
+    const r = imgStore(g.src); if (r) { g.src = r; ch = true; }
+  }
+  return ch;
+}
+function imgsIn(s) { // для автокопии кабинета: ссылки обратно в data: (копия должна быть самодостаточной)
+  for (const pg in s.images || {}) for (const id in s.images[pg]) {
+    const g = s.images[pg][id]; if (!g || !IREF.test(String(g.src))) continue;
+    try { const b = fs.readFileSync(path.join(IMD, g.src.slice(5))), ext = g.src.split('.').pop(); g.src = 'data:image/' + (ext === 'jpg' ? 'jpeg' : ext) + ';base64,' + b.toString('base64'); } catch (e) {}
+  }
+  return s;
 }
 function save(r) {
   clearTimeout(r.timer); r.pend = true; r.last = Date.now();
@@ -45,7 +75,7 @@ function save(r) {
 // доски, которые 30 минут никто не держит открытыми (и всё уже записано на диск), убираем из памяти; при открытии загрузятся снова
 setInterval(() => {
   const now = Date.now();
-  for (const id in rooms) { const r = rooms[id]; if (!r.clients.size && !r.call.size && !r.pend && now - r.last > 30 * 60e3) delete rooms[id]; }
+  for (const id in rooms) { const r = rooms[id]; if (!r.clients.size && !r.call.size && !r.pend && now - r.last > 120 * 60e3) delete rooms[id]; } // памяти теперь много — держим 2 часа
 }, 5 * 60e3);
 function bcast(r, msg) {
   const d = 'data: ' + JSON.stringify(msg) + '\n\n';
@@ -94,9 +124,10 @@ function apply(s, op) {
     }
     case 'image': {
       const g = op.img;
-      if (!g || !ID.test(g.id) || typeof g.src !== 'string' || g.src.length > 900000 || !IMG.test(g.src)) return false;
+      if (!g || !ID.test(g.id) || typeof g.src !== 'string' || g.src.length > 900000 || !(IREF.test(g.src) || IMG.test(g.src))) return false;
       const m = (im[op.page] = im[op.page] || {});
-      if (!m[g.id] && Object.keys(m).length >= 80) return false;
+      if (!m[g.id] && Object.keys(m).length >= 300) return false; // до 300 картинок на доске
+      const ref = imgStore(g.src); if (!ref) return false; g.src = ref; // другим участникам уходит уже ссылка, а не сама картинка
       m[g.id] = { src: g.src, x: num(g.x, -1e6, 1e6, 0), y: num(g.y, -1e6, 1e6, 0), w: num(g.w, 1, 1e5, 200), h: num(g.h, 1, 1e5, 200) };
       return true;
     }
@@ -281,8 +312,7 @@ async function backupOut(req, res, u, L) {
   for (const s of L) {
     if (gone) return;
     let d = null;
-    if (rooms[s.id]) d = JSON.stringify(rooms[s.id].s);
-    else { try { d = await fs.promises.readFile(path.join(DIR, s.id + '.json'), 'utf8'); } catch (e) {} }
+    try { const st = rooms[s.id] ? JSON.parse(JSON.stringify(rooms[s.id].s)) : JSON.parse(await fs.promises.readFile(path.join(DIR, s.id + '.json'), 'utf8')); d = JSON.stringify(imgsIn(st)); } catch (e) {}
     if (!d) continue;
     await put((first ? '' : ',') + JSON.stringify(s.id) + ':' + d); first = false;
   }
@@ -1162,7 +1192,7 @@ function admin(req, res, u) {
       todo.forEach(s => {
         const st = (j.data.rooms || {})[s.id];
         if (!st || !Array.isArray(st.pages)) return;
-        st.strokes = st.strokes || {}; st.images = st.images || {};
+        st.strokes = st.strokes || {}; st.images = st.images || {}; imgsOut(st);
         fs.writeFileSync(path.join(DIR, s.id + '.json'), JSON.stringify(st));
         if (rooms[s.id]) { rooms[s.id].s = st; bcast(rooms[s.id], { t: 'init', s: st, name: s.name }); }
       });
@@ -1181,6 +1211,16 @@ http.createServer((req, res) => {
   const pj = u.pathname.match(/^\/pdfjs\/(pdf(?:\.worker)?\.min\.mjs)$/);
   if (pj) { // pdf.js для просмотра сборников задач в кабинете преподавателя
     return sendFile(req, res, path.join(__dirname, pj[1]), 'text/javascript; charset=utf-8', 'public, max-age=86400');
+  }
+  const im = u.pathname.match(/^\/img\/([a-f0-9]{32}\.(png|jpg|webp))$/);
+  if (im) { // картинка с доски: имя = хеш содержимого, поэтому браузер может хранить её у себя «вечно»
+    const f = path.join(IMD, im[1]);
+    return fs.stat(f, (e, st) => {
+      if (e) { res.writeHead(404); return res.end(); }
+      res.writeHead(200, { 'Content-Type': im[2] === 'jpg' ? 'image/jpeg' : 'image/' + im[2], 'Content-Length': st.size, 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff' });
+      if (req.method === 'HEAD') return res.end();
+      fs.createReadStream(f).pipe(res);
+    });
   }
   if (u.pathname === '/api/img') { // картинку, скопированную со страницы чужого сайта, браузер сам скачать не может — скачиваем мы (только для открытых досок)
     const rr = String(u.searchParams.get('r') || '');
