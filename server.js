@@ -168,6 +168,25 @@ function apply(s, op) {
       s.pages = np; return true;
     }
     case 'title': { const p = s.pages.find(p => p.id === op.id); if (p) p.title = String(op.title || '').slice(0, 80); return true; }
+    case 'folder': { // папка для досок: создать или переименовать
+      if (!ID.test(op.id)) return false;
+      const name = String(op.name || '').trim().slice(0, 40); if (!name) return false;
+      const fs_ = (s.folders = Array.isArray(s.folders) ? s.folders : []), f = fs_.find(x => x.id === op.id);
+      if (f) f.name = name; else { if (fs_.length >= 50) return false; fs_.push({ id: op.id, name }); }
+      op.name = name; return true;
+    }
+    case 'delFolder': { // удалить папку: доски из неё остаются, просто без папки
+      if (!Array.isArray(s.folders)) return false;
+      s.folders = s.folders.filter(x => x.id !== op.id);
+      s.pages.forEach(p => { if (p.f === op.id) delete p.f; });
+      return true;
+    }
+    case 'pageFolder': { // переложить доску в папку (f: '' — без папки)
+      const p = s.pages.find(p => p.id === op.id); if (!p) return false;
+      if (op.f && !(s.folders || []).some(x => x.id === op.f)) return false;
+      if (op.f) p.f = op.f; else delete p.f;
+      return true;
+    }
     case 'rtc': return ['hello', 'here', 'offer', 'answer', 'ice', 'bye', 'st'].includes(op.kind) && RID.test(String(op.from)) && (!op.to || RID.test(String(op.to))) && JSON.stringify(op.data || null).length < 30000;
     case 'cursor': return Number.isFinite(+op.x) && Number.isFinite(+op.y) && String(op.label || '').length <= 40;
     case 'live': return true;
@@ -1340,7 +1359,7 @@ http.createServer((req, res) => {
       return;
     }
     if (m[2] === 'op' && req.method === 'POST') return body(req, res, 1.2e6, op => {
-      if (op && (op.t === 'delPage' || op.t === 'clear')) { // удалить или очистить доску может только её репетитор, не ученик
+      if (op && ['delPage', 'clear', 'folder', 'delFolder', 'pageFolder'].includes(op.t)) { // удалить или очистить доску, разложить по папкам может только её репетитор, не ученик
         const me = auth(req), st = index.students.find(x => x.id === m[1]);
         if (!me || !st || (st.owner !== me.id && me.id !== 'owner')) { res.writeHead(403); return res.end(); }
       }
