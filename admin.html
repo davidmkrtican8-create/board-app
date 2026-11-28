@@ -264,6 +264,26 @@ function callPill(){
  const end=document.createElement('button');end.className='end';end.textContent='Завершить';end.onclick=()=>{try{pk.contentWindow.postMessage({t:'callend'},location.origin)}catch(e){}setTimeout(()=>{const q=document.getElementById('frpark');if(q){q.remove();callPill()}},1500)};
  p.append(t,back,end);
 }
+// аккуратная гирлянда: тонкий провод неглубокими дугами, маленькие лампочки, каждая мерцает в своём ритме (одинаковый код в доске и кабинете)
+function garDraw(c,t){
+ const W=c.clientWidth,H=20,q=Math.min(2,window.devicePixelRatio||1);if(!W)return;
+ if(c.width!==Math.round(W*q)||c.height!==Math.round(H*q)){c.width=Math.round(W*q);c.height=Math.round(H*q);c._B=null}
+ const g=c.getContext('2d');g.setTransform(q,0,0,q,0,0);g.clearRect(0,0,W,H);
+ const n=Math.max(1,Math.round(W/110)),seg=W/n,wy=x=>{const f=(x%seg)/seg;return 1.5+6*Math.sin(Math.PI*f)};
+ if(!c._B){const cols=['#ff5a5a','#ffcf4a','#5fd38a','#5ab4ff','#c58bff'];c._B=[];for(let x=11,i=0;x<W-4;x+=22,i++)c._B.push({x,c:cols[i%cols.length],sp:1.2+Math.random()*1.6,ph:Math.random()*6.3})}
+ g.strokeStyle='#2d5a3d';g.lineWidth=1;g.beginPath();for(let k=0;k<n;k++){const x0=k*seg;g.moveTo(x0,1.5);g.quadraticCurveTo(x0+seg/2,13.5,x0+seg,1.5)}g.stroke();
+ const T=t/1000;
+ for(const b of c._B){const y=wy(b.x),on=.45+.55*(.5+.5*Math.sin(T*b.sp+b.ph));
+  g.globalAlpha=.28*on;g.fillStyle=b.c;g.beginPath();g.arc(b.x,y+6,6.5,0,6.2832);g.fill();
+  g.globalAlpha=1;g.fillStyle='#4a5560';g.fillRect(b.x-1.3,y,2.6,2);
+  g.globalAlpha=.55+.45*on;g.fillStyle=b.c;g.beginPath();g.ellipse(b.x,y+6,2.6,3.9,0,0,6.2832);g.fill();
+  g.globalAlpha=.6*on;g.fillStyle='#fff';g.beginPath();g.ellipse(b.x-.8,y+5,.7,1.3,0,0,6.2832);g.fill()}
+ g.globalAlpha=1}
+// гирлянда, которую включили на открытой доске, — висит в строке «Задачи / Домашка» над кнопками
+addEventListener('message',e=>{if(e.origin!==location.origin||!e.data||e.data.t!=='garland')return;const f=document.getElementById('fr');if(!f||e.source!==f.contentWindow)return;
+ let c=document.getElementById('garc');const bar=document.getElementById('bar');
+ if(!c){c=document.createElement('canvas');c.id='garc';c.style.cssText='position:absolute;left:0;top:0;width:100%;height:20px;pointer-events:none;z-index:5';bar.style.position='relative';bar.prepend(c)}
+ const on=!!e.data.on;c.hidden=!on;if(on&&!c._raf){const lp=t=>{if(c.hidden){c._raf=0;return}c._raf=requestAnimationFrame(lp);if(t-(c._t||0)<50)return;c._t=t;garDraw(c,t)};c._raf=requestAnimationFrame(lp)}});
 addEventListener('message',e=>{ // доска сообщает, идёт ли на ней звонок
  if(e.origin!==location.origin||!e.data||e.data.t!=='callstate')return;
  const f=[...document.querySelectorAll('#fr,#frpark')].find(x=>x.contentWindow===e.source);if(!f)return;
@@ -869,7 +889,8 @@ if(localStorage.getItem('nosidebar')==='1')setSB(true);
 // «фокус»: убирает боковые панели (встроенный полный экран Safari ломает клавиатуру, поэтому без него)
 // ⛶ и ⤢ прячут оба списка слева: учеников (здесь) и досок (внутри доски)
 const sideMsg=()=>{try{$('fr').contentWindow.postMessage({t:'side',hide:document.body.classList.contains('admfocus')},location.origin)}catch(e){}};
-onFr(f=>f.addEventListener('load',sideMsg)); // при переходе к другому ученику доска загружается заново
+onFr(f=>f.addEventListener('load',sideMsg));
+onFr(f=>f.addEventListener('load',()=>{const c=document.getElementById('garc');if(c)c.hidden=true})); // другая доска — гирлянду покажет, только если её включат там // при переходе к другому ученику доска загружается заново
 $('fs').onclick=()=>{document.body.classList.toggle('admfocus');sideMsg()};
 // настоящий полный экран (кнопка ⤢): вместе с ним включается «фокус»; выход — Esc или ещё раз ⤢
 const fsEl=()=>document.fullscreenElement||document.webkitFullscreenElement,de=document.documentElement;
