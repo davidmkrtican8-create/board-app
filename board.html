@@ -252,7 +252,6 @@ body.focus #main{padding:4px;gap:4px}
   <label>Тема <select id="theme"><option value="auto">Как в системе</option><option value="light">Светлая</option><option value="dark">Тёмная</option></select></label>
   <label>Фон листа <select id="bgs"><option value="grid">Клетка</option><option value="line">Линейка</option><option value="none">Чистый</option></select></label>
   <label>Шумоподавление в звонке <select id="nrs"><option value="strong">Сильное — убирает скрип пера и шорохи</option><option value="normal">Обычное</option><option value="off">Выключено</option></select></label>
-  <label class="c" id="snowrow" hidden><input type="checkbox" id="snowck"> ❄️ Снегопад на доске (видят все, кто на ней)</label>
   <label class="c"><input type="checkbox" id="snap"> Ровные фигуры (задержать перо)</label>
   <label class="c"><input type="checkbox" id="prs"> Нажим пера: толщина зависит от силы нажатия (обычно лучше выключить)</label>
   <label class="c"><input type="checkbox" id="palm"> Со стилусом пальцы только листают</label>
@@ -894,12 +893,12 @@ function renderPages(){if(window.sortDrag)return;const b=$('pl');b.innerHTML='';
    x.onclick=e=>{e.stopPropagation();delPage(p.id)};d.appendChild(x)}
   return d};
  pages.filter(p=>!pgFolder(p)).forEach(p=>b.appendChild(row(p)));
- folders.forEach(f=>{const ps=pages.filter(p=>pgFolder(p)===f.id),open=!!fOpen[f.id]||ps.some(p=>p.id===page); // папка с открытой доской всегда раскрыта
+ folders.forEach(f=>{const ps=pages.filter(p=>pgFolder(p)===f.id),open=!!fOpen[f.id]; // сворачивается и тогда, когда открытая доска лежит в ней
   const h=document.createElement('div');h.className='fld'+(open?' open':'');h.dataset.k='f';h.dataset.f=f.id;h.title=open?'Свернуть папку':'Открыть папку';
   const a=document.createElement('span');a.className='fla';a.textContent=open?'▾':'▸';
   const n=document.createElement('span');n.className='pgt';n.textContent='📁 '+f.name;
   const c=document.createElement('span');c.className='fln';c.textContent=ps.length;h.append(a,n,c);
-  h.onclick=()=>{if(ps.some(p=>p.id===page)&&open){$('st').textContent='В этой папке открытая доска — папка остаётся раскрытой';return}fOpen[f.id]=!open;if(!fOpen[f.id])delete fOpen[f.id];saveFOpen();renderPages()};
+  h.onclick=()=>{fOpen[f.id]=!open;if(!fOpen[f.id])delete fOpen[f.id];saveFOpen();renderPages()};
   if(isTeacher){const e=document.createElement('button');e.className='pgx';e.textContent='✎';e.title='Переименовать папку';e.onclick=ev=>{ev.stopPropagation();folderName(f.id)};
    const x=document.createElement('button');x.className='pgx';x.textContent='✕';x.title='Удалить папку (доски из неё останутся)';x.onclick=ev=>{ev.stopPropagation();delFolder(f.id)};h.append(e,x)}
   b.appendChild(h);
@@ -1937,7 +1936,7 @@ async function buildPDF(all,only){ // only — одна доска по id, бе
 const snowOwner=isTeacher; // включает любой репетитор (меню «Ещё» и настройки), видят все на доске
 let snowOn=false,snowRaf=0,snowF=[],snowT=0;
 function snowSet(on){
- snowOn=on;const c=$('snowc');c.hidden=!on;if($('snowst'))$('snowst').textContent=on?'вкл':'выкл';if($('snowck'))$('snowck').checked=on;
+ snowOn=on;const c=$('snowc');c.hidden=!on;if($('snowst'))$('snowst').textContent=on?'вкл':'выкл';
  cancelAnimationFrame(snowRaf);snowRaf=0;snowF=[];if(!on)return;
  const g=c.getContext('2d');snowT=performance.now();
  const mk=(top)=>{const z=Math.random();return{x:Math.random(),y:top?Math.random():-.05,r:1.2+z*3.2,v:.018+z*.05,w:Math.random()*6.28,ws:.4+Math.random()*1.2,a:.55+z*.4,f:z>.82}}; // z — «глубина»: ближние снежинки крупнее и быстрее
@@ -1958,9 +1957,7 @@ function snowSet(on){
  };snowRaf=requestAnimationFrame(tick);
 }
 function snowOff(){cancelAnimationFrame(snowRaf);snowRaf=0;snowF=[];const c=$('snowc');c.getContext('2d').clearRect(0,0,c.width,c.height);c.hidden=true;$('st').textContent='Снег выключен: устройство не успевает его рисовать'}
-if(snowOwner){$('snowmi').hidden=false;$('snowrow').hidden=false;
- const tog=on=>{snowSet(on);$('snowck').checked=on;send({t:'snow',on:on})};
- $('snowb').onclick=()=>tog(!snowOn);$('snowck').onchange=()=>tog($('snowck').checked)}
+if(snowOwner){$('snowmi').hidden=false;$('snowb').onclick=()=>{snowSet(!snowOn);send({t:'snow',on:snowOn})}} // кнопка — в меню «⋯» (Ещё)
 // ---------- «отвлёкся»: ученик ушёл с доски на другую вкладку или в другое приложение — у репетитора плашка ----------
 let peersN=0;
 function note(text,cls,ms,key){ // плашка сверху по центру доски; key — одна плашка на человека
