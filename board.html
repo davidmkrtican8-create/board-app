@@ -1499,6 +1499,7 @@ cv.addEventListener('pointermove',e=>{
    g.w=w;g.h=w*cur.r;g.x=sx>0?cur.ax:cur.ax-w;g.y=sy>0?cur.ay:cur.ay-g.h}
   else{g.x=p[0]-cur.dx;g.y=p[1]-cur.dy}
   cur.guides=e.altKey?[]:imgSnap(cur.mv,g,cur.size?'size':'mv',cur.c||'se');
+  if(isTC(cur.mv)&&!e.altKey)cur.guides=tcSnap(cur,g,p);
   if(!cur.size)carryMove(cur);
   redraw();return}
  if((cur.k==='pen'||cur.k==='hl')&&e.shiftKey&&cur.pts.length>=2){ // Shift — прямая линия от точки, где зажали Shift (отпустили — дальше рисуем от руки)
@@ -1548,7 +1549,7 @@ function end(e){
  if(s.axres){const sk=(strokes[page]||{})[s.axres];if(sk)send({t:'stroke',page:page,stroke:clean(sk)});return}
  if(s.rsz){const sk=(strokes[page]||{})[s.rsz];if(sk)send({t:'stroke',page:page,stroke:clean(sk)});redraw();return}
  if(s.rot){const sk=(strokes[page]||{})[s.rot];if(sk)send({t:'strokeset',page:page,id:s.rot,pts:sk.pts,a:sk.a||0});setTimeout(()=>{$('st').textContent=peersTxt},1200);return}
- if(s.mv){const g=images[page][s.mv];send({t:'imgset',page:page,id:s.mv,x:r2(g.x),y:r2(g.y),w:r2(g.w),h:r2(g.h)});
+ if(s.mv){const g=images[page][s.mv];if(isTC(s.mv)&&s.size)setTimeout(()=>{$('st').textContent=peersTxt},1500);send({t:'imgset',page:page,id:s.mv,x:r2(g.x),y:r2(g.y),w:r2(g.w),h:r2(g.h)});
   if(s.os){const ps=strokes[page]||{};for(const id in s.os)if(ps[id])send({t:'strokeset',page:page,id:id,pts:ps[id].pts})}if(s.guides&&s.guides.length)redraw();return}
  if(s.exitTap&&(s.k==='pen'||s.k==='hl'||s.k==='ers')&&curTr<6&&s.pts.length<=6){pf=null;clearLive();redraw();return} // касание только вышло из правки — без точки
  if(s.k==='hl'){ // почти прямая полоса (подчёркивание) — делаем ровной; почти горизонтальную — строго горизонтальной
@@ -1577,6 +1578,17 @@ function end(e){
 }
 cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
 // что написано поверх картинки (линия целиком внутри неё) — переносится вместе с картинкой
+// окружность для №13: центр всегда на пересечении линий клетки (видны направляющие через центр), радиус — целое число клеток; Alt — без прилипания
+const isTC=id=>/^tc/.test(id||'');
+function tcSnap(c,g,p){const C=24,ims=images[page]||{};
+ if(c.size){if(!c.cc)c.cc=[g.x+g.w/2,g.y+g.h/2];const raw=2*Math.max(Math.abs(p[0]-c.cc[0]),Math.abs(p[1]-c.cc[1])),w=Math.max(3*C,Math.round(raw/(3*C))*3*C); // картинка — 3 радиуса
+  g.w=g.h=w;g.x=c.cc[0]-w/2;g.y=c.cc[1]-w/2;$('st').textContent='Радиус: '+(w/(3*C))+' кл.'}
+ else{const cx=g.x+g.w/2,cy=g.y+g.h/2,y0=Math.max(0,Math.floor(cy/PS))*PS,nx=Math.round(cx/C)*C,ny=y0+Math.round((cy-y0)/C)*C;g.x+=nx-cx;g.y+=ny-cy}
+ const cx=g.x+g.w/2,cy=g.y+g.h/2,G=[{x:cx,a:g.y,b:g.y+g.h},{y:cy,a:g.x,b:g.x+g.w}];
+ for(const k in ims){const o=ims[k];if(k===c.mv)continue; // на одной линии с серединой другой картинки — тянем направляющую до неё
+  if(Math.abs(o.x+o.w/2-cx)<.5)G.push({x:cx,a:Math.min(g.y,o.y),b:Math.max(g.y+g.h,o.y+o.h)});
+  if(Math.abs(o.y+o.h/2-cy)<.5)G.push({y:cy,a:Math.min(g.x,o.x),b:Math.max(g.x+g.w,o.x+o.w)})}
+ return G}
 function carryStart(c){const g=(images[page]||{})[c.mv];if(!g)return;const ps=strokes[page]||{},t=2;c.os={};c.o0=[g.x,g.y];
  for(const id in ps){const sk=ps[id];if(!sk.pts||sk._hide)continue;const b=bbox(sk);if(b[0]>=g.x-t&&b[1]>=g.y-t&&b[2]<=g.x+g.w+t&&b[3]<=g.y+g.h+t)c.os[id]=sk.pts.slice()}
  if(!Object.keys(c.os).length)c.os=null}
@@ -1585,7 +1597,8 @@ function carryMove(c){if(!c.os)return;const g=images[page][c.mv],dx=g.x-c.o0[0],
  if(inkC)inkC.key=null}
 cv.addEventListener('pointerdown',()=>{const c=cur;if(!c||c._eb)return; // начало переноса/поворота/растягивания — запоминаем «как было» для Ctrl+Z
  const sid=c.mvs||c.rot||c.axres||c.orbit||c.rsz;
- if(c.mv&&!c.size)carryStart(c); // записи поверх картинки едут вместе с ней (как в Miro)
+ if(c.mv&&!c.size)carryStart(c);
+ if(c.mv&&c.size&&isTC(c.mv)){const g=(images[page]||{})[c.mv];if(g)c.cc=[g.x+g.w/2,g.y+g.h/2]} // окружность растягивается от центра — центр на месте // записи поверх картинки едут вместе с ней (как в Miro)
  if(sid)c._eb=edSnap([sid],[]);else if(c.mv)c._eb=edSnap(Object.keys(c.os||{}),[c.mv]);else if(c.gmv||c.gsz)c._eb=edSnap(Object.keys(c.os||{}),Object.keys(c.oi||{}));
  if(c._eb)c._ep=page});
 cv.addEventListener('pointerleave',()=>{ptr=null;drawOverlay()});
@@ -2656,7 +2669,7 @@ function insertTrig4(){
  g.beginPath();g.arc(O,O,2*K,0,7);g.fill();
  const v=view,sx=v.x+cw/v.s/2,sy=v.y+ch/v.s/2,k=Math.max(0,Math.floor(sy/PS)),y0=k*PS; // центр — ближайший узел клетки на листе под серединой экрана
  const cx=Math.min(PW-HALF,Math.max(HALF,Math.round(sx/C)*C)),cy=Math.min(y0+PH-HALF,Math.max(y0+HALF,y0+Math.round((sy-y0)/C)*C));
- const iid=newId();mine.push({page:page,id:iid});redo=[];
+ const iid='tc'+newId();mine.push({page:page,id:iid});redo=[]; // tc… — по номеру видно, что это окружность для №13 (центр прилипает к клетке)
  send({t:'image',page:page,img:{id:iid,src:c.toDataURL('image/png'),x:cx-HALF,y:cy-HALF,w:2*HALF,h:2*HALF}});
  editImg=iid;redraw();
 }
