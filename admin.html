@@ -282,7 +282,7 @@ function garDraw(c,t){
 // гирлянда, которую включили на открытой доске, — висит в строке «Задачи / Домашка» над кнопками
 addEventListener('message',e=>{if(e.origin!==location.origin||!e.data||e.data.t!=='garland')return;const f=document.getElementById('fr');if(!f||e.source!==f.contentWindow)return;
  let c=document.getElementById('garc');const bar=document.getElementById('bar');
- if(!c){c=document.createElement('canvas');c.id='garc';c.style.cssText='position:absolute;left:0;top:0;width:100%;height:20px;pointer-events:none;z-index:5';bar.style.position='relative';bar.prepend(c)}
+ if(!c){c=document.createElement('canvas');c.id='garc';c.className='keep';c.style.cssText='position:absolute;left:0;top:0;width:100%;height:20px;pointer-events:none;z-index:5';bar.style.position='relative';bar.prepend(c)}
  const on=!!e.data.on;c.hidden=!on;if(on&&!c._raf){const lp=t=>{if(c.hidden){c._raf=0;return}c._raf=requestAnimationFrame(lp);if(t-(c._t||0)<50)return;c._t=t;garDraw(c,t)};c._raf=requestAnimationFrame(lp)}});
 addEventListener('message',e=>{ // доска сообщает, идёт ли на ней звонок
  if(e.origin!==location.origin||!e.data||e.data.t!=='callstate')return;
