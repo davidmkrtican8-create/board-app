@@ -252,6 +252,7 @@ body.focus #main{padding:4px;gap:4px}
   <label>Тема <select id="theme"><option value="auto">Как в системе</option><option value="light">Светлая</option><option value="dark">Тёмная</option></select></label>
   <label>Фон листа <select id="bgs"><option value="grid">Клетка</option><option value="line">Линейка</option><option value="none">Чистый</option></select></label>
   <label>Шумоподавление в звонке <select id="nrs"><option value="strong">Сильное — убирает скрип пера и шорохи</option><option value="normal">Обычное</option><option value="off">Выключено</option></select></label>
+  <label class="c" id="snowrow" hidden><input type="checkbox" id="snowck"> ❄️ Снегопад на доске (видят все, кто на ней)</label>
   <label class="c"><input type="checkbox" id="snap"> Ровные фигуры (задержать перо)</label>
   <label class="c"><input type="checkbox" id="prs"> Нажим пера: толщина зависит от силы нажатия (обычно лучше выключить)</label>
   <label class="c"><input type="checkbox" id="palm"> Со стилусом пальцы только листают</label>
@@ -282,7 +283,7 @@ addEventListener('hashchange',()=>{const hp=(location.hash.match(/^#p=([\w-]+)$/
 let pages=[],folders=[],strokes={},images={},page=null,live={},color='#1a1a1a',bg='grid',cur=null,lastEmit=0,mine=[],redo=[];
 let cw=1,ch=1,dpr=1,view={x:0,y:0,s:1},gest=null,pan=null,space=false,holdT=0,holdA=null,lastP=[0,0],editImg=null,editStroke=null,jump=null,fingerPan=false;
 let ovRaf=0,rectO=null,lastAct=0,rectC=null,rq=0,pendErase=[],pendPage=null,eraseT=0,peersTxt='',msel=null; // msel — выделение рамкой: {ids,imgs,box}
-let penUpT=-1e9,curPid=null,curPen=false,curT0=0,curX=0,curY=0,curTr=0,viewOnly=false,dark=false,penSeen=(()=>{try{return localStorage.getItem('penSeen')==='1'}catch(e){return false}})(),myName=null,ptr=null,curTool='pen',lastCur=0,lastCurP=[-9,-9];
+let lastTap=null,penUpT=-1e9,curPid=null,curPen=false,curT0=0,curX=0,curY=0,curTr=0,viewOnly=false,dark=false,penSeen=(()=>{try{return localStorage.getItem('penSeen')==='1'}catch(e){return false}})(),myName=null,ptr=null,curTool='pen',lastCur=0,lastCurP=[-9,-9];
 const views={},imgEl={},ptrs=new Map(),cursors={};
 const $=i=>document.getElementById(i),tool=()=>curTool;
 const postOp=(op,b)=>{const h={};if(['delPage','clear','folder','delFolder','pageFolder'].includes(op.t)){try{h['X-Token']=localStorage.getItem('tok')||''}catch(e){}} // удалять и очищать доски сервер разрешает только репетитору
@@ -1325,7 +1326,8 @@ function openText(x,y,id){
   addObj({id:newId(),k:'text',pts:[x,y],c:color,w:size,s:txt});
  };
  ta.oninput=fit2;
- ta.onkeydown=e=>{if(e.key==='Escape'){done=true;tbox=null;ta.remove();unhide()}else if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();commit()}};
+ ta.placeholder='Пишите… Enter — новая строка, щёлкните мимо — готово';
+ ta.onkeydown=e=>{if(e.key==='Escape'||(e.key==='Enter'&&(e.metaKey||e.ctrlKey))){e.preventDefault();commit()}}; // Enter — новая строка (раньше Enter сразу закрывал текст); Esc и ⌘Enter — готово, написанное сохраняется
  ta.onblur=commit;
  wrap.appendChild(ta);tbox={commit:commit};fit2();ta.focus();
 }
@@ -1349,7 +1351,7 @@ function flushCursor(){
 cv.addEventListener('pointerdown',e=>{
  rectC=rectO=null;e.preventDefault();
  if(e.pointerType==='mouse'&&e.button===2)return;
- if(tbox&&e.target===cv)closeText();
+ let tbWas=false;if(tbox&&e.target===cv){closeText();tbWas=true} // щелчок мимо текста — только закончить ввод (без точки)
  try{cv.setPointerCapture(e.pointerId)}catch(_){}
  if(e.pointerType==='pen'){if(!penSeen){penSeen=true;try{localStorage.setItem('penSeen','1')}catch(_){}} // запоминаем: на этом планшете есть стилус
   if(pan&&pan.touch)pan=null;ptrs.clear();gest=null} // ладонь (одним или двумя местами) начала двигать или приближать доску, а потом коснулось перо — доску больше не двигаем
@@ -1372,10 +1374,17 @@ cv.addEventListener('pointerdown',e=>{
  }
  if(!page)return;
  const t=tool();
+ { // двойное касание/щелчок по тексту любым инструментом — дописать или исправить его (раньше только инструментом «Т»)
+  const nw=performance.now(),lt=lastTap;lastTap={t:nw,x:e.clientX,y:e.clientY};
+  if(!viewOnly&&t!=='text'&&lt&&nw-lt.t<450&&Math.hypot(e.clientX-lt.x,e.clientY-lt.y)<16){const q=pos(e),tid=strokeAt(q[0],q[1],true,true);
+   if(tid){lastTap=null;const m=mine[mine.length-1],d=m&&m.page===page&&(strokes[page]||{})[m.id]; // первое касание пером поставило точку — убираем её
+    if(d&&(d.k==='pen'||d.k==='hl')&&d.pts.length<=4){delete strokes[page][m.id];mine.pop();send({t:'erase',page:page,id:m.id})}
+    pan=null;editStroke=null;editImg=null;msel=null;const sk=strokes[page][tid];openText(sk.pts[0],sk.pts[1],tid);return}}
+ }
  const panMode=e.button===1||space||t==='hand'||viewOnly||(e.pointerType==='touch'&&(fingerPan||(S.palm&&penSeen)));
  if(panMode){pan={id:e.pointerId,touch:e.pointerType==='touch',x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};cv.style.cursor='grabbing';return}
  curPid=e.pointerId;curPen=e.pointerType==='pen';curT0=performance.now();curX=e.clientX;curY=e.clientY;curTr=0; // рисует только это касание; другие (ладонь) линию не трогают
- const p=pos(e);lastP=p;const wasEd=!!(editStroke||editImg); // касание рядом с картинкой/фигурой в правке — выход из правки
+ const p=pos(e);lastP=p;const wasEd=tbWas||!!(editStroke||editImg); // касание рядом с картинкой/фигурой в правке — выход из правки
  if(t==='laser'){editStroke=null;editImg=null;cur={laser:1,cx:e.clientX,cy:e.clientY,t0:performance.now(),p0:p};laserFlush();laserNw=true;laserBuf.push(p[0],p[1]);laserPoint(p,null,true);return}
  if(e.altKey&&t!=='er'){const ia=imgAt(p[0],p[1]);if(ia){editImg=ia;redraw();return}} // Alt+клик по картинке — править её
  if(editStroke){ // сразу после создания фигуры/оси: можно перенести, клик в стороне — выход
@@ -1491,6 +1500,7 @@ cv.addEventListener('pointermove',e=>{
    g.w=w;g.h=w*cur.r;g.x=sx>0?cur.ax:cur.ax-w;g.y=sy>0?cur.ay:cur.ay-g.h}
   else{g.x=p[0]-cur.dx;g.y=p[1]-cur.dy}
   cur.guides=e.altKey?[]:imgSnap(cur.mv,g,cur.size?'size':'mv',cur.c||'se');
+  if(!cur.size)carryMove(cur);
   redraw();return}
  if((cur.k==='pen'||cur.k==='hl')&&e.shiftKey&&cur.pts.length>=2){ // Shift — прямая линия от точки, где зажали Shift (отпустили — дальше рисуем от руки)
   if(!cur.sb){cur.sb=cur.pts.slice();cur.sbp=cur.pr?cur.pr.slice():null}
@@ -1539,7 +1549,8 @@ function end(e){
  if(s.axres){const sk=(strokes[page]||{})[s.axres];if(sk)send({t:'stroke',page:page,stroke:clean(sk)});return}
  if(s.rsz){const sk=(strokes[page]||{})[s.rsz];if(sk)send({t:'stroke',page:page,stroke:clean(sk)});redraw();return}
  if(s.rot){const sk=(strokes[page]||{})[s.rot];if(sk)send({t:'strokeset',page:page,id:s.rot,pts:sk.pts,a:sk.a||0});setTimeout(()=>{$('st').textContent=peersTxt},1200);return}
- if(s.mv){const g=images[page][s.mv];send({t:'imgset',page:page,id:s.mv,x:r2(g.x),y:r2(g.y),w:r2(g.w),h:r2(g.h)});if(s.guides&&s.guides.length)redraw();return}
+ if(s.mv){const g=images[page][s.mv];send({t:'imgset',page:page,id:s.mv,x:r2(g.x),y:r2(g.y),w:r2(g.w),h:r2(g.h)});
+  if(s.os){const ps=strokes[page]||{};for(const id in s.os)if(ps[id])send({t:'strokeset',page:page,id:id,pts:ps[id].pts})}if(s.guides&&s.guides.length)redraw();return}
  if(s.exitTap&&(s.k==='pen'||s.k==='hl'||s.k==='ers')&&curTr<6&&s.pts.length<=6){pf=null;clearLive();redraw();return} // касание только вышло из правки — без точки
  if(s.k==='hl'){ // почти прямая полоса (подчёркивание) — делаем ровной; почти горизонтальную — строго горизонтальной
   const p=pos(e),q=s.pts;if(!s.sb&&(p[0]!==q[q.length-2]||p[1]!==q[q.length-1]))q.push(p[0],p[1]); // у прямой с Shift конец уже выровнен
@@ -1566,9 +1577,17 @@ function end(e){
  addObj(o);
 }
 cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
+// что написано поверх картинки (линия целиком внутри неё) — переносится вместе с картинкой
+function carryStart(c){const g=(images[page]||{})[c.mv];if(!g)return;const ps=strokes[page]||{},t=2;c.os={};c.o0=[g.x,g.y];
+ for(const id in ps){const sk=ps[id];if(!sk.pts||sk._hide)continue;const b=bbox(sk);if(b[0]>=g.x-t&&b[1]>=g.y-t&&b[2]<=g.x+g.w+t&&b[3]<=g.y+g.h+t)c.os[id]=sk.pts.slice()}
+ if(!Object.keys(c.os).length)c.os=null}
+function carryMove(c){if(!c.os)return;const g=images[page][c.mv],dx=g.x-c.o0[0],dy=g.y-c.o0[1],ps=strokes[page]||{};
+ for(const id in c.os)if(ps[id]){ps[id].pts=c.os[id].map((v,i)=>r2(v+(i%2?dy:dx)));inval(ps[id])}
+ if(inkC)inkC.key=null}
 cv.addEventListener('pointerdown',()=>{const c=cur;if(!c||c._eb)return; // начало переноса/поворота/растягивания — запоминаем «как было» для Ctrl+Z
  const sid=c.mvs||c.rot||c.axres||c.orbit||c.rsz;
- if(sid)c._eb=edSnap([sid],[]);else if(c.mv)c._eb=edSnap([],[c.mv]);else if(c.gmv||c.gsz)c._eb=edSnap(Object.keys(c.os||{}),Object.keys(c.oi||{}));
+ if(c.mv&&!c.size)carryStart(c); // записи поверх картинки едут вместе с ней (как в Miro)
+ if(sid)c._eb=edSnap([sid],[]);else if(c.mv)c._eb=edSnap(Object.keys(c.os||{}),[c.mv]);else if(c.gmv||c.gsz)c._eb=edSnap(Object.keys(c.os||{}),Object.keys(c.oi||{}));
  if(c._eb)c._ep=page});
 cv.addEventListener('pointerleave',()=>{ptr=null;drawOverlay()});
 
@@ -1915,16 +1934,19 @@ async function buildPDF(all,only){ // only — одна доска по id, бе
 
 // ---------- звонок на доске (WebRTC: звук и видео идут напрямую, через свой TURN, если напрямую нельзя) ----------
 // ---------- снегопад: включает только владелец сайта (кнопка «❄️ Снегопад» в меню «Ещё»), видят все на доске; рисовать не мешает ----------
-const snowOwner=isTeacher&&(()=>{try{return localStorage.getItem('tlogin')==='admin'}catch(e){return false}})();
+const snowOwner=isTeacher; // включает любой репетитор (меню «Ещё» и настройки), видят все на доске
 let snowOn=false,snowRaf=0,snowF=[],snowT=0;
 function snowSet(on){
- snowOn=on;const c=$('snowc');c.hidden=!on;if($('snowst'))$('snowst').textContent=on?'вкл':'выкл';
+ snowOn=on;const c=$('snowc');c.hidden=!on;if($('snowst'))$('snowst').textContent=on?'вкл':'выкл';if($('snowck'))$('snowck').checked=on;
  cancelAnimationFrame(snowRaf);snowRaf=0;snowF=[];if(!on)return;
  const g=c.getContext('2d');snowT=performance.now();
  const mk=(top)=>{const z=Math.random();return{x:Math.random(),y:top?Math.random():-.05,r:1.2+z*3.2,v:.018+z*.05,w:Math.random()*6.28,ws:.4+Math.random()*1.2,a:.55+z*.4,f:z>.82}}; // z — «глубина»: ближние снежинки крупнее и быстрее
- for(let i=0;i<90;i++)snowF.push(mk(true));
+ let nF=window.innerWidth<900?40:60,slow=0;for(let i=0;i<nF;i++)snowF.push(mk(true));
+ // снег не должен мешать писать: 30 кадров в секунду, пока пишут или двигают доску — замирает; если устройство не успевает — снежинок меньше, а совсем слабое — снег выключается у себя
  const tick=t=>{snowRaf=requestAnimationFrame(tick);if(document.hidden)return;
-  const dt=Math.min(.05,(t-snowT)/1000);snowT=t;const W=c.clientWidth,H=c.clientHeight;if(!W||!H)return;
+  if(t-snowT<30)return;if(cur||moving()){snowT=t;return}
+  const fr=t-snowT;if(fr>80){if(++slow>20){slow=0;snowF.length=Math.floor(snowF.length*.6);if(snowF.length<12){snowOff();return}}}else if(slow)slow--;
+  const dt=Math.min(.05,fr/1000);snowT=t;const W=c.clientWidth,H=c.clientHeight;if(!W||!H)return;
   if(c.width!==W||c.height!==H){c.width=W;c.height=H}
   g.clearRect(0,0,W,H);
   for(const f of snowF){f.y+=f.v*dt*(H>0?600/H:1);f.w+=f.ws*dt;const x=(f.x+Math.sin(f.w)*.012)*W,y=f.y*H;
@@ -1935,7 +1957,10 @@ function snowSet(on){
    else{g.fillStyle='rgba(150,185,235,'+f.a+')';g.beginPath();g.arc(x,y,f.r,0,6.2832);g.fill();g.fillStyle='rgba(255,255,255,'+f.a+')';g.beginPath();g.arc(x-f.r*.25,y-f.r*.25,f.r*.5,0,6.2832);g.fill()}} // голубоватые — видно и на белом листе
  };snowRaf=requestAnimationFrame(tick);
 }
-if(snowOwner){$('snowmi').hidden=false;$('snowb').onclick=()=>{snowSet(!snowOn);send({t:'snow',on:snowOn})}}
+function snowOff(){cancelAnimationFrame(snowRaf);snowRaf=0;snowF=[];const c=$('snowc');c.getContext('2d').clearRect(0,0,c.width,c.height);c.hidden=true;$('st').textContent='Снег выключен: устройство не успевает его рисовать'}
+if(snowOwner){$('snowmi').hidden=false;$('snowrow').hidden=false;
+ const tog=on=>{snowSet(on);$('snowck').checked=on;send({t:'snow',on:on})};
+ $('snowb').onclick=()=>tog(!snowOn);$('snowck').onchange=()=>tog($('snowck').checked)}
 // ---------- «отвлёкся»: ученик ушёл с доски на другую вкладку или в другое приложение — у репетитора плашка ----------
 let peersN=0;
 function note(text,cls,ms,key){ // плашка сверху по центру доски; key — одна плашка на человека
@@ -2558,6 +2583,7 @@ function setTool(v){
  if(v==='axes'){insertAxes();return}
  if(v==='plot'){insertPlot();return}
  if(v==='trig'||v==='trigt'||v==='trign'){insertTrig(v==='trigt',v==='trign');return}
+ if(v==='trig4'){insertTrig4();return}
  curTool=v;if(v!=='mv')msel=null;closeText();updTools();setCursor();drawOverlay();redraw();
 }
 function togglePE(){setTool(tool()==='pen'?ersTool():'pen')} // перо ⇄ ластик одной кнопкой
@@ -2573,7 +2599,7 @@ const SHAPE_MENU=[
  ['Линии',[['line','Линия'],['arrow','Стрелка']]],
  ['Плоские фигуры',[['rect','Прямо­угольник'],['sh:square',SHP.square],['sh:circle',SHP.circle],['ellipse','Эллипс'],['sh:tri',SHP.tri],['sh:rtri',SHP.rtri],['sh:para',SHP.para],['sh:trap',SHP.trap],['sh:rhomb',SHP.rhomb],['sh:hex',SHP.hex]]],
  ['Объёмные — можно вращать',[['3d:cube',SOLID_NAMES.cube],['3d:box',SOLID_NAMES.box],['3d:prism',SOLID_NAMES.prism],['3d:pyr',SOLID_NAMES.pyr],['3d:tetra',SOLID_NAMES.tetra],['3d:cyl',SOLID_NAMES.cyl],['3d:cone',SOLID_NAMES.cone],['3d:sphere',SOLID_NAMES.sphere]]],
- ['Графики',[['plot','График функции…'],['axes','Координат­ная плоскость'],['trig','Тригоно­метри­ческая окружность'],['trign','Окружность без подписей углов'],['trigt','Окружность с осями tg и ctg']]]
+ ['Графики',[['plot','График функции…'],['axes','Координат­ная плоскость'],['trig','Тригоно­метри­ческая окружность'],['trign','Окружность без подписей углов'],['trigt','Окружность с осями tg и ctg'],['trig4','Окружность для №13: радиус 4 клетки, без фона']]]
 ];
 // ---------- тригонометрическая окружность (для №13): вставляется картинкой — двигать, растягивать, рисовать поверх ----------
 function trigCanvas(tan,bare){ // bare — без подписей углов и лучей (ученик подписывает сам)
@@ -2618,6 +2644,25 @@ function trigCanvas(tan,bare){ // bare — без подписей углов и
  }
  return c;
 }
+// окружность для №13: радиус ровно 4 клетки листа, центр — на пересечении линий клетки, прозрачный фон (клетка листа видна сквозь неё)
+function insertTrig4(){
+ if(viewOnly||imgFull()||!page)return;
+ const C=24,HALF=6*C,K=5,N=2*HALF*K,c=document.createElement('canvas');c.width=c.height=N; // 12×12 клеток, 5 точек на единицу листа — чётко и при приближении
+ const g=c.getContext('2d'),O=N/2,R=4*C*K,E=5.4*C*K,ink=dark?'#f1eef8':'#1a1a1a';g.lineCap='round';
+ const arrow=(x1,y1,x2,y2)=>{g.strokeStyle=ink;g.lineWidth=1.4*K;g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke();const a=Math.atan2(y2-y1,x2-x1),L=7*K;
+  g.fillStyle=ink;g.beginPath();g.moveTo(x2,y2);g.lineTo(x2-L*Math.cos(a-.38),y2-L*Math.sin(a-.38));g.lineTo(x2-L*Math.cos(a+.38),y2-L*Math.sin(a+.38));g.fill()};
+ arrow(O-E,O,O+E,O);arrow(O,O+E,O,O-E);
+ g.strokeStyle=ink;g.lineWidth=2*K;g.beginPath();g.arc(O,O,R,0,7);g.stroke();
+ g.fillStyle=ink;g.font='italic '+(13*K)+'px "Times New Roman",Times,serif';g.textBaseline='alphabetic';
+ g.textAlign='right';g.fillText('cos',O+E-2*K,O+15*K);g.textAlign='left';g.fillText('sin',O+5*K,O-E+10*K);
+ g.font=(12*K)+'px "Times New Roman",Times,serif';g.textAlign='right';g.fillText('0',O-3*K,O+13*K);
+ g.beginPath();g.arc(O,O,2*K,0,7);g.fill();
+ const v=view,sx=v.x+cw/v.s/2,sy=v.y+ch/v.s/2,k=Math.max(0,Math.floor(sy/PS)),y0=k*PS; // центр — ближайший узел клетки на листе под серединой экрана
+ const cx=Math.min(PW-HALF,Math.max(HALF,Math.round(sx/C)*C)),cy=Math.min(y0+PH-HALF,Math.max(y0+HALF,y0+Math.round((sy-y0)/C)*C));
+ const iid=newId();mine.push({page:page,id:iid});redo=[];
+ send({t:'image',page:page,img:{id:iid,src:c.toDataURL('image/png'),x:cx-HALF,y:cy-HALF,w:2*HALF,h:2*HALF}});
+ editImg=iid;redraw();
+}
 function insertTrig(tan,bare){
  if(viewOnly||imgFull())return;const im=new Image();im.onload=()=>placeImage(im,false);im.src=trigCanvas(tan,bare).toDataURL('image/png');
 }
@@ -2626,6 +2671,8 @@ function shapeIcon(v,c,col){ // маленькая картинка фигуры
  try{
   if(v==='axes'){ctx.strokeStyle=ctx.fillStyle=col;ctx.lineWidth=1.6;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(8,24);ctx.lineTo(48,24);ctx.moveTo(24,36);ctx.lineTo(24,4);ctx.stroke();
    ctx.beginPath();ctx.moveTo(50,24);ctx.lineTo(45,21.5);ctx.lineTo(45,26.5);ctx.fill();ctx.beginPath();ctx.moveTo(24,2);ctx.lineTo(21.5,7);ctx.lineTo(26.5,7);ctx.fill();return}
+  if(v==='trig4'){ctx.strokeStyle=ctx.fillStyle=col;ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(8,20);ctx.lineTo(48,20);ctx.moveTo(28,38);ctx.lineTo(28,2);ctx.stroke();
+   ctx.lineWidth=1.8;ctx.beginPath();ctx.arc(28,20,13,0,7);ctx.stroke();ctx.font='italic 8px serif';ctx.fillText('cos',38,30);ctx.fillText('sin',31,8);ctx.fillText('0',21,28);return}
   if(v==='trig'||v==='trigt'||v==='trign'){ctx.strokeStyle=col;ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(8,20);ctx.lineTo(48,20);ctx.moveTo(28,2);ctx.lineTo(28,38);ctx.stroke();
    ctx.lineWidth=1.8;ctx.beginPath();ctx.arc(28,20,14,0,7);ctx.stroke();ctx.fillStyle='#3b5bd6';for(const d of [30,45,60,120,135,150,210,225,240,300,315,330]){const a=d*Math.PI/180;ctx.beginPath();ctx.arc(28+14*Math.cos(a),20-14*Math.sin(a),1.6,0,7);ctx.fill()}
    if(v==='trigt'){ctx.strokeStyle='#3b5bd6';ctx.beginPath();ctx.moveTo(42,4);ctx.lineTo(42,36);ctx.moveTo(10,6);ctx.lineTo(46,6);ctx.stroke()}return}
