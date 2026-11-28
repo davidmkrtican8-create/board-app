@@ -19,9 +19,16 @@ const IMG = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/=]+$/;
 const IREF = /^\/img\/[a-f0-9]{32}\.(png|jpg|webp)$/, IDATA = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+\/=]+)$/;
 const COLORS = ['#4caf50', '#1e4f8f', '#e8702a', '#a3238e', '#c4a67a', '#8a9a9f', '#d93025', '#f5c242', '#2a6bb0', '#b0254f', '#8bc34a', '#5b2d90', '#3a9ad9'];
 const IDX = path.join(DIR, '_index.json');
-let index = { students: [] };
-try { index = JSON.parse(fs.readFileSync(IDX, 'utf8')); } catch (e) {}
-const saveIndex = () => fs.writeFileSync(IDX, JSON.stringify(index));
+// запись файла целиком или никак: сначала во временный файл, потом подмена (перезапуск посреди записи не оставит обрезанный файл)
+function writeAtomic(f, data) { const t = f + '.' + process.pid + '.tmp'; fs.writeFileSync(t, data); fs.renameSync(t, f); }
+// файл есть, но не читается — НЕ начинаем с пустого списка (иначе первая же запись сотрёт всех учеников/репетиторов): сервер не стартует, сторож напишет в Telegram
+function loadJSON(f, def) {
+  if (!fs.existsSync(f)) return def;
+  try { return JSON.parse(fs.readFileSync(f, 'utf8')); }
+  catch (e) { console.error('ФАЙЛ ИСПОРЧЕН, сервер остановлен, чтобы не затереть данные: ' + f + ' — ' + e.message + '. Восстановите из /var/backups/board'); process.exit(1); }
+}
+let index = loadJSON(IDX, { students: [] });
+const saveIndex = () => writeAtomic(IDX, JSON.stringify(index));
 const nameOf = id => (index.students.find(s => s.id === id) || {}).name || null;
 // группы: запись в том же списке, что и ученики, с type:'group' и members — у группы свои общие доски, у участников свои кабинеты
 const isGroup = id => (index.students.find(s => s.id === id) || {}).type === 'group';
@@ -31,10 +38,14 @@ const groupsOf = sid => index.students.filter(g => g.type === 'group' && (g.memb
 // Комната = папка одного ученика (внутри неё несколько досок-страниц)
 function room(id) {
   if (rooms[id]) { rooms[id].last = Date.now(); return rooms[id]; }
-  let s;
-  try { s = JSON.parse(fs.readFileSync(path.join(DIR, id + '.json'), 'utf8')); }
+  let s;const f = path.join(DIR, id + '.json');
+  try { s = JSON.parse(fs.readFileSync(f, 'utf8')); }
   catch (e) {
     if (!index.students.some(x => x.id === id)) return null; // неизвестные адреса не создаются
+    if (fs.existsSync(f)) { // файл досок испорчен — откладываем его в сторону (не затираем!), ученику пока пустая доска
+      const bad = f + '.bad-' + Date.now(); try { fs.renameSync(f, bad); } catch (er) {}
+      console.error('client-error ' + JSON.stringify({ m: 'server: файл досок ученика испорчен, отложен в ' + path.basename(bad) + ' — восстановить из /var/backups/board', p: '/b/' + id, u: 'server' }));
+    }
     s = { pages: [{ id: 'p1', title: 'Доска 1' }], strokes: {} };
   }
   s.images = s.images || {};
@@ -70,8 +81,22 @@ function imgsIn(s) { // для автокопии кабинета: ссылки
 }
 function save(r) {
   clearTimeout(r.timer); r.pend = true; r.last = Date.now();
-  r.timer = setTimeout(() => fs.writeFile(path.join(DIR, r.id + '.json'), JSON.stringify(r.s), () => { r.pend = false; }), 1000);
+  r.timer = setTimeout(() => { r.timer = null; writeRoom(r); }, 1000);
 }
+function writeRoom(r) { // во временный файл, потом подмена; запоздавшая старая запись новую не перетрёт
+  const n = r.wn = (r.wn || 0) + 1, f = path.join(DIR, r.id + '.json'), t = f + '.' + n + '.tmp';
+  fs.writeFile(t, JSON.stringify(r.s), e => {
+    if (e || n !== r.wn) { fs.unlink(t, () => {}); if (e && n === r.wn) { console.error('save ' + r.id + ': ' + e.message); save(r); } return; }
+    fs.rename(t, f, e2 => { if (e2) { console.error('save ' + r.id + ': ' + e2.message); save(r); } else if (n === r.wn && !r.timer) r.pend = false; });
+  });
+}
+// перезапуск (загрузка обновления, systemctl restart): сначала дописываем на диск все несохранённые доски, потом выходим
+function flushAll() {
+  for (const id in rooms) { const r = rooms[id]; if (!r.pend) continue;
+    clearTimeout(r.timer); r.timer = null; r.wn = (r.wn || 0) + 1;
+    try { writeAtomic(path.join(DIR, id + '.json'), JSON.stringify(r.s)); r.pend = false; } catch (e) { console.error('flush ' + id + ': ' + e.message); } }
+}
+['SIGTERM', 'SIGINT'].forEach(sg => process.on(sg, () => { try { flushAll(); } finally { process.exit(0); } }));
 // доски, которые 30 минут никто не держит открытыми (и всё уже записано на диск), убираем из памяти; при открытии загрузятся снова
 setInterval(() => {
   const now = Date.now();
@@ -231,8 +256,8 @@ async function iceServers() {
 // Остальные преподаватели регистрируются по одноразовой ссылке-приглашению от владельца.
 const TF = path.join(DIR, '_teachers.json');
 let T = { teachers: [], invites: [] };
-try { T = Object.assign(T, JSON.parse(fs.readFileSync(TF, 'utf8'))); } catch (e) {}
-const saveT = () => fs.writeFileSync(TF, JSON.stringify(T));
+T = Object.assign(T, loadJSON(TF, {}));
+const saveT = () => writeAtomic(TF, JSON.stringify(T));
 index.students.forEach(s => { if (!s.owner) s.owner = 'owner'; }); // ученики, созданные до аккаунтов, — владельца
 const SECRET = (() => {
   const f = path.join(DIR, '_secret');
@@ -1244,7 +1269,8 @@ function admin(req, res, u) {
         const st = (j.data.rooms || {})[s.id];
         if (!st || !Array.isArray(st.pages)) return;
         st.strokes = st.strokes || {}; st.images = st.images || {}; imgsOut(st);
-        fs.writeFileSync(path.join(DIR, s.id + '.json'), JSON.stringify(st));
+        if (rooms[s.id]) { clearTimeout(rooms[s.id].timer); rooms[s.id].timer = null; rooms[s.id].wn = (rooms[s.id].wn || 0) + 1; rooms[s.id].pend = false; } // старая несохранённая версия не должна перетереть восстановленную
+        writeAtomic(path.join(DIR, s.id + '.json'), JSON.stringify(st));
         if (rooms[s.id]) { rooms[s.id].s = st; bcast(rooms[s.id], { t: 'init', s: st, name: s.name }); }
       });
     } else { res.writeHead(400); return res.end(); }

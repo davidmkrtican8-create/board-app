@@ -1375,7 +1375,7 @@ cv.addEventListener('pointerdown',e=>{
  const panMode=e.button===1||space||t==='hand'||viewOnly||(e.pointerType==='touch'&&(fingerPan||(S.palm&&penSeen)));
  if(panMode){pan={id:e.pointerId,touch:e.pointerType==='touch',x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};cv.style.cursor='grabbing';return}
  curPid=e.pointerId;curPen=e.pointerType==='pen';curT0=performance.now();curX=e.clientX;curY=e.clientY;curTr=0; // рисует только это касание; другие (ладонь) линию не трогают
- const p=pos(e);lastP=p;
+ const p=pos(e);lastP=p;const wasEd=!!(editStroke||editImg); // касание рядом с картинкой/фигурой в правке — выход из правки
  if(t==='laser'){editStroke=null;editImg=null;cur={laser:1,cx:e.clientX,cy:e.clientY,t0:performance.now(),p0:p};laserFlush();laserNw=true;laserBuf.push(p[0],p[1]);laserPoint(p,null,true);return}
  if(e.altKey&&t!=='er'){const ia=imgAt(p[0],p[1]);if(ia){editImg=ia;redraw();return}} // Alt+клик по картинке — править её
  if(editStroke){ // сразу после создания фигуры/оси: можно перенести, клик в стороне — выход
@@ -1424,6 +1424,7 @@ cv.addEventListener('pointerdown',e=>{
     :t.startsWith('sh:')?{id:newId(),k:'shape',s:t.slice(3),pts:[p[0],p[1],p[0],p[1]],c:color,w:w}
     :t.startsWith('3d:')?{id:newId(),k:'solid',s:JSON.stringify({t:t.slice(3),y:-.6,p:.35,l:0}),pts:[p[0],p[1],p[0],p[1]],c:color,w:w}
               :{id:newId(),k:t,pts:[p[0],p[1],p[0],p[1]],c:color,w:w};
+ if(wasEd&&!editStroke&&!editImg)cur.exitTap=1; // если это просто касание (без линии) — оно только снимает выделение, точку не ставим
  if(cur.k==='pen'&&pfOk()&&canvasCurrent()){pf={key:pfKey(),n:0,vis:drawn.vis};drawOverlay();return} // касание пером: доска уже нарисована — не перерисовываем её целиком (при приближении это и «заедало»)
  redraw();
 });
@@ -1539,6 +1540,7 @@ function end(e){
  if(s.rsz){const sk=(strokes[page]||{})[s.rsz];if(sk)send({t:'stroke',page:page,stroke:clean(sk)});redraw();return}
  if(s.rot){const sk=(strokes[page]||{})[s.rot];if(sk)send({t:'strokeset',page:page,id:s.rot,pts:sk.pts,a:sk.a||0});setTimeout(()=>{$('st').textContent=peersTxt},1200);return}
  if(s.mv){const g=images[page][s.mv];send({t:'imgset',page:page,id:s.mv,x:r2(g.x),y:r2(g.y),w:r2(g.w),h:r2(g.h)});if(s.guides&&s.guides.length)redraw();return}
+ if(s.exitTap&&(s.k==='pen'||s.k==='hl'||s.k==='ers')&&curTr<6&&s.pts.length<=6){pf=null;clearLive();redraw();return} // касание только вышло из правки — без точки
  if(s.k==='hl'){ // почти прямая полоса (подчёркивание) — делаем ровной; почти горизонтальную — строго горизонтальной
   const p=pos(e),q=s.pts;if(!s.sb&&(p[0]!==q[q.length-2]||p[1]!==q[q.length-1]))q.push(p[0],p[1]); // у прямой с Shift конец уже выровнен
   let L=0;for(let i=2;i<q.length;i+=2)L+=Math.hypot(q[i]-q[i-2],q[i+1]-q[i-1]);
@@ -1776,8 +1778,10 @@ function edApply(pg,S){ // вернуть объекты к сохранённо
  for(const id in S.s){if(!ps[id])continue;const o=JSON.parse(S.s[id]);ps[id]=o;inval(o);send({t:'stroke',page:pg,stroke:clean(o)});n++}
  for(const id in S.i){const g=ims[id];if(!g)continue;Object.assign(g,JSON.parse(S.i[id]));send({t:'imgset',page:pg,id:id,x:g.x,y:g.y,w:g.w,h:g.h});n++}
  if(n&&inkC)inkC.key=null;return n>0}
+// отмена и возврат — только на открытой доске (раньше Ctrl+Z на «Доске 2» незаметно стирал последнее с «Доски 1»)
+function popPage(a){for(let i=a.length-1;i>=0;i--)if(a[i].page===page)return a.splice(i,1)[0];return null}
 function undo(){
- for(let m;(m=mine.pop());){ // если объект уже стёр кто-то другой — эту запись пропускаем и отменяем следующее действие, а не «молчим»
+ for(let m;(m=popPage(mine));){ // если объект уже стёр кто-то другой — эту запись пропускаем и отменяем следующее действие, а не «молчим»
   if(m.edit){if(edApply(m.page,m.edit.b)){redo.push({page:m.page,edit:{b:m.edit.a,a:m.edit.b}});redraw();return}continue}
   if(m.dels){m.dels.forEach(d=>restoreObj(m.page,d));redo.push({page:m.page,redels:m.dels});redraw();return} // вернуть стёртое ластиком
   if(m.del){restoreObj(m.page,m.del);redo.push({page:m.page,id:m.id,redel:m.del});redraw();return} // вернуть удалённое
@@ -1788,7 +1792,7 @@ function undo(){
   send({t:'erase',page:m.page,id:m.id});redraw();return}
 }
 function redoAct(){
- for(let r;(r=redo.pop());){
+ for(let r;(r=popPage(redo));){
   if(r.edit){if(edApply(r.page,r.edit.b)){mine.push({page:r.page,edit:{b:r.edit.a,a:r.edit.b}});redraw();return}continue}
   if(r.redels){const ids=r.redels.map(d=>d.id);ids.forEach(id=>{if(strokes[r.page])delete strokes[r.page][id];if(images[r.page])delete images[r.page][id]});send({t:'erase',page:r.page,ids:ids});mine.push({page:r.page,dels:r.redels});redraw();return}
   if(r.redel){if(strokes[r.page])delete strokes[r.page][r.id];if(images[r.page])delete images[r.page][r.id];send({t:'erase',page:r.page,id:r.id});mine.push({page:r.page,id:r.id,del:r.redel});redraw();return}
