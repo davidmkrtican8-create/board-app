@@ -236,6 +236,7 @@ body.focus #main{padding:4px;gap:4px}
   <div class="mi" data-click="fit"><span class="mic" data-i="arrows-horizontal"></span>По ширине<button id="fit" hidden>По ширине</button></div>
   <div class="mi" data-click="fs2"><span class="mic" data-i="layout-off"></span>Убрать лишние панели<button id="fs2" hidden title="Фокус: убрать панели">⛶</button></div>
   <div class="mi" data-click="snowb" id="snowmi" hidden><span class="mic" style="font-size:16px">❄️</span>Снегопад<button id="snowb" hidden></button><small id="snowst">выкл</small></div>
+  <div class="mi" data-click="garb" id="garmi" hidden><span class="mic" style="font-size:16px">🎄</span>Гирлянда<button id="garb" hidden></button><small id="garst">выкл</small></div>
   <div class="mi" data-click="gear"><span class="mic" data-i="settings"></span>Настройки<button id="gear" hidden title="Настройки">⚙</button></div>
   <hr class="tonly">
   <div class="mi red" data-fm="clr"><span class="mic" data-i="eraser-off"></span>Очистить доску…</div>
@@ -967,12 +968,12 @@ function onOp(o){
  reapplyQ();flushQ();
  const hp=(location.hash.match(/^#p=([\w-]+)$/)||[])[1];if(hp&&!initDone&&pages.some(p=>p.id===hp))page=hp;initDone=true; // ссылка на конкретную доску (из кабинета ученика)
  if(!page||!pages.some(p=>p.id===page))page=pages[0].id;openPage(page);return}
- if(o.t==='peers'){peersN=+o.n||0;if(snowOwner&&snowOn)setTimeout(()=>send({t:'snow',on:true}),400); // новый участник тоже видит снег
+ if(o.t==='peers'){peersN=+o.n||0;if(snowOwner&&(snowOn||garOn))setTimeout(()=>send({t:'snow',on:snowOn,gar:garOn}),400); // новый участник тоже видит снег
  $('st').textContent=peersTxt='Онлайн: '+o.n+(o.who&&o.who.length?' · '+o.who.join(', '):'');if(lead)sendView(true);return}
  if(o.t==='laser'){if(o.from!==me&&Array.isArray(o.pts)){const l=(lasers[o.from]=lasers[o.from]||{page:o.page,pts:[],sp:[]}),n0=performance.now();l.page=o.page;
   if(o.ping){laserPing([+o.pts[0],+o.pts[1]],o.from);return}
   const m=o.pts.length/2;for(let i=0;i+1<o.pts.length;i+=2)l.pts.push({x:+o.pts[i],y:+o.pts[i+1],t:n0+(i/2+1)/m*50,nw:i===0&&o.nw?1:0});laserLoop()}return} // пачку из 50 мс показываем постепенно — указка ученика и преподавателя движется плавно
- if(o.t==='snow'){if(o.from!==me)snowSet(!!o.on);return}
+ if(o.t==='snow'){if(o.from!==me)snowSet(!!o.on,!!o.gar);return}
  if(o.t==='away'){if(isTeacher&&o.from!==me)awayGot(o);return}
  if(o.t==='view'){if(o.from===me)return;if(o.stop){leaderView=null;detached=false}else{leaderView={page:o.page,x:+o.x,y:+o.y,w:+o.w,h:+o.h};applyLeader()}followUI();return}
  if(o.t==='cursor'){if(o.from!==me){const old=cursors[o.from],x=+o.x,y=+o.y,jump=!old||old.page!==o.page||Date.now()-old.t>1500; // новый или давно стоявший курсор ставим сразу, остальное — плавно доводим
@@ -1373,6 +1374,7 @@ cv.addEventListener('pointerdown',e=>{
  }
  if(!page)return;
  const t=tool();
+ {const dk=driftAt(pos(e));if(dk!==null&&t!=='hand'&&!space&&!viewOnly){cur={sweep:dk};curPid=e.pointerId;driftSweep(cur,pos(e));return}} // по сугробу — смахнуть снег
  { // двойное касание/щелчок по тексту любым инструментом — дописать или исправить его (раньше только инструментом «Т»)
   const nw=performance.now(),lt=lastTap;lastTap={t:nw,x:e.clientX,y:e.clientY};
   if(!viewOnly&&t!=='text'&&lt&&nw-lt.t<450&&Math.hypot(e.clientX-lt.x,e.clientY-lt.y)<16){const q=pos(e),tid=strokeAt(q[0],q[1],true,true);
@@ -1460,6 +1462,7 @@ cv.addEventListener('pointermove',e=>{
   cv.style.cursor=h2?(h2.type==='move'?'move':(h2.c==='nw'||h2.c==='se'?'nwse-resize':'nesw-resize')):(ins?'move':(S.ring&&ringTools.includes(tool())?'none':'crosshair'));
  }
  if(!cur)return;
+ if(cur.sweep!==undefined){driftSweep(cur,pos(e));return}
  if(cur.snapped){adjust(pos(e));return}
  const evs=(e.getCoalescedEvents&&e.getCoalescedEvents())||[];if(!evs.length)evs.push(e);
  if(cur.erasing){evs.forEach(v=>{const p=pos(v),l=cur.le; // кружок маленький — между точками мыши проверяем промежуток, чтобы не перескочить линию
@@ -1544,6 +1547,7 @@ function end(e){
   for(const id in s.os)if(ps[id])send({t:'strokeset',page:page,id:id,pts:ps[id].pts});
   for(const id in s.oi){const g=ims[id];if(g)send({t:'imgset',page:page,id:id,x:r2(g.x),y:r2(g.y),w:r2(g.w),h:r2(g.h)})}
   if(msel)mselBox();redraw();return}
+ if(s.sweep!==undefined)return;
  if(s.laser){laserFlush();if(performance.now()-s.t0<350&&Math.hypot(e.clientX-s.cx,e.clientY-s.cy)<8){laserPing(s.p0);send({t:'laser',page:page,pts:[r2(s.p0[0]),r2(s.p0[1])],ping:1})}return} // коротко ткнули — волна
  if(s.orbit){const sk=(strokes[page]||{})[s.orbit];if(sk)send({t:'stroke',page:page,stroke:clean(sk)});return}
  if(s.axres){const sk=(strokes[page]||{})[s.axres];if(sk)send({t:'stroke',page:page,stroke:clean(sk)});return}
@@ -1961,30 +1965,88 @@ function snowSprites(){if(snowSpr)return snowSpr;const q=2,mkC=n=>{const c=docum
   const st=()=>{g.beginPath();for(let k=0;k<(v?6:3);k++){const a=k*Math.PI/(v?3:3)+(v?0:Math.PI/6),ca=Math.cos(a),sa=Math.sin(a);g.moveTo(o-ca*L,o-sa*L);g.lineTo(o+ca*L,o+sa*L)}g.stroke()};
   g.lineCap='round';g.strokeStyle='rgba(80,125,205,.85)';g.lineWidth=2.8;st();g.strokeStyle='#fff';g.lineWidth=1;st();snowSpr.fl.push(c)}
  return snowSpr}
-function snowSet(on){
- snowOn=on;const c=$('snowc');c.hidden=!on;if($('snowst'))$('snowst').textContent=on?'вкл':'выкл';
- cancelAnimationFrame(snowRaf);snowRaf=0;snowF=[];if(!on)return;
- const g=c.getContext('2d'),SP=snowSprites();snowT=performance.now();let wind=0,windT=0;
- const mk=(top)=>{const z=Math.random(),cr=Math.random()<.55; // z — «глубина»: ближние крупнее и быстрее; падают медленно и покачиваются — как снег, а не дождь
-  return{x:Math.random(),y:top?Math.random():-.06,sz:cr?10+z*13:6+z*6,v:.012+z*.022,w:Math.random()*6.28,ws:.5+Math.random()*.9,sw:.008+Math.random()*.018,rot:Math.random()*6.28,rs:(Math.random()-.5)*1.2,a:.8+z*.2,spr:cr?SP.cr[Math.floor(Math.random()*3)]:SP.fl[Math.floor(Math.random()*2)]}};
- let nF=window.innerWidth<900?45:70,slow=0;for(let i=0;i<nF;i++)snowF.push(mk(true));
- // 30 кадров в секунду; если устройство не успевает — снежинок меньше, а на совсем слабом снег выключается только у него
- const tick=t=>{snowRaf=requestAnimationFrame(tick);if(document.hidden)return;
-  if(t-snowT<30)return;
-  const fr=t-snowT;if(fr>80){if(++slow>20){slow=0;snowF.length=Math.floor(snowF.length*.6);if(snowF.length<12){snowOff();return}}}else if(slow)slow--;
-  const dt=Math.min(.05,fr/1000);snowT=t;const W=c.clientWidth,H=c.clientHeight;if(!W||!H)return;
-  const q=Math.min(2,window.devicePixelRatio||1);if(c.width!==Math.round(W*q)||c.height!==Math.round(H*q)){c.width=Math.round(W*q);c.height=Math.round(H*q)}
-  g.setTransform(q,0,0,q,0,0);g.clearRect(0,0,W,H);
+// ---------- украшения: снег, сугробы на верхних краях листов, гирлянда. Один цикл рисования на 30 кадров в секунду ----------
+let garOn=false,snowWeak=false,drifts={},chunks=[],gar=null;
+const DBW=10,DNB=Math.ceil(PW/DBW),DMAX=60; // сугроб: столбики по 10 единиц листа, высота до 60 (поднимается над краем листа)
+const driftOf=(pg,k)=>{const d=(drifts[pg]=drifts[pg]||{});return d[k]||(d[k]=new Float32Array(DNB))};
+function decoSync(){ // включить/выключить цикл по состоянию снега и гирлянды
+ const c=$('snowc'),on=(snowOn&&!snowWeak)||garOn||chunks.length>0;c.hidden=!on;
+ if($('snowst'))$('snowst').textContent=snowOn?'вкл':'выкл';if($('garst'))$('garst').textContent=garOn?'вкл':'выкл';
+ if(!on){cancelAnimationFrame(snowRaf);snowRaf=0;return}if(!snowRaf){snowT=performance.now();snowRaf=requestAnimationFrame(decoTick)}}
+function snowSet(on,gOn){
+ if(gOn!==undefined)garOn=!!gOn;
+ if(on!==snowOn){snowOn=on;snowF=[];snowWeak=false;if(!on){drifts={}}}
+ if(snowOn&&!snowF.length){const n=window.innerWidth<900?45:70;for(let i=0;i<n;i++)snowF.push(snowMk(true))}
+ decoSync();
+}
+const snowMk=top=>{const SP=snowSprites(),z=Math.random(),cr=Math.random()<.55; // z — «глубина»: ближние крупнее и быстрее; падают медленно и покачиваются — как снег, а не дождь
+ return{x:Math.random(),y:top?Math.random():-.06,sz:cr?10+z*13:6+z*6,v:.012+z*.022,w:Math.random()*6.28,ws:.5+Math.random()*.9,sw:.008+Math.random()*.018,rot:Math.random()*6.28,rs:(Math.random()-.5)*1.2,a:.8+z*.2,spr:cr?SP.cr[Math.floor(Math.random()*3)]:SP.fl[Math.floor(Math.random()*2)],by:null}};
+let wind=0,windT=0,slow=0;
+function decoTick(t){
+ snowRaf=requestAnimationFrame(decoTick);if(document.hidden)return;
+ if(t-snowT<30)return;const c=$('snowc'),g=c.getContext('2d');
+ const fr=t-snowT;if(snowOn&&!snowWeak){if(fr>80){if(++slow>20){slow=0;snowF.length=Math.floor(snowF.length*.6);if(snowF.length<12){snowWeak=true;snowF=[];$('st').textContent='Снег выключен у вас: устройство не успевает его рисовать'}}}else if(slow)slow--}
+ const dt=Math.min(.05,fr/1000);snowT=t;const W=c.clientWidth,H=c.clientHeight;if(!W||!H)return;
+ const q=Math.min(2,window.devicePixelRatio||1);if(c.width!==Math.round(W*q)||c.height!==Math.round(H*q)){c.width=Math.round(W*q);c.height=Math.round(H*q)}
+ g.setTransform(q,0,0,q,0,0);g.clearRect(0,0,W,H);
+ const s=view.s,SX=X=>(X-view.x)*s,SY=Y=>(Y-view.y)*s;
+ if(snowOn&&!snowWeak&&page){
   windT+=dt;wind=Math.sin(windT*.25)*.006; // лёгкий ветер то влево, то вправо
   for(const f of snowF){f.y+=f.v*dt*(H>0?600/H:1);f.w+=f.ws*dt;f.rot+=f.rs*dt;f.x+=wind*dt;if(f.x<-.05)f.x+=1.1;else if(f.x>1.05)f.x-=1.1;
-   if(f.y>1.06){Object.assign(f,mk(false));continue}
-   const x=(f.x+Math.sin(f.w)*f.sw)*W,y=f.y*H,h=f.sz/2;g.globalAlpha=f.a;
-   g.save();g.translate(x,y);g.rotate(f.rot);g.drawImage(f.spr,-h,-h,f.sz,f.sz);g.restore()}
+   if(f.y>1.06){Object.assign(f,snowMk(false));continue}
+   const x=(f.x+Math.sin(f.w)*f.sw)*W,y=f.y*H,h=f.sz/2;
+   // снежинка долетела до верхнего края листа — ложится в сугроб (примерно каждая вторая, остальные летят дальше «за листом»)
+   const BX=view.x+x/s,BY=view.y+(y+h*.6)/s,k=Math.floor(BY/PS),edge=k*PS;
+   if(f.by!=null&&f.by<edge&&BY>=edge&&BX>2&&BX<PW-2&&f.land){const d=driftOf(page,k),i0=Math.floor(BX/DBW),amt=f.sz*.6;
+    for(let j=-3;j<=3;j++){const i=i0+j;if(i>=0&&i<DNB)d[i]=Math.min(DMAX,d[i]+amt*Math.exp(-j*j/4))}
+    Object.assign(f,snowMk(false));continue}
+   f.by=BY;if(f.land===undefined)f.land=Math.random()<.55;
+   g.globalAlpha=f.a;g.save();g.translate(x,y);g.rotate(f.rot);g.drawImage(f.spr,-h,-h,f.sz,f.sz);g.restore()}
   g.globalAlpha=1;
- };snowRaf=requestAnimationFrame(tick);
+  // сугробы на видимых верхних краях листов
+  const dp=drifts[page]||{};
+  for(const k in dp){const Y=k*PS,sy=SY(Y);if(sy<-40||sy>H+10)continue;const d=dp[k];let mx=0;for(let i=0;i<DNB;i++)mx=Math.max(mx,d[i]);if(mx<.5)continue;
+   if(Math.random()<.3)for(let i=1;i<DNB-1;i++)d[i]+=(d[i-1]+d[i+1]-2*d[i])*.04; // снег чуть оседает и выравнивается
+   g.beginPath();g.moveTo(SX(0)-2,sy+1);
+   for(let i=0;i<DNB;i++){const x0=SX(i*DBW+DBW/2),y0=sy-d[i]*s;if(i===0)g.lineTo(SX(0),sy-d[0]*s*.6);const xn=SX((i+1)*DBW+DBW/2),yn=sy-(i+1<DNB?d[i+1]:d[i]*.6)*s;g.quadraticCurveTo(x0,y0,(x0+xn)/2,(y0+yn)/2)}
+   g.lineTo(SX(PW)+2,sy+1);g.closePath();
+   const gr=g.createLinearGradient(0,sy-DMAX*s,0,sy);gr.addColorStop(0,'#ffffff');gr.addColorStop(1,'#e4ecf8');g.fillStyle=gr;g.fill();
+   g.strokeStyle='rgba(120,155,210,.85)';g.lineWidth=1.2;g.stroke()}
+ }
+ // комья снега, сметённые с сугроба, — падают вниз
+ for(let i=chunks.length-1;i>=0;i--){const m=chunks[i];m.vy+=900*dt;m.x+=m.vx*dt;m.y+=m.vy*dt;m.life-=dt;if(m.life<=0){chunks.splice(i,1);continue}
+  g.globalAlpha=Math.min(1,m.life*1.5);g.fillStyle='#fff';g.strokeStyle='rgba(120,155,210,.8)';g.lineWidth=1;g.beginPath();g.arc(SX(m.x),SY(m.y),m.r*s,0,6.2832);g.fill();g.stroke()}
+ g.globalAlpha=1;
+ if(garOn)drawGarland(g,W,t);
+ if(!snowOn&&!garOn&&!chunks.length)decoSync();
 }
-function snowOff(){cancelAnimationFrame(snowRaf);snowRaf=0;snowF=[];const c=$('snowc');c.getContext('2d').clearRect(0,0,c.width,c.height);c.hidden=true;$('st').textContent='Снег выключен: устройство не успевает его рисовать'}
-if(snowOwner){$('snowmi').hidden=false;$('snowb').onclick=()=>{snowSet(!snowOn);send({t:'snow',on:snowOn})}} // кнопка — в меню «⋯» (Ещё)
+// смахнуть сугроб: провести пером, мышью или пальцем по снегу над листом — снег комьями падает вниз
+function driftAt(p){if(!snowOn||!page||p[0]<0||p[0]>PW)return null;const k=Math.round(p[1]/PS),Y=k*PS,dp=drifts[page]||{},d=dp[k];if(!d)return null;
+ const i=Math.floor(p[0]/DBW);let h=0;for(let j=i-4;j<=i+4;j++)if(j>=0&&j<DNB)h=Math.max(h,d[j]);if(h<2)return null;
+ return p[1]>=Y-h-14&&p[1]<=Y+8?k:null}
+function driftSweep(c,p){const k=c.sweep,d=driftOf(page,k),Y=k*PS,dx=p[0]-(c.lx??p[0]);c.lx=p[0];
+ const a=Math.floor((Math.min(p[0],p[0]-dx))/DBW)-3,b=Math.floor((Math.max(p[0],p[0]-dx))/DBW)+3; // вся полоса от прошлой точки до этой — быстрый взмах не оставляет «островков»
+ for(let i=Math.max(0,a);i<=Math.min(DNB-1,b);i++){if(d[i]<.3)continue;const h=d[i];d[i]=0;
+  for(let n=0;n<Math.ceil(h/5);n++)chunks.push({x:i*DBW+Math.random()*DBW,y:Y-Math.random()*h,r:2+Math.random()*3.5,vx:dx*8+(Math.random()-.5)*60,vy:-60-Math.random()*90,life:1.4+Math.random()*.6})}
+ if(chunks.length>400)chunks.splice(0,chunks.length-400);decoSync()}
+// гирлянда вдоль верхнего края доски: провод провисает дугами, лампочки мигают волной
+function drawGarland(g,W,t){
+ if(!gar||gar.W!==W){const sp=150,n=Math.max(1,Math.round(W/sp)),seg=W/n,B=[];const cols=['#ff3b3b','#ffd23b','#3bdc6b','#3ba7ff','#c86bff','#ff8a3b'];
+  for(let x=14,i=0;x<W-6;x+=30,i++){const f=(x%seg)/seg;B.push({x,y:5+20*Math.sin(Math.PI*f),c:cols[i%cols.length],ph:i*.7,a:Math.atan2(20*Math.PI/seg*Math.cos(Math.PI*f),1)})}
+  const glow={};for(const col of cols){const cc=document.createElement('canvas');cc.width=cc.height=48;const x=cc.getContext('2d'),r=x.createRadialGradient(24,24,0,24,24,24);r.addColorStop(0,col);r.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=r;x.fillRect(0,0,48,48);glow[col]=cc}
+  gar={W,n,seg,B,glow}}
+ g.strokeStyle='#2f4a2f';g.lineWidth=1.6;g.beginPath();
+ for(let k=0;k<gar.n;k++){const x0=k*gar.seg;g.moveTo(x0,5);g.quadraticCurveTo(x0+gar.seg/2,45,x0+gar.seg,5)}g.stroke();
+ const T=t/1000;
+ for(const b of gar.B){const on=.35+.65*Math.max(0,Math.sin(T*2.2-b.ph));
+  g.globalAlpha=on*.85;g.drawImage(gar.glow[b.c],b.x-16,b.y+4-16+6,32,32);g.globalAlpha=1;
+  g.save();g.translate(b.x,b.y);g.rotate(b.a*.6);g.fillStyle='#556';g.fillRect(-2.5,0,5,4);
+  g.fillStyle=b.c;g.globalAlpha=.45+.55*on;g.beginPath();g.ellipse(0,10,4.2,6.5,0,0,6.2832);g.fill();
+  g.globalAlpha=.7*on;g.fillStyle='#fff';g.beginPath();g.ellipse(-1.3,8,1.2,2.2,0,0,6.2832);g.fill();g.restore();g.globalAlpha=1}
+}
+if(snowOwner){$('snowmi').hidden=false;$('garmi').hidden=false; // кнопки — в меню «⋯» (Ещё); видят все на доске
+ $('snowb').onclick=()=>{snowSet(!snowOn);send({t:'snow',on:snowOn,gar:garOn})};
+ $('garb').onclick=()=>{snowSet(snowOn,!garOn);send({t:'snow',on:snowOn,gar:garOn})}}
 // ---------- «отвлёкся»: ученик ушёл с доски на другую вкладку или в другое приложение — у репетитора плашка ----------
 let peersN=0;
 function note(text,cls,ms,key){ // плашка сверху по центру доски; key — одна плашка на человека
