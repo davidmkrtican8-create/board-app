@@ -871,7 +871,7 @@ function drawOverlay(){
    c.fillStyle='#fff';c.textAlign='left';c.textBaseline='middle';c.fillText(o.label,sx+18,sy+23);
   }
  }
- if(ptr&&S.ring&&!viewOnly&&ringTools.includes(tool())&&!space){
+ if(ptr&&S.ring&&!viewOnly&&ringTools.includes(tool())&&!space&&cv.style.cursor==='none'){ // кружок пера — только там, где нет обычного курсора (над картинкой в правке — стрелки «перенести», кружок поверх них путал)
   const t=tool(),er=t==='er',r=er?erR()*view.s:t==='ers'?Math.max(3,ersW()*view.s/2):t==='hl'?Math.max(3,hlW()*view.s/2):Math.max(3,penW()*view.s/2);
   c.lineWidth=2;c.strokeStyle='rgba(255,255,255,.95)';c.beginPath();c.arc(ptr.x,ptr.y,r+1,0,6.2832);c.stroke();
   c.lineWidth=1;c.strokeStyle='rgba(0,0,0,.8)';if(er)c.setLineDash([4,3]);c.beginPath();c.arc(ptr.x,ptr.y,r,0,6.2832);c.stroke();c.setLineDash([]);
@@ -1444,6 +1444,7 @@ cv.addEventListener('pointermove',e=>{
   const rq=sk&&rszAt(sk,q);
   if(sk)cv.style.cursor=rq?(rq==='nw'||rq==='se'?'nwse-resize':'nesw-resize'):axc?'nwse-resize':onRotHandle(sk,q)?'grab':inBox(strokeBox(sk),q[0],q[1])?'move':(S.ring&&ringTools.includes(tool())?'none':'crosshair');
  }
+ if(!cur&&!pan&&!msel&&!editImg&&!editStroke&&e.pointerType!=='touch'&&/move|resize|^grab$/.test(cv.style.cursor))setCursor(); // вышли из правки картинки/фигуры — курсор «перенести» больше не нужен (раньше оставался со стрелками)
  if(!cur&&msel&&!editImg&&!editStroke&&e.pointerType!=='touch'&&!space){const gc=gszAt(pos(e));if(gc){cv.style.cursor=gc==='nw'||gc==='se'?'nwse-resize':'nesw-resize'}else if(tool()==='mv')cv.style.cursor=inBox(msel.box,...pos(e))?'move':'default'}
  if(!cur&&editImg&&e.pointerType!=='touch'&&!space){
   const q=pos(e),h2=handleAt(q[0],q[1]),g=(images[page]||{})[editImg],ins=g&&inBox([g.x,g.y,g.x+g.w,g.y+g.h],q[0],q[1]);
