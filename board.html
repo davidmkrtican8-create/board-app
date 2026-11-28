@@ -1445,7 +1445,7 @@ cv.addEventListener('pointerdown',e=>{
 });
 cv.addEventListener('pointermove',e=>{
  lastAct=Date.now();
- if(e.pointerType!=='touch'){const r=rectO||(rectO=rg.getBoundingClientRect());ptr={x:e.clientX-r.left,y:e.clientY-r.top};if(!cur||cur.erasing||cur.k==='pen'||cur.k==='ers'||cur.k==='hl')ovRq();sendCursor(e)} // кружок-курсор — раз за кадр, а не на каждую из сотен точек пера
+ if(e.pointerType!=='touch'){const r=rectO||(rectO=rg.getBoundingClientRect());ptr={x:e.clientX-r.left,y:e.clientY-r.top};if(!cur||cur.erasing||cur.sweep!==undefined||cur.k==='pen'||cur.k==='ers'||cur.k==='hl')ovRq();sendCursor(e)} // кружок-курсор — раз за кадр, а не на каждую из сотен точек пера
  if(e.pointerType==='touch'&&cur&&curPen)return; // пишет стилус — движения ладони ничего не двигают
  if(e.pointerType==='touch'&&ptrs.has(e.pointerId)){
   ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
