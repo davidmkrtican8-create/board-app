@@ -1948,25 +1948,39 @@ async function buildPDF(all,only){ // only — одна доска по id, бе
 // ---------- снегопад: включает только владелец сайта (кнопка «❄️ Снегопад» в меню «Ещё»), видят все на доске; рисовать не мешает ----------
 const snowOwner=isTeacher; // включает любой репетитор (меню «Ещё» и настройки), видят все на доске
 let snowOn=false,snowRaf=0,snowF=[],snowT=0;
+// снежинки рисуются один раз в маленькие картинки, дальше только переносятся — дёшево даже на слабом устройстве
+let snowSpr=null;
+function snowSprites(){if(snowSpr)return snowSpr;const q=2,mkC=n=>{const c=document.createElement('canvas');c.width=c.height=n*q;const g=c.getContext('2d');g.scale(q,q);return [c,g]};snowSpr={cr:[],fl:[]};
+ for(let v=0;v<3;v++){const N=36,[c,g]=mkC(N),o=N/2,L=15; // кристаллы: 6 лучей с веточками, белые с голубым контуром — видно и на белом листе
+  const arms=()=>{g.beginPath();for(let k=0;k<6;k++){const a=k*Math.PI/3,ca=Math.cos(a),sa=Math.sin(a);g.moveTo(o,o);g.lineTo(o+ca*L,o+sa*L);
+    const br=v===0?[.45,.7]:v===1?[.35,.6,.8]:[.55];for(const m of br){const bx=o+ca*L*m,by=o+sa*L*m,bl=L*(v===2?.42:.28)*(1.1-m*.5);
+     for(const d of [.6,-.6]){g.moveTo(bx,by);g.lineTo(bx+Math.cos(a+d)*bl,by+Math.sin(a+d)*bl)}}}g.stroke()};
+  g.lineCap='round';g.strokeStyle='rgba(80,125,205,.9)';g.lineWidth=3.4;arms();g.strokeStyle='#fff';g.lineWidth=1.3;arms();
+  g.fillStyle='rgba(80,125,205,.9)';g.beginPath();g.arc(o,o,3,0,6.2832);g.fill();g.fillStyle='#fff';g.beginPath();g.arc(o,o,1.8,0,6.2832);g.fill();snowSpr.cr.push(c)}
+ for(let v=0;v<2;v++){const N=20,[c,g]=mkC(N),o=N/2,L=v?8:7; // мелкие — простые звёздочки из 6 лучей (круглые точки были похожи на капли и пузырьки)
+  const st=()=>{g.beginPath();for(let k=0;k<(v?6:3);k++){const a=k*Math.PI/(v?3:3)+(v?0:Math.PI/6),ca=Math.cos(a),sa=Math.sin(a);g.moveTo(o-ca*L,o-sa*L);g.lineTo(o+ca*L,o+sa*L)}g.stroke()};
+  g.lineCap='round';g.strokeStyle='rgba(80,125,205,.85)';g.lineWidth=2.8;st();g.strokeStyle='#fff';g.lineWidth=1;st();snowSpr.fl.push(c)}
+ return snowSpr}
 function snowSet(on){
  snowOn=on;const c=$('snowc');c.hidden=!on;if($('snowst'))$('snowst').textContent=on?'вкл':'выкл';
  cancelAnimationFrame(snowRaf);snowRaf=0;snowF=[];if(!on)return;
- const g=c.getContext('2d');snowT=performance.now();
- const mk=(top)=>{const z=Math.random();return{x:Math.random(),y:top?Math.random():-.05,r:1.2+z*3.2,v:.018+z*.05,w:Math.random()*6.28,ws:.4+Math.random()*1.2,a:.55+z*.4,f:z>.82}}; // z — «глубина»: ближние снежинки крупнее и быстрее
- let nF=window.innerWidth<900?40:60,slow=0;for(let i=0;i<nF;i++)snowF.push(mk(true));
- // снег не должен мешать писать: 30 кадров в секунду, пока пишут или двигают доску — замирает; если устройство не успевает — снежинок меньше, а совсем слабое — снег выключается у себя
+ const g=c.getContext('2d'),SP=snowSprites();snowT=performance.now();let wind=0,windT=0;
+ const mk=(top)=>{const z=Math.random(),cr=Math.random()<.55; // z — «глубина»: ближние крупнее и быстрее; падают медленно и покачиваются — как снег, а не дождь
+  return{x:Math.random(),y:top?Math.random():-.06,sz:cr?10+z*13:6+z*6,v:.012+z*.022,w:Math.random()*6.28,ws:.5+Math.random()*.9,sw:.008+Math.random()*.018,rot:Math.random()*6.28,rs:(Math.random()-.5)*1.2,a:.8+z*.2,spr:cr?SP.cr[Math.floor(Math.random()*3)]:SP.fl[Math.floor(Math.random()*2)]}};
+ let nF=window.innerWidth<900?45:70,slow=0;for(let i=0;i<nF;i++)snowF.push(mk(true));
+ // 30 кадров в секунду; если устройство не успевает — снежинок меньше, а на совсем слабом снег выключается только у него
  const tick=t=>{snowRaf=requestAnimationFrame(tick);if(document.hidden)return;
-  if(t-snowT<30)return;if(cur||moving()){snowT=t;return}
+  if(t-snowT<30)return;
   const fr=t-snowT;if(fr>80){if(++slow>20){slow=0;snowF.length=Math.floor(snowF.length*.6);if(snowF.length<12){snowOff();return}}}else if(slow)slow--;
   const dt=Math.min(.05,fr/1000);snowT=t;const W=c.clientWidth,H=c.clientHeight;if(!W||!H)return;
-  if(c.width!==W||c.height!==H){c.width=W;c.height=H}
-  g.clearRect(0,0,W,H);
-  for(const f of snowF){f.y+=f.v*dt*(H>0?600/H:1);f.w+=f.ws*dt;const x=(f.x+Math.sin(f.w)*.012)*W,y=f.y*H;
-   if(f.y>1.05){Object.assign(f,mk(false))}
-   if(f.f){g.save();g.translate(x,y);g.rotate(f.w*.3);g.strokeStyle='rgba(120,160,220,'+f.a+')';g.lineWidth=1.2;g.beginPath(); // крупные — шестиконечные снежинки
-    for(let k=0;k<6;k++){const a=k*Math.PI/3,L=f.r*2.2;g.moveTo(0,0);g.lineTo(Math.cos(a)*L,Math.sin(a)*L);const m=L*.55;g.moveTo(Math.cos(a)*m,Math.sin(a)*m);g.lineTo(Math.cos(a+.5)*m*1.35,Math.sin(a+.5)*m*1.35);g.moveTo(Math.cos(a)*m,Math.sin(a)*m);g.lineTo(Math.cos(a-.5)*m*1.35,Math.sin(a-.5)*m*1.35)}
-    g.stroke();g.restore()}
-   else{g.fillStyle='rgba(150,185,235,'+f.a+')';g.beginPath();g.arc(x,y,f.r,0,6.2832);g.fill();g.fillStyle='rgba(255,255,255,'+f.a+')';g.beginPath();g.arc(x-f.r*.25,y-f.r*.25,f.r*.5,0,6.2832);g.fill()}} // голубоватые — видно и на белом листе
+  const q=Math.min(2,window.devicePixelRatio||1);if(c.width!==Math.round(W*q)||c.height!==Math.round(H*q)){c.width=Math.round(W*q);c.height=Math.round(H*q)}
+  g.setTransform(q,0,0,q,0,0);g.clearRect(0,0,W,H);
+  windT+=dt;wind=Math.sin(windT*.25)*.006; // лёгкий ветер то влево, то вправо
+  for(const f of snowF){f.y+=f.v*dt*(H>0?600/H:1);f.w+=f.ws*dt;f.rot+=f.rs*dt;f.x+=wind*dt;if(f.x<-.05)f.x+=1.1;else if(f.x>1.05)f.x-=1.1;
+   if(f.y>1.06){Object.assign(f,mk(false));continue}
+   const x=(f.x+Math.sin(f.w)*f.sw)*W,y=f.y*H,h=f.sz/2;g.globalAlpha=f.a;
+   g.save();g.translate(x,y);g.rotate(f.rot);g.drawImage(f.spr,-h,-h,f.sz,f.sz);g.restore()}
+  g.globalAlpha=1;
  };snowRaf=requestAnimationFrame(tick);
 }
 function snowOff(){cancelAnimationFrame(snowRaf);snowRaf=0;snowF=[];const c=$('snowc');c.getContext('2d').clearRect(0,0,c.width,c.height);c.hidden=true;$('st').textContent='Снег выключен: устройство не успевает его рисовать'}
