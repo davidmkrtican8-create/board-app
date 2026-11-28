@@ -541,6 +541,10 @@ const inval=s=>{s._my=undefined;s._tb=undefined;s._bb=undefined;s._sm=undefined}
 let rqFull=false;
 function rd(lo){if(lo!==true)rqFull=true;if(rq)return;rq=requestAnimationFrame(()=>{rq=0;const f=rqFull;rqFull=false;redraw(!f)})} // не чаще одного раза за кадр; rd(true) — только черновик чужой линии
 const objBox=s=>s.k==='text'?textBox(s):axesBox(s);
+function tcInk(e,col){ // окружность для №13 одноцветная на прозрачном фоне — перекрашиваем под тему (в тёмной — светлые линии); в PDF и буфер — всегда тёмная
+ col=col||(dark?'#f1eef8':'#1a1a1a');if(e._tc&&e._tc.col===col)return e._tc.c;
+ const c=document.createElement('canvas');c.width=e.naturalWidth;c.height=e.naturalHeight;const g=c.getContext('2d');g.drawImage(e,0,0);g.globalCompositeOperation='source-in';g.fillStyle=col;g.fillRect(0,0,c.width,c.height);
+ e._tc={col,c};return c}
 function getImg(id,src){
  if(!imgEl[id]||imgEl[id].s!==src){const e=new Image();e.onload=redraw;e.src=src;imgEl[id]={e:e,s:src}}
  return imgEl[id].e;
@@ -799,7 +803,7 @@ function redraw(lo){ // lo===true — изменились только черн
   ctx.strokeStyle=dark?'#3a3450':'#cfc8e0';ctx.lineWidth=1/s;ctx.strokeRect(0,y0,PW,PH);sheetNum(y0,s)});
  ctx.save();ctx.beginPath();vis.forEach(y0=>ctx.rect(0,y0,PW,PH));ctx.clip(); // чернила видны только на листах
  const ims=images[page]||{};
- for(const id in ims){const g=ims[id],e=getImg(id,g.src);if(e.complete&&e.naturalWidth)ctx.drawImage(e,g.x,g.y,g.w,g.h)}
+ for(const id in ims){const g=ims[id],e=getImg(id,g.src);if(e.complete&&e.naturalWidth)ctx.drawImage(/^tc/.test(id)?tcInk(e):e,g.x,g.y,g.w,g.h)} // окружность №13 — цветом чернил темы
  const ps=strokes[page]||{},vx0=view.x-60,vx1=view.x+cw/s+60,vy0=ya-60,vy1=yb+60;
  const L=inkLayer(cv.width,cv.height,[dpr*s,0,0,dpr*s,-view.x*s*dpr,ty],()=>{ // чернила на отдельном слое: ластик стирает только их
   // пока рисуем линию, уже готовые записи не перерисовываем каждый кадр, а берём их готовой картинкой (iPad не «заедает» на заполненной доске)
@@ -1779,7 +1783,7 @@ function copySel(){
   await Promise.all(imgs.map(id=>{const e=getImg(id,ims[id].src);return e.complete?1:new Promise(r=>{e.addEventListener('load',r,{once:true});e.addEventListener('error',r,{once:true})})}));
   const c=document.createElement('canvas');c.width=W;c.height=H;const keepCtx=ctx,keepDark=dark;
   try{dark=false;ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.setTransform(sc,0,0,sc,-bx*sc,-by*sc);
-   for(const id of imgs){const g=ims[id],e=getImg(id,g.src);if(e.complete&&e.naturalWidth)ctx.drawImage(e,g.x,g.y,g.w,g.h)}
+   for(const id of imgs){const g=ims[id],e=getImg(id,g.src);if(e.complete&&e.naturalWidth)ctx.drawImage(/^tc/.test(id)?tcInk(e,'#1a1a1a'):e,g.x,g.y,g.w,g.h)}
    const L=inkLayer(W,H,[sc,0,0,sc,-bx*sc,-by*sc],()=>{for(const id of ids)drawStroke(ps[id])});
    ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(L,0,0);
   }finally{ctx=keepCtx;dark=keepDark}
@@ -1934,7 +1938,7 @@ async function buildPDF(all,only){ // only — одна доска по id, бе
     ctx.fillStyle='#fff';ctx.fillRect(0,y0,PW,PH);
     sheetGrid(y0,sc,{xa:0,xb:PW,ya:y0,yb:y0+PH});sheetNum(y0,sc,true);
     ctx.save();ctx.beginPath();ctx.rect(0,y0,PW,PH);ctx.clip();
-    for(const id in im){const g=im[id],e=getImg(id,g.src);if(e.complete&&e.naturalWidth)ctx.drawImage(e,g.x,g.y,g.w,g.h)}
+    for(const id in im){const g=im[id],e=getImg(id,g.src);if(e.complete&&e.naturalWidth)ctx.drawImage(/^tc/.test(id)?tcInk(e,'#1a1a1a'):e,g.x,g.y,g.w,g.h)}
     const L=inkLayer(1240,1754,[sc,0,0,sc,0,-y0*sc],()=>{for(const id in sk)drawStroke(sk[id])});
     ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(L,0,0);
     ctx.restore();
@@ -2751,7 +2755,7 @@ function trigCanvas(tan,bare){ // bare — без подписей углов и
 function insertTrig4(){
  if(viewOnly||imgFull()||!page)return;
  const C=24,HALF=6*C,K=5,N=2*HALF*K,c=document.createElement('canvas');c.width=c.height=N; // 12×12 клеток, 5 точек на единицу листа — чётко и при приближении
- const g=c.getContext('2d'),O=N/2,R=4*C*K,E=5.4*C*K,ink=dark?'#f1eef8':'#1a1a1a';g.lineCap='round';
+ const g=c.getContext('2d'),O=N/2,R=4*C*K,E=5.4*C*K,ink='#1a1a1a'; // всегда тёмная: на доске её перекрашивает tcInk под тему, в PDF — как естьg.lineCap='round';
  const arrow=(x1,y1,x2,y2)=>{g.strokeStyle=ink;g.lineWidth=1.4*K;g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke();const a=Math.atan2(y2-y1,x2-x1),L=7*K;
   g.fillStyle=ink;g.beginPath();g.moveTo(x2,y2);g.lineTo(x2-L*Math.cos(a-.38),y2-L*Math.sin(a-.38));g.lineTo(x2-L*Math.cos(a+.38),y2-L*Math.sin(a+.38));g.fill()};
  arrow(O-E,O,O+E,O);arrow(O,O+E,O,O-E);
